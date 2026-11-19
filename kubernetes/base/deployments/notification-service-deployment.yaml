@@ -25,7 +25,7 @@ spec:
       serviceAccountName: banking-app-sa
       initContainers:
       - name: wait-for-kafka
-        image: busybox
+        image: busybox:1.38.0
         command: ['sh', '-c', 'echo "[notification-service] Waiting for Kafka..."; until nc -z banking-kafka 9092; do sleep 1; done; echo "[notification-service] Kafka ready!"']
       containers:
       - name: notification-service

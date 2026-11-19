@@ -70,9 +70,9 @@ spec:
       containers:
       - name: reroll
         # bitnami/kubectl:1.30 doesn't exist on Docker Hub (Broadcom pulled the
-        # Bitnami catalog). alpine/k8s:1.34.0 matches the staging-decoy server
+        # Bitnami catalog). alpine/k8s:1.37.2 matches the staging-decoy server
         # version (v1.34.8) and ships kubectl + bash.
-        image: alpine/k8s:1.34.0
+        image: alpine/k8s:1.37.2
         command: ["/bin/bash", "-c"]
         args:
         - |

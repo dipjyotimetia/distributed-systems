@@ -4,53 +4,57 @@ metadata:
   name: promtail-config
   namespace: observability
 data:
-  promtail.yaml: |
-    server:
-      http_listen_port: 3101
-      grpc_listen_port: 0
+  config.alloy: |
+    loki.process "banking_app" {
+      forward_to = [loki.write.default.receiver]
 
-    positions:
-      filename: /tmp/positions.yaml
+      stage.cri { }
 
-    clients:
-      - url: http://loki:3100/loki/api/v1/push
+      stage.regex {
+        expression = "/var/log/pods/[^_]+_(?P<pod>.+)_[^_/]+/(?P<container>[^/]+)/[^/]+\\.log"
+        source     = "filename"
+      }
 
-    scrape_configs:
-      # Kubernetes pod service-discovery returns zero targets on this cluster
-      # (RBAC + config are correct, but promtail 2.9.8's k8s SD silently
-      # discovers nothing here). Tail the CRI pod logs straight off the mounted
-      # /var/log/pods hostPath instead — deterministic and SD-free. promtail
-      # runs as root and the path is mounted, so the files are readable.
-      - job_name: banking-app
-        static_configs:
-          - targets: [localhost]
-            labels:
-              namespace: banking-app
-              __path__: /var/log/pods/banking-app_*/*/*.log
-        pipeline_stages:
-          - cri: {}
-          # Derive pod/container from the log file path
-          # (/var/log/pods/<ns>_<pod>_<uid>/<container>/<n>.log)
-          - regex:
-              source: filename
-              expression: '/var/log/pods/[^_]+_(?P<pod>.+)_[^_/]+/(?P<container>[^/]+)/[^/]+\.log'
-          - labels:
-              pod:
-              container:
-          # Keep the panel focused on application containers: drop the sim load
-          # generator and the injected init/sidecar containers.
-          - drop:
-              source: container
-              expression: 'simulation-client|speedscale-.*|wait-for-.*|istio-.*'
-          # Drop high-volume DEBUG/TRACE lines (the Spring Cloud Gateway alone
-          # emits multi-MB of reactor DEBUG noise) — it OOM-kills the small Loki
-          # and the errors panel only surfaces WARN/ERROR/fatal anyway.
-          - match:
-              selector: '{namespace="banking-app"}'
-              stages:
-                - drop:
-                    expression: '(?i)\s(DEBUG|TRACE)\s'
-                    drop_counter_reason: debug_trace_volume
+      stage.labels {
+        values = {
+          container = null,
+          pod       = null,
+        }
+      }
+
+      stage.drop {
+        source     = "container"
+        expression = "simulation-client|speedscale-.*|wait-for-.*|istio-.*"
+      }
+
+      stage.match {
+        selector = "{namespace=\"banking-app\"}"
+
+        stage.drop {
+          drop_counter_reason = "debug_trace_volume"
+          expression          = "(?i)\\s(DEBUG|TRACE)\\s"
+        }
+      }
+    }
+
+    loki.source.file "banking_app" {
+      targets = [{
+        __address__ = "localhost",
+        __path__    = "/var/log/pods/banking-app_*/*/*.log",
+        namespace   = "banking-app",
+      }]
+      forward_to = [loki.process.banking_app.receiver]
+
+      file_match {
+        enabled = true
+      }
+    }
+
+    loki.write "default" {
+      endpoint {
+        url = "http://loki:3100/loki/api/v1/push"
+      }
+    }
 ---
 apiVersion: apps/v1
 kind: DaemonSet
@@ -71,15 +75,20 @@ spec:
       serviceAccountName: promtail
       containers:
         - name: promtail
-          image: grafana/promtail:2.9.8
+          image: grafana/alloy:v1.22.0
           args:
-            - -config.file=/etc/promtail/promtail.yaml
+            - run
+            - --server.http.listen-addr=0.0.0.0:3101
+            - --storage.path=/var/lib/alloy
+            - /etc/alloy/config.alloy
           ports:
             - containerPort: 3101
               name: http
           volumeMounts:
             - name: config
-              mountPath: /etc/promtail
+              mountPath: /etc/alloy
+            - name: positions
+              mountPath: /var/lib/alloy
             - name: pods
               mountPath: /var/log/pods
               readOnly: true
@@ -96,6 +105,8 @@ spec:
         - name: config
           configMap:
             name: promtail-config
+        - name: positions
+          emptyDir: {}
         - name: pods
           hostPath:
             path: /var/log/pods

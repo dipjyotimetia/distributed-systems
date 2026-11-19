@@ -51,23 +51,9 @@ services:
       fraud-service:
         condition: service_started
   redpanda:
-    image: docker.redpanda.com/redpandadata/redpanda:v26.2.1
-    networks: [banking-network]
     tmpfs: ["/var/lib/redpanda/data:size=512m,uid=101,gid=101,mode=0700"]
-    command:
-      - redpanda
-      - start
-      - --mode=dev-container
-      - --smp=1
-      - --kafka-addr=0.0.0.0:9092
-      - --advertise-kafka-addr=redpanda:9092
-    healthcheck:
-      test: ["CMD-SHELL", "rpk topic describe transaction-events -X brokers=redpanda:9092 >/dev/null 2>&1 || rpk topic create transaction-events --partitions 1 --replicas 1 -X brokers=redpanda:9092"]
-      interval: 5s
-      timeout: 10s
-      retries: 15
   mongodb:
-    image: mongo:7.0
+    image: mongo:9.0.8
     tmpfs: ["/data/db:size=384m"]
     networks: [banking-network]
     healthcheck:

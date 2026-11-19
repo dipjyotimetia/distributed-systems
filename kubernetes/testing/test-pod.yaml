@@ -6,7 +6,7 @@ metadata:
 spec:
   containers:
   - name: curl
-    image: curlimages/curl:latest
+    image: curlimages/curl:8.23.0
     command: ["/bin/sh"]
     args: ["-c", "while true; do sleep 30; done"]
   restartPolicy: Never

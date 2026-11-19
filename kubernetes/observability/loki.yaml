@@ -24,21 +24,21 @@ data:
     schema_config:
       configs:
         - from: 2020-10-24
-          store: boltdb-shipper
+          store: tsdb
           object_store: filesystem
-          schema: v11
+          schema: v13
           index:
             prefix: index_
             period: 24h
 
     limits_config:
-      allow_structured_metadata: false
+      allow_structured_metadata: true
       retention_period: 24h
       max_query_series: 5000
 
     compactor:
       working_directory: /loki/compactor
-      shared_store: filesystem
+      delete_request_store: filesystem
       compaction_interval: 10m
       retention_enabled: true
       retention_delete_delay: 1h
@@ -66,7 +66,7 @@ spec:
     spec:
       containers:
         - name: loki
-          image: grafana/loki:2.9.8
+          image: grafana/loki:3.7.10
           args:
             - -config.file=/etc/loki/loki.yaml
           ports:
