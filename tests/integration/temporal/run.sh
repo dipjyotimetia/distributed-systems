@@ -44,8 +44,12 @@ browser_verdict=skipped
 cleanup() {
   local status=$?
   local cleanup_passed=true
-  if [[ "$status" != 0 && "$MICROSVC_SCENARIO" == disputes ]]; then
-    "${compose[@]}" logs --tail 40 postgres disputes-schema disputes-service disputes-worker disputes-temporal statement-worker || true
+  if [[ "$status" != 0 ]]; then
+    "${compose[@]}" ps -a || true
+    "${compose[@]}" logs --tail 60 frontend api-gateway user-service accounts-service transactions-service ai-service notification-service || true
+    if [[ "$MICROSVC_SCENARIO" == disputes ]]; then
+      "${compose[@]}" logs --tail 40 postgres disputes-schema disputes-service disputes-worker disputes-temporal statement-worker || true
+    fi
   fi
   if ! "${compose[@]}" down --volumes --remove-orphans --rmi local; then
     cleanup_passed=false
