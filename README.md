@@ -44,7 +44,7 @@ Eight application backend services across four languages, a Next.js frontend, an
 | `frontend` | Next.js 15 / React 19 | Server-side proxy + UI |
 | `simulation-client` | Node.js | Drives realistic user-session traffic with burst and negative-path patterns |
 
-**Storage / messaging:** PostgreSQL (per-service schemas), MongoDB, Kafka (transaction event stream).
+**Storage / messaging:** PostgreSQL (per-service schemas), MongoDB, and Redpanda (Kafka-compatible transaction event stream).
 
 **Observability:** OpenTelemetry -> otel-collector -> Jaeger (traces) + Prometheus (metrics) + Loki (logs) + Grafana (dashboards).
 

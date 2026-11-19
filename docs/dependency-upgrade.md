@@ -1,0 +1,38 @@
+# Full-stack dependency upgrade
+
+The upgrade starts from `dipjyotimetia/distributed-systems` `main` at `82bd0f6`. Version checks used official package registries, image registries, and maintainer releases. The application uses Java 25 LTS, Go 1.27.4, .NET 10 LTS, Python 3.15.2, and Node.js 26.13.1 LTS.
+
+Redpanda is the Kafka-compatible broker for Compose, Kubernetes, and the integration stack. The Kubernetes DNS name remains `banking-kafka:9092`. The notification service uses franz-go and commits only after processing a record. MongoDB deduplicates replays using the existing transaction/status unique index. The SASL overlay still accepts PLAIN clients and provisions their bootstrap account through secret references.
+
+## Versions held below latest
+
+| Dependency | Installed | Latest checked | Blocker and upgrade step |
+| --- | --- | --- | --- |
+| Frontend OpenTelemetry API | 1.9.1 from `~1.9.0` | 1.10.0 | Node trace SDK 2.12.1 requires API below 1.10. Upgrade the SDK, resources, exporter, and API together when a compatible Node SDK is available. |
+| Frontend OpenTelemetry resources | 2.12.1 | 3.1.1 | Version 3 requires API 1.10. Upgrade with the Node trace SDK. |
+| Frontend OTLP HTTP trace exporter | 0.223.2 | 0.301.2 | The 0.301 line requires API 1.10. Upgrade with the Node trace SDK. |
+| Frontend TypeScript | 6.0.3 | 7.0.2 | typescript-eslint 8.73.0 declares TypeScript below 6.1. Upgrade when its parser supports TypeScript 7. |
+| Frontend ESLint | 9.39.5 | 10.15.0 | The Next.js preset includes import, React, and JSX accessibility plugins whose peer ranges stop at 9. Upgrade when the preset ships compatible plugin versions. |
+| ASP.NET Core JWT bearer provider | 10.0.15 | 11.0.0 | The 11 release targets .NET 11. Upgrade with the service's next eligible .NET LTS runtime. |
+| Node Exporter image | v1.12.1 | v1.13.0 | The v1.13.0 repository release had no matching manifest in the checked Quay or Docker Hub registries. Update when the upstream multi-platform image is published. |
+| Maven Corretto builder image | 3.10.0-amazoncorretto-25 | Maven 3.10.1 | The registry had no 3.10.1 Corretto 25 variant. Builds already run Maven 3.10.1 through the wrapper. Update the base tag when the variant is published. |
+
+`simulation-client/go.mod` is an unused manifest. The directory has no Go source and its entry points use Node.js. Production npm audits were clear. The Python, NuGet, and final Maven audits reported no known findings. Go scans reported no reachable findings in the services or Temporal harness. Full frontend and simulation audits still report moderate findings in development dependencies, mainly Jest's glob/minimatch chain. Update the test toolchain when it resolves patched releases within supported dependency ranges.
+
+## Stateful upgrade evidence
+
+- PostgreSQL 15 to 18.7 used a logical backup and restore into a fresh database. Account balances matched the movement ledger after restart. The existing volume and PVC mount paths still point at their configured data directories. An existing PostgreSQL 15 data directory requires migration before PostgreSQL 18 can start.
+- MongoDB 7.0 to 8.0.38 to 9.0.8 used a separate volume and advanced feature compatibility at each step. The notification document and unique index survived each upgrade and the final restart.
+- Redis 7 to 8.10.3 loaded a copied RDB from an isolated instance. The rate-limit hash and expiry survived restart.
+- Grafana 10 to 13.3.1 reopened an isolated SQLite volume initialized with the repository provisioning and reported a healthy database after restart.
+- Loki's Kubernetes storage is pod-local. The updated configuration uses TSDB schema v13 and receives logs over native OTLP. A synthetic log sent through the updated Collector was queryable in Loki. An OTLP trace ingested by Jaeger 2.23 was queryable through both its v3 API and the legacy trace-by-ID endpoint.
+
+These rehearsals used synthetic data. Schedule any live data migration separately and retain the original data for recovery. The Kafka-to-Redpanda change replaces the Kubernetes broker's pod-local store. Environments that retain Kafka data or consumer offsets elsewhere need a separately planned migration.
+
+## Baseline and verification
+
+The original frontend had 166 passing unit tests. Its coverage command already failed the 30% line, statement, and branch gates. After the upgrade, all 166 tests pass and the three coverage measures improve, but remain below those gates and the repository's 80% target. Several Go packages also started below 80%. Coverage thresholds were kept in place.
+
+The original transactions-service Maven build failed to run its Protobuf compiler on macOS ARM. Its replacement builds with the platform-specific compiler and gRPC plugin. The final Java suites ran 85 tests, including the PostgreSQL-backed accounts tests.
+
+The Go suites, legacy Temporal history replay, Python service tests, frontend lint and type checks, Buf build/lint/breaking checks, binding regeneration, and Compose and Kustomize rendering passed locally. The banking journeys exercised identity, ledger integrity, transfer worker replacement, consumer and broker recovery, synchronous statements, disputed transfers, and asynchronous statement generation and expiry. The Kubernetes resources were rendered locally.
