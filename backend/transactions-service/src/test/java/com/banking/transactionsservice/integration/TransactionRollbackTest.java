@@ -18,7 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.data.domain.Page;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
@@ -45,19 +45,19 @@ class TransactionRollbackTest {
     @Autowired
     private TransactionRepository transactionRepository;
 
-    @MockBean
+    @MockitoBean
     private AccountsServiceClient accountsServiceClient;
 
-    @MockBean
+    @MockitoBean
     private FraudServiceClient fraudServiceClient;
 
-    @MockBean
+    @MockitoBean
     private TransactionEventProducer transactionEventProducer;
 
-    @MockBean
+    @MockitoBean
     private PaymentComplianceService paymentComplianceService;
 
-    @MockBean
+    @MockitoBean
     private HttpServletRequest httpServletRequest;
 
     @Autowired

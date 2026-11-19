@@ -3,7 +3,6 @@ package com.banking.transactionsservice.client;
 import com.banking.transactions.grpc.FraudCheckResponse;
 import com.banking.transactions.grpc.FraudCheckerGrpc;
 import com.banking.transactions.grpc.TransactionRequest;
-import net.devh.boot.grpc.client.inject.GrpcClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -13,8 +12,11 @@ public class FraudServiceClient {
 
     private static final Logger logger = LoggerFactory.getLogger(FraudServiceClient.class);
 
-    @GrpcClient("fraud-service")
-    private FraudCheckerGrpc.FraudCheckerBlockingStub fraudCheckerStub;
+    private final FraudCheckerGrpc.FraudCheckerBlockingStub fraudCheckerStub;
+
+    public FraudServiceClient(FraudCheckerGrpc.FraudCheckerBlockingStub fraudCheckerStub) {
+        this.fraudCheckerStub = fraudCheckerStub;
+    }
 
     public FraudCheckResponse checkTransaction(String accountId, String userId, double amount, String transactionType, String merchantCategory) {
         try {

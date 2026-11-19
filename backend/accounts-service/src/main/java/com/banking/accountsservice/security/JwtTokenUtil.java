@@ -86,11 +86,11 @@ public class JwtTokenUtil {
      */
     private Claims getAllClaimsFromToken(String token) {
         try {
-            return Jwts.parserBuilder()
-                    .setSigningKey(getSigningKey())
+            return Jwts.parser()
+                    .verifyWith(getSigningKey())
                     .build()
-                    .parseClaimsJws(token)
-                    .getBody();
+                    .parseSignedClaims(token)
+                    .getPayload();
         } catch (ExpiredJwtException e) {
             logger.error("JWT token is expired: {}", e.getMessage());
             throw e;

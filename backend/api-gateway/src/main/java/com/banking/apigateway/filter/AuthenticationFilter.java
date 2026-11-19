@@ -56,7 +56,7 @@ public class AuthenticationFilter implements GatewayFilter {
     }
 
     private boolean isAuthMissing(ServerHttpRequest request) {
-        return !request.getHeaders().containsKey("Authorization");
+        return !request.getHeaders().containsHeader("Authorization");
     }
 
     // Forward the validated user id so the per-user rate limiter has a key. Any

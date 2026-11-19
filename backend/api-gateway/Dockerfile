@@ -1,24 +1,28 @@
 # Multi-stage build for API Gateway
-FROM --platform=$BUILDPLATFORM maven:3-amazoncorretto-17 AS builder
+FROM --platform=$BUILDPLATFORM maven:3.10.0-amazoncorretto-25 AS builder
 
 WORKDIR /app
 
+RUN dnf install -y tar && dnf clean all
+
 # Copy pom.xml and download dependencies
-COPY pom.xml .
-RUN mvn dependency:go-offline -B
+COPY pom.xml mvnw ./
+COPY .mvn .mvn
+RUN ./mvnw dependency:go-offline -B
 
 # Copy source code
 COPY src ./src
 
 # Build the application
-RUN mvn clean package -DskipTests
+RUN ./mvnw clean package -DskipTests
 
 # Extract layers from the JAR
-RUN java -Djarmode=layertools -jar target/api-gateway-*.jar extract
+RUN cp target/api-gateway-*.jar application.jar && \
+    java -Djarmode=tools -jar application.jar extract --layers --destination extracted
 
 # Runtime image - use Amazon Corretto Alpine for Colima compatibility
-# Pinned by digest to Corretto 17.0.21.1.2 (fixes CVE-2026-114938); the tag floats across builds.
-FROM --platform=$TARGETPLATFORM amazoncorretto:17-alpine@sha256:45f029c659c0205534dee537231ba394daaea0b14ecbad59b55af9135a2c5211
+# Pin the Corretto 25 image index for reproducible multi-platform builds.
+FROM --platform=$TARGETPLATFORM amazoncorretto:25-alpine@sha256:1124f698f69d2185828dbd1a1ebeb9aee21884ac64bed7af3deeafd20b21a9dc
 
 WORKDIR /app
 
@@ -27,10 +31,10 @@ RUN addgroup -g 1001 spring && \
     adduser -D -s /bin/sh -u 1001 -G spring spring
 
 # Copy layers in order of likelihood to change (dependencies first, then application)
-COPY --from=builder /app/dependencies/ ./
-COPY --from=builder /app/spring-boot-loader/ ./
-COPY --from=builder /app/snapshot-dependencies/ ./
-COPY --from=builder /app/application/ ./
+COPY --from=builder /app/extracted/dependencies/ ./
+COPY --from=builder /app/extracted/spring-boot-loader/ ./
+COPY --from=builder /app/extracted/snapshot-dependencies/ ./
+COPY --from=builder /app/extracted/application/ ./
 
 # Change ownership to non-root user
 RUN chown -R spring:spring /app
@@ -56,4 +60,4 @@ ENTRYPOINT ["java", \
     "-Dspring.main.banner-mode=off", \
     "-Dlogging.level.org.springframework.boot.autoconfigure=WARN", \
     "-Dlogging.level.io.opentelemetry=WARN", \
-    "org.springframework.boot.loader.launch.JarLauncher"]
+    "-jar", "application.jar"]

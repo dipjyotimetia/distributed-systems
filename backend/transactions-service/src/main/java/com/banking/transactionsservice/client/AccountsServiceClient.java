@@ -4,7 +4,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import com.banking.transactionsservice.service.InsufficientFundsException;
 import com.banking.transactionsservice.service.MovementCoordinator.Action;
 import com.banking.transactionsservice.service.MovementCoordinator.Movement;
-import org.springframework.boot.web.client.RestTemplateBuilder;
+import org.springframework.boot.restclient.RestTemplateBuilder;
 import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -61,7 +61,7 @@ public class AccountsServiceClient {
                 throw new IllegalStateException("Unexpected movement response status");
             }
         } catch (HttpStatusCodeException e) {
-            if (action == Action.RESERVE && e.getStatusCode() == HttpStatus.UNPROCESSABLE_ENTITY) {
+            if (action == Action.RESERVE && e.getStatusCode().isSameCodeAs(HttpStatus.UNPROCESSABLE_CONTENT)) {
                 throw new InsufficientFundsException("Insufficient balance for movement");
             }
             if (e.getStatusCode() == HttpStatus.NOT_FOUND || e.getStatusCode() == HttpStatus.CONFLICT) {

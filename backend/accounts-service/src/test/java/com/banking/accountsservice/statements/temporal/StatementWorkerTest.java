@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.actuate.health.Status;
+import org.springframework.boot.health.contributor.Status;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
