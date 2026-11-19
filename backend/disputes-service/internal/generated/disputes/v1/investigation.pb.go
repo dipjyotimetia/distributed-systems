@@ -135,7 +135,7 @@ const file_banking_disputes_v1_investigation_proto_rawDesc = "" +
 	"\brevision\x18\x02 \x01(\x03R\brevision\"m\n" +
 	"\x12InvestigationState\x12\x1a\n" +
 	"\bresolved\x18\x01 \x01(\bR\bresolved\x12;\n" +
-	"\x1anext_deadline_epoch_millis\x18\x02 \x01(\x03R\x17nextDeadlineEpochMillisB[ZYgithub.com/speedscale/microsvc/disputes-service/internal/generated/disputes/v1;disputesv1b\x06proto3"
+	"\x1anext_deadline_epoch_millis\x18\x02 \x01(\x03R\x17nextDeadlineEpochMillisBqZogithub.com/dipjyotimetia/distributed-systems/backend/disputes-service/internal/generated/disputes/v1;disputesv1b\x06proto3"
 
 var (
 	file_banking_disputes_v1_investigation_proto_rawDescOnce sync.Once

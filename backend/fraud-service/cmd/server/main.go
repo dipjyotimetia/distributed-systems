@@ -11,9 +11,9 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
 
-	"github.com/speedscale/microsvc/fraud-service/internal/fraud"
+	"github.com/dipjyotimetia/distributed-systems/backend/fraud-service/internal/fraud"
 
-	fraudv1 "github.com/speedscale/microsvc/fraud-service/gen/fraud/v1"
+	fraudv1 "github.com/dipjyotimetia/distributed-systems/backend/fraud-service/gen/fraud/v1"
 )
 
 func main() {

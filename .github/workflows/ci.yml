@@ -267,7 +267,7 @@ jobs:
       id: meta
       uses: docker/metadata-action@v6.2.0
       with:
-        images: ghcr.io/speedscale/microsvc/${{ matrix.service }}
+        images: ghcr.io/dipjyotimetia/distributed-systems/${{ matrix.service }}
         tags: |
           type=raw,value=${{ steps.version.outputs.simple_tag }}
           type=raw,value=${{ steps.version.outputs.sha_tag }}
@@ -386,6 +386,7 @@ jobs:
     - name: Install Playwright browsers
       run: |
         cd frontend
+        sudo sed -i 's|http://\(archive\|security\).ubuntu.com/ubuntu|https://\1.ubuntu.com/ubuntu|g' /etc/apt/sources.list.d/ubuntu.sources
         npx playwright install --with-deps chromium
     
     - name: Create test results directory

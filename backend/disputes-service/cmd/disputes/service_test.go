@@ -1,10 +1,10 @@
 package main
 
 import (
-	casesmodel "github.com/speedscale/microsvc/disputes-service/internal/cases"
-	"github.com/speedscale/microsvc/disputes-service/internal/httpapi"
-	"github.com/speedscale/microsvc/disputes-service/internal/postgres"
-	"github.com/speedscale/microsvc/disputes-service/internal/temporal"
+	casesmodel "github.com/dipjyotimetia/distributed-systems/backend/disputes-service/internal/cases"
+	"github.com/dipjyotimetia/distributed-systems/backend/disputes-service/internal/httpapi"
+	"github.com/dipjyotimetia/distributed-systems/backend/disputes-service/internal/postgres"
+	"github.com/dipjyotimetia/distributed-systems/backend/disputes-service/internal/temporal"
 
 	"context"
 	"database/sql"
@@ -23,7 +23,7 @@ import (
 	enumspb "go.temporal.io/api/enums/v1"
 	"go.temporal.io/api/serviceerror"
 
-	disputesv1 "github.com/speedscale/microsvc/disputes-service/internal/generated/disputes/v1"
+	disputesv1 "github.com/dipjyotimetia/distributed-systems/backend/disputes-service/internal/generated/disputes/v1"
 	"go.temporal.io/sdk/client"
 )
 

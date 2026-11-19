@@ -9,9 +9,9 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/speedscale/microsvc/notification-service/internal/api"
-	"github.com/speedscale/microsvc/notification-service/internal/consumer"
-	"github.com/speedscale/microsvc/notification-service/internal/store"
+	"github.com/dipjyotimetia/distributed-systems/backend/notification-service/internal/api"
+	"github.com/dipjyotimetia/distributed-systems/backend/notification-service/internal/consumer"
+	"github.com/dipjyotimetia/distributed-systems/backend/notification-service/internal/store"
 )
 
 func main() {

@@ -30,6 +30,7 @@ jobs:
         working-directory: frontend
         run: |
           npm ci
+          sudo sed -i 's|http://\(archive\|security\).ubuntu.com/ubuntu|https://\1.ubuntu.com/ubuntu|g' /etc/apt/sources.list.d/ubuntu.sources
           npx playwright install --with-deps chromium
       - name: Run banking journeys and browser session check
         env:

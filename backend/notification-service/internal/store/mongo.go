@@ -9,7 +9,7 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
-	"github.com/speedscale/microsvc/notification-service/internal/consumer"
+	"github.com/dipjyotimetia/distributed-systems/backend/notification-service/internal/consumer"
 )
 
 type MongoStore struct {

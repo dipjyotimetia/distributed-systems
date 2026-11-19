@@ -1,4 +1,4 @@
-module github.com/speedscale/microsvc/notification-service
+module github.com/dipjyotimetia/distributed-systems/backend/notification-service
 
 go 1.27.4
 

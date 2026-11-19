@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
-	"github.com/speedscale/microsvc/notification-service/internal/metrics"
+	"github.com/dipjyotimetia/distributed-systems/backend/notification-service/internal/metrics"
 )
 
 func TestRingBufferLatestAndForUser(t *testing.T) {

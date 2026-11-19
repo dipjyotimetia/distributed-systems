@@ -15,7 +15,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/speedscale/microsvc/disputes-service/internal/cases"
+	"github.com/dipjyotimetia/distributed-systems/backend/disputes-service/internal/cases"
 )
 
 type caseStore interface {

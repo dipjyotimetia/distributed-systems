@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/speedscale/microsvc/disputes-service/internal/cases"
+	"github.com/dipjyotimetia/distributed-systems/backend/disputes-service/internal/cases"
 )
 
 const signalCTE = `), queued AS (

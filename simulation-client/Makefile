@@ -2,7 +2,7 @@
 
 # Project configuration
 PROJECT_NAME = simulation-client
-IMAGE_NAME = ghcr.io/speedscale/microsvc/simulation-client
+IMAGE_NAME = ghcr.io/dipjyotimetia/distributed-systems/simulation-client
 VERSION = $(shell cat ../VERSION 2>/dev/null || echo "1.0.0")
 GIT_SHA = $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 IMAGE_TAG = v$(VERSION)-$(GIT_SHA)

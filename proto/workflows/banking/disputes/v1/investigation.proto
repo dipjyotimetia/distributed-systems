@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package banking.disputes.v1;
 
-option go_package = "github.com/speedscale/microsvc/disputes-service/internal/generated/disputes/v1;disputesv1";
+option go_package = "github.com/dipjyotimetia/distributed-systems/backend/disputes-service/internal/generated/disputes/v1;disputesv1";
 
 message CaseRevision {
   int64 case_id = 1;

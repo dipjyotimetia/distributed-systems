@@ -2,7 +2,7 @@
 
 ## Local Development with Colima
 
-The `kubernetes/overlays/local/` overlay uses the same base manifests and namespace (`banking-app`) as the default stack. It does not override container images; services use the published images from the base manifests (e.g. `ghcr.io/speedscale/microsvc/...`).
+The `kubernetes/overlays/local/` overlay uses the same base manifests and namespace (`banking-app`) as the default stack. It does not override container images; services use the published images from the base manifests (e.g. `ghcr.io/dipjyotimetia/distributed-systems/...`).
 
 To run against images built locally (e.g. `localhost:5000/...`), build and tag images, run a local registry if needed, then patch deployments or use `kubectl set image` to point at your registry.
 
@@ -12,7 +12,7 @@ kubectl apply -k kubernetes/overlays/local/
 
 # Optional: local registry for custom tags
 docker run -d -p 5000:5000 --name registry registry:2
-docker tag ghcr.io/speedscale/microsvc/frontend:v1.3.4 localhost:5000/frontend:v1.3.4
+docker tag ghcr.io/dipjyotimetia/distributed-systems/frontend:v1.3.4 localhost:5000/frontend:v1.3.4
 docker push localhost:5000/frontend:v1.3.4
 ```
 

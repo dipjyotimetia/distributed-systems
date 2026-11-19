@@ -32,7 +32,7 @@ jobs:
       - name: Verify fraud gRPC bindings
         run: |
           generated="$(mktemp -d)"
-          module=github.com/speedscale/microsvc/fraud-service
+          module=github.com/dipjyotimetia/distributed-systems/backend/fraud-service
           protoc -I proto/fraud \
             --go_out="$generated" --go_opt=module="$module" \
             --go-grpc_out="$generated" --go-grpc_opt=module="$module" \

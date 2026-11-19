@@ -1,4 +1,4 @@
-module github.com/speedscale/microsvc/disputes-service
+module github.com/dipjyotimetia/distributed-systems/backend/disputes-service
 
 go 1.27.4
 

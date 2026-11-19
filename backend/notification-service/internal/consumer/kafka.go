@@ -13,8 +13,8 @@ import (
 	"github.com/twmb/franz-go/pkg/sasl"
 	"github.com/twmb/franz-go/pkg/sasl/plain"
 
-	"github.com/speedscale/microsvc/notification-service/internal/metrics"
-	"github.com/speedscale/microsvc/notification-service/internal/notify"
+	"github.com/dipjyotimetia/distributed-systems/backend/notification-service/internal/metrics"
+	"github.com/dipjyotimetia/distributed-systems/backend/notification-service/internal/notify"
 )
 
 const ringSize = 1000

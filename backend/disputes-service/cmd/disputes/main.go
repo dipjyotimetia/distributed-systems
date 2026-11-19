@@ -1,9 +1,9 @@
 package main
 
 import (
-	"github.com/speedscale/microsvc/disputes-service/internal/httpapi"
-	"github.com/speedscale/microsvc/disputes-service/internal/postgres"
-	"github.com/speedscale/microsvc/disputes-service/internal/temporal"
+	"github.com/dipjyotimetia/distributed-systems/backend/disputes-service/internal/httpapi"
+	"github.com/dipjyotimetia/distributed-systems/backend/disputes-service/internal/postgres"
+	"github.com/dipjyotimetia/distributed-systems/backend/disputes-service/internal/temporal"
 
 	"context"
 	"database/sql"

@@ -1,4 +1,4 @@
-module github.com/speedscale/microsvc/fraud-service
+module github.com/dipjyotimetia/distributed-systems/backend/fraud-service
 
 go 1.27.4
 

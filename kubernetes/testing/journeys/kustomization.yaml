@@ -5,28 +5,28 @@ resources:
   - ../../overlays/local
 
 images:
-  - name: ghcr.io/speedscale/microsvc/frontend
+  - name: ghcr.io/dipjyotimetia/distributed-systems/frontend
     newName: microsvc-journeys/frontend
     newTag: checkout
-  - name: ghcr.io/speedscale/microsvc/api-gateway
+  - name: ghcr.io/dipjyotimetia/distributed-systems/api-gateway
     newName: microsvc-journeys/api-gateway
     newTag: checkout
-  - name: ghcr.io/speedscale/microsvc/accounts-service
+  - name: ghcr.io/dipjyotimetia/distributed-systems/accounts-service
     newName: microsvc-journeys/accounts-service
     newTag: checkout
-  - name: ghcr.io/speedscale/microsvc/user-service
+  - name: ghcr.io/dipjyotimetia/distributed-systems/user-service
     newName: microsvc-journeys/user-service
     newTag: checkout
-  - name: ghcr.io/speedscale/microsvc/transactions-service
+  - name: ghcr.io/dipjyotimetia/distributed-systems/transactions-service
     newName: microsvc-journeys/transactions-service
     newTag: checkout
-  - name: ghcr.io/speedscale/microsvc/fraud-service
+  - name: ghcr.io/dipjyotimetia/distributed-systems/fraud-service
     newName: microsvc-journeys/fraud-service
     newTag: checkout
-  - name: ghcr.io/speedscale/microsvc/notification-service
+  - name: ghcr.io/dipjyotimetia/distributed-systems/notification-service
     newName: microsvc-journeys/notification-service
     newTag: checkout
-  - name: ghcr.io/speedscale/microsvc/ai-service
+  - name: ghcr.io/dipjyotimetia/distributed-systems/ai-service
     newName: microsvc-journeys/ai-service
     newTag: checkout
 

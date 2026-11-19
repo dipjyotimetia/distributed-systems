@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package fraud.v1;
 
-option go_package = "github.com/speedscale/microsvc/fraud-service/gen/fraud/v1;fraudv1";
+option go_package = "github.com/dipjyotimetia/distributed-systems/backend/fraud-service/gen/fraud/v1;fraudv1";
 
 service FraudChecker {
   rpc CheckTransaction(TransactionRequest) returns (FraudCheckResponse);
