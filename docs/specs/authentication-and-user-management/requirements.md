@@ -1,5 +1,7 @@
 # Requirements — Authentication & User Management
 
+> Historical specification. See the [current architecture](../../../architecture.md) and [project README](../../../README.md).
+
 Covers `backend/user-service` (.NET 8, registration/login/profile/token issuance),
 `backend/api-gateway` (Spring Cloud Gateway, edge JWT enforcement) and `frontend`
 (Next.js, token handling). Note: the README calls user-service Java; the implementation is

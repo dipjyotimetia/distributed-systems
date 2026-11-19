@@ -1,52 +1,21 @@
-# Database Setup
+# Database setup
 
-This directory contains the database configuration for the banking application.
+Default Compose provisions PostgreSQL for identity, accounts, transactions
+and disputes. It initializes the `user_service`, `accounts_service` and
+`transactions_service` schemas on a fresh data directory using `init/`.
+The `disputes-schema` Compose service applies the disputes bootstrap SQL
+and provisions the `disputes` schema separately.
 
-## Structure
+```bash
+docker compose up -d postgres
+psql -h localhost -p 5432 -U postgres -d banking_app
+```
 
-- `init/` - Database initialization scripts that run when PostgreSQL starts
-- `migrations/` - Service-specific migration scripts
-- `database.properties` - Database connection configuration
+Use the credentials configured for your local environment. Run `\dn` in
+psql to list schemas.
 
-## Schemas
-
-The application uses three schemas in a single PostgreSQL database:
-
-- `user_service` - User authentication and profile data
-- `accounts_service` - Bank account information and balances
-- `transactions_service` - Transaction history and processing
-
-## Quick Start
-
-1. Start the database:
-   ```bash
-   docker-compose up -d postgres
-   ```
-
-2. Connect to the database:
-   ```bash
-   psql -h localhost -U postgres -d banking_app
-   ```
-
-3. Verify schemas:
-   ```sql
-   \dn
-   ```
-
-## Migration Scripts
-
-Each service has its own migration directory with Flyway-compatible SQL files:
-
-- `V1__Create_users_table.sql` - Creates users table with authentication data
-- `V1__Create_accounts_table.sql` - Creates accounts table with balance tracking
-- `V1__Create_transactions_table.sql` - Creates transactions table with full audit trail
-
-## Connection Details
-
-- **Host**: localhost
-- **Port**: 5432
-- **Database**: banking_app
-- **Admin User**: postgres
-- **Admin Password**: password
-
-Each service has its own database user with schema-specific permissions for security.
+Accounts and transactions apply their Flyway migrations from their service
+resources. The .NET user service bootstraps its table at startup in the
+pre-provisioned schema. Use the explicit seed files and Kubernetes seed Job
+for their intended development or simulation purposes. MongoDB stores
+notification events in Kubernetes and the applicable integration scenarios.

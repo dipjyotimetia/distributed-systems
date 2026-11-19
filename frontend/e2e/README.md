@@ -58,7 +58,7 @@ These tests work with the actual backend services to test the complete integrati
 2. **Frontend dependencies** installed:
    ```bash
    cd frontend
-   npm install
+   npm ci
    ```
 
 ### Option 1: Simplified CI Tests (Recommended)
@@ -151,7 +151,7 @@ This script:
 
 The tests use these environment variables:
 
-- `BACKEND_API_URL`: URL of the API Gateway (default: `http://localhost:8080`)
+- `API_GATEWAY_URL`: URL of the API Gateway (default: `http://localhost:8080`)
 - `NODE_ENV`: Environment mode (set to `test` for e2e tests)
 
 ### Playwright Configuration
@@ -166,7 +166,7 @@ The tests use these environment variables:
 
 #### 1. "getaddrinfo EAI_AGAIN api-gateway" Error
 **Cause**: Tests trying to connect to Docker hostname from outside Docker network
-**Solution**: Use the CI configuration or ensure `BACKEND_API_URL` is set to `http://localhost:8080`
+**Solution**: Use the CI configuration or ensure `API_GATEWAY_URL` is set to `http://localhost:8080`
 
 #### 2. Tests Timing Out in CI
 **Cause**: Complex test scenarios or network issues
@@ -185,7 +185,7 @@ npx playwright install --with-deps chromium
 **Solution**: 
 ```bash
 cd frontend
-npm install
+npm ci
 npm run dev
 ```
 

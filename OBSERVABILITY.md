@@ -40,7 +40,7 @@ flowchart LR
 How trace data moves from code to storage:
 
 1. **SDK** — Auto-instrumentation and manual spans run in-process; `tracecontext` propagates IDs across HTTP calls; the sampler decides whether to record; spans are batched (for example `BatchSpanProcessor` with queue and export intervals in Spring config) and exported over **OTLP** (gRPC on `:4317` for Java services, HTTP/protobuf on `:4318` for the frontend where configured).
-2. **Docker Compose** — OTLP goes to **Jaeger all-in-one** (`COLLECTOR_OTLP_ENABLED`); there is no separate collector service in `docker-compose.yml`.
+2. **Docker Compose** — OTLP goes to **Jaeger all-in-one** (`COLLECTOR_OTLP_ENABLED`); there is no separate collector service in `docker compose.yml`.
 3. **Kubernetes** — OTLP goes to **`otel-collector`** (`kubernetes/observability/otel-collector.yaml`): **receivers** `otlp` (gRPC + HTTP) → **processors** `filter` (drops noisy actuator/security spans) → **exporters** `otlp` → Jaeger. The traces pipeline is `receivers: [otlp] → processors: [filter] → exporters: [otlp]`.
 
 ```mermaid
@@ -56,7 +56,7 @@ flowchart TB
 
   export --> route{Deploy target}
 
-  route -->|docker-compose| jaeger_in[Jaeger OTLP receiver]
+  route -->|docker compose| jaeger_in[Jaeger OTLP receiver]
   route -->|Kubernetes| recv[Collector receiver otlp]
   recv --> filt[Processor filter]
   filt --> out[Exporter otlp to Jaeger]
@@ -86,34 +86,33 @@ flowchart LR
 ### Starting the Observability Stack
 ```bash
 # Start all monitoring services (Jaeger receives OTLP directly in compose; collector is Kubernetes-only)
-docker-compose up -d prometheus grafana jaeger
+docker compose up -d prometheus grafana jaeger
 
 # Verify services are running
 curl http://localhost:9090/api/v1/targets  # Prometheus targets
 curl http://localhost:16686/api/v3/services   # Jaeger services
-curl http://localhost:3001                 # Grafana (admin/admin)
+curl http://localhost:3001                 # Grafana
 ```
 
 ### Access Points
 - **Jaeger UI**: http://localhost:16686 - Distributed tracing
 - **Prometheus**: http://localhost:9090 - Metrics and targets
 - **Grafana**: http://localhost:3001 - Dashboards and visualization
-- **OTLP Collector**: http://localhost:4317 (gRPC), http://localhost:4318 (HTTP)
+- **Jaeger OTLP receivers in Compose**: localhost:4317 (gRPC) and localhost:4318 (HTTP)
 
 ## Distributed Tracing
 
 ### OpenTelemetry Configuration
 
-All services are instrumented with OpenTelemetry:
+| Environment | Java services | Next.js frontend |
+|---|---|---|
+| Compose | `http://jaeger:4317` (gRPC) | `http://jaeger:4318/v1/traces` (HTTP/protobuf) |
+| Kubernetes | `http://otel-collector.observability:4317` (gRPC) | `http://otel-collector.observability:4318/v1/traces` (HTTP/protobuf) |
 
-```yaml
-# Environment variables for all services
-OTEL_SERVICE_NAME: "user-service"  # Unique per service
-OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4318"
-OTEL_RESOURCE_ATTRIBUTES: "service.namespace=banking-app"
-OTEL_TRACES_EXPORTER: "otlp"
-OTEL_METRICS_EXPORTER: "otlp"
-```
+For other services, use the settings in the deployment configuration.
+The [collector](kubernetes/observability/otel-collector.yaml) defines
+separate trace, metrics, and log pipelines, including OTLP export to Loki
+for logs. See [trace filtering](docs/TRACE_FILTERING.md) for the filter rules.
 
 ### Trace Propagation
 
@@ -278,7 +277,7 @@ hikaricp_connections_active{pool="banking_app"}
 
 ### Creating Custom Dashboards
 
-1. **Access Grafana**: http://localhost:3001 (admin/admin)
+1. **Access Grafana**: http://localhost:3001
 2. **Add Data Source**: Prometheus (http://prometheus:9090)
 3. **Import Dashboard**: Use dashboard ID or JSON
 4. **Create Panel**: Add PromQL queries and visualizations
@@ -354,16 +353,16 @@ curl -X POST "http://localhost:8081/actuator/loggers/com.banking.userservice" \
 **View logs across all services**:
 ```bash
 # All services
-docker-compose logs -f
+docker compose logs -f
 
 # Specific services
-docker-compose logs -f user-service accounts-service
+docker compose logs -f user-service accounts-service
 
 # Filter by log level
-docker-compose logs | grep '"level":"ERROR"'
+docker compose logs | grep '"level":"ERROR"'
 
 # Search for specific user
-docker-compose logs | grep '"user_id":"12345"'
+docker compose logs | grep '"user_id":"12345"'
 ```
 
 ### Log Correlation
@@ -479,19 +478,19 @@ histogram_quantile(0.95,
 
 1. **Check Service Configuration**:
    ```bash
-   docker-compose exec user-service env | grep OTEL
+   docker compose exec user-service env | grep OTEL
    ```
 
 2. **Verify OTLP Collector**:
    ```bash
-   curl http://localhost:4318/v1/traces
-   docker-compose logs otel-collector
+   curl -fsS http://localhost:16686/api/services
+   docker compose logs otel-collector
    ```
 
 3. **Enable Debug Logging**:
    ```bash
    export OTEL_LOG_LEVEL=DEBUG
-   docker-compose restart user-service
+   docker compose restart user-service
    ```
 
 ### Missing Metrics in Prometheus
@@ -509,7 +508,7 @@ histogram_quantile(0.95,
 
 3. **Check Service Discovery**:
    ```bash
-   docker-compose logs prometheus
+   docker compose logs prometheus
    ```
 
 ### Grafana Dashboard Issues

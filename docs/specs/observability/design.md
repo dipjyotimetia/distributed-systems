@@ -1,5 +1,7 @@
 # Design — Observability
 
+> Historical specification. See the [current architecture](../../../architecture.md) and [project README](../../../README.md).
+
 Spans come from the OTel SDK in each service, are propagated with `tracecontext`, sampled
 at 100%, batched and exported over OTLP. Metrics go to Prometheus/Grafana; logs carry the
 trace and span id, which joins all three signals.

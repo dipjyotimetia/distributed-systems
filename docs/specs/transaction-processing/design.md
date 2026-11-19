@@ -1,5 +1,7 @@
 # Design — Transaction Processing
 
+> Historical specification. See the [current architecture](../../../architecture.md) and [project README](../../../README.md).
+
 `TransactionService` orchestrates fraud-service (gRPC), accounts-service (REST), its own
 Postgres schema, Kafka and the payment providers.
 

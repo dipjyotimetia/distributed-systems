@@ -80,9 +80,6 @@ make docker-run
 ### Kubernetes Deployment
 
 ```bash
-# Apply database migration first
-make migrate-simulation-users
-
 # Deploy entire banking app (including simulation client)
 kubectl apply -k ../kubernetes/base/
 
@@ -127,22 +124,11 @@ The simulation client is configured via environment variables:
 
 ## Database Setup
 
-The simulation requires pre-existing users in the database:
-
-```bash
-# Run the database migration
-cd ../backend/user-service
-./mvnw flyway:migrate
-
-# Or use the Makefile from simulation-client directory
-make migrate-simulation-users
-```
-
-This creates:
-- 1000 locale-matched named users
-- Realistic account balances ($100 - $50,000)
-- Transaction history
-- Multiple account types (checking, savings, investment)
+The existing-user workflow uses the configured user pool. The Kubernetes
+base includes a seed Job and mounts configuration for the simulation.
+For a manually managed development environment, provision a matching pool
+before exercising that workflow. See the [database guide](../database/README.md)
+for initialization and seed locations.
 
 ## Monitoring & Observability
 
@@ -194,7 +180,7 @@ Automatic scaling based on:
 make k8s-scale REPLICAS=3
 
 # Or use kubectl directly
-kubectl scale deployment simulation-client --replicas=5 -n banking-app
+kubectl scale deployment banking-sim --replicas=5 -n banking-app
 ```
 
 ## Development
@@ -238,8 +224,7 @@ make docker-build
 - Check network connectivity in Kubernetes
 
 **No Simulation Users**
-- Run database migration: `make migrate-simulation-users`
-- Check user count: `make check-simulation-users`
+- Check that the configured user pool exists in PostgreSQL
 
 **High Memory Usage**
 - Reduce `CONCURRENT_USERS`

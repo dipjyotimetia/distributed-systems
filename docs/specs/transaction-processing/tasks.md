@@ -1,5 +1,7 @@
 # Tasks — Transaction Processing
 
+> Historical specification. See the [current architecture](../../../architecture.md) and [project README](../../../README.md).
+
 Endpoints, fraud screening, ownership/balance rules, locked mutation with compensation,
 payment fan-out, Kafka events and observability are implemented (requirements 1–8), except
 the gaps in tasks 1–2. Tasks 3–5 address the known limitations in design.md and build on the

@@ -1,5 +1,7 @@
 # Requirements — Observability
 
+> Historical specification. See the [current architecture](../../../architecture.md) and [project README](../../../README.md).
+
 Distributed tracing, metrics and logs. Currently instrumented with OpenTelemetry:
 `frontend`, `api-gateway`, `accounts-service`, `transactions-service` and `ai-service`.
 `user-service`, `fraud-service` and `notification-service` have no OTel SDK yet (tasks.md

@@ -12,14 +12,14 @@ curl http://localhost:8080/actuator/health  # API Gateway
 curl http://localhost:8081/actuator/health  # User Service
 curl http://localhost:8082/actuator/health  # Accounts Service
 curl http://localhost:8083/actuator/health  # Transactions Service
-curl http://localhost:3000/api/health       # Frontend
+curl http://localhost:3000/api/healthz       # Frontend
 ```
 
 ### Database Connection
 Test database connectivity:
 ```bash
 # From host machine
-psql -h localhost -p 5432 -U banking_user -d banking_app
+psql -h localhost -p 5432 -U postgres -d banking_app
 
 # Check individual service databases
 psql -h localhost -p 5432 -U user_service_user -d banking_app
@@ -31,14 +31,14 @@ psql -h localhost -p 5432 -U transactions_service_user -d banking_app
 View logs for debugging:
 ```bash
 # Docker Compose logs
-docker-compose logs user-service
-docker-compose logs accounts-service
-docker-compose logs transactions-service
-docker-compose logs api-gateway
-docker-compose logs frontend
+docker compose logs user-service
+docker compose logs accounts-service
+docker compose logs transactions-service
+docker compose logs api-gateway
+docker compose logs frontend
 
 # Follow logs in real-time
-docker-compose logs -f user-service
+docker compose logs -f user-service
 ```
 
 ## Common Issues
@@ -54,7 +54,7 @@ kill -9 <PID> # Kill the process using the port
 
 # Or restart with different ports
 export USER_SERVICE_PORT=8091
-docker-compose up user-service
+docker compose up user-service
 ```
 
 ### 2. Database Connection Issues
@@ -64,8 +64,8 @@ docker-compose up user-service
 
 - **Database not running**:
   ```bash
-  docker-compose up -d postgres
-  docker-compose logs postgres
+  docker compose up -d postgres
+  docker compose logs postgres
   ```
 
 - **Wrong credentials**:
@@ -134,15 +134,42 @@ cd backend/user-service
 # Check if Jaeger is running
 curl http://localhost:16686
 
-# Verify OTLP collector is running
-curl http://localhost:4318/v1/traces
+# Check the Jaeger container in Compose
+docker compose logs --tail=50 jaeger
 
 # Check service environment variables
-docker-compose exec user-service env | grep OTEL
+docker compose exec user-service env | grep OTEL
 
 # Enable debug logging
 export OTEL_LOG_LEVEL=DEBUG
 ```
+
+### Gateway exits during OpenTelemetry startup
+
+If `docker compose logs api-gateway` shows
+`NoClassDefFoundError: io/opentelemetry/semconv/ContainerAttributes`, the
+gateway failed while loading its OpenTelemetry container resource provider.
+The gateway's Maven dependencies are in
+[`backend/api-gateway/pom.xml`](backend/api-gateway/pom.xml).
+
+For local development, save this as `compose.gateway-workaround.yml`:
+
+```yaml
+services:
+  api-gateway:
+    environment:
+      OTEL_JAVA_DISABLED_RESOURCE_PROVIDERS: io.opentelemetry.instrumentation.resources.ContainerResourceProvider
+```
+
+From the repository root, recreate the gateway with that override:
+
+```bash
+docker compose -f docker-compose.yml -f compose.gateway-workaround.yml up -d --no-deps api-gateway
+curl -fsS http://localhost:8080/actuator/health
+```
+
+The override disables container resource metadata collection on the local
+gateway.
 
 ## CI Replay Validation
 
@@ -160,10 +187,10 @@ echo "log_statement = 'all'" >> /var/lib/postgresql/data/postgresql.conf
 echo "log_duration = on" >> /var/lib/postgresql/data/postgresql.conf
 
 # Restart postgres container
-docker-compose restart postgres
+docker compose restart postgres
 
 # View query logs
-docker-compose logs postgres | grep "duration:"
+docker compose logs postgres | grep "duration:"
 ```
 
 ### Memory Issues
@@ -173,14 +200,14 @@ docker stats
 
 # Increase JVM heap size
 export JAVA_OPTS="-Xmx1g -Xms512m"
-docker-compose up user-service
+docker compose up user-service
 ```
 
 ### Network Latency
 ```bash
 # Test service-to-service communication
-docker-compose exec user-service curl http://accounts-service:8082/actuator/health
-docker-compose exec accounts-service curl http://transactions-service:8083/actuator/health
+docker compose exec user-service curl http://accounts-service:8080/actuator/health
+docker compose exec accounts-service curl http://transactions-service:8080/actuator/health
 ```
 
 ## Development Environment
@@ -189,7 +216,7 @@ docker-compose exec accounts-service curl http://transactions-service:8083/actua
 
 1. **Start only PostgreSQL in Docker**:
    ```bash
-   docker-compose up -d postgres
+   docker compose up -d postgres
    ```
 
 2. **Run services locally**:
@@ -229,11 +256,11 @@ npm run dev  # Automatically reloads on file changes
 ### Environment Variables
 ```bash
 # Check current environment
-docker-compose config
+docker compose config --services
 
 # Override for debugging
 echo "LOGGING_LEVEL_ROOT=DEBUG" >> .env
-docker-compose up user-service
+docker compose up user-service
 ```
 
 ### Database Migrations
@@ -245,9 +272,6 @@ cd backend/user-service
 # Run migrations manually
 ./mvnw flyway:migrate
 
-# Reset database (CAUTION: destroys data)
-./mvnw flyway:clean
-./mvnw flyway:migrate
 ```
 
 ## Monitoring and Logs
@@ -255,18 +279,18 @@ cd backend/user-service
 ### Centralized Logging
 ```bash
 # View all service logs together
-docker-compose logs -f --tail=100
+docker compose logs -f --tail=100
 
 # Filter for errors
-docker-compose logs | grep ERROR
+docker compose logs | grep ERROR
 
 # Filter by service
-docker-compose logs user-service accounts-service
+docker compose logs user-service accounts-service
 ```
 
 ### Metrics Access
 - **Prometheus**: http://localhost:9090
-- **Grafana**: http://localhost:3001 (admin/admin)
+- **Grafana**: http://localhost:3001
 - **Jaeger**: http://localhost:16686
 
 ## Testing
@@ -299,13 +323,13 @@ curl -X POST http://localhost:8080/api/users/register \
 ### Log Analysis Commands
 ```bash
 # Find errors in the last hour
-docker-compose logs --since=1h | grep -i error
+docker compose logs --since=1h | grep -i error
 
 # Count error occurrences
-docker-compose logs | grep -c ERROR
+docker compose logs | grep -c ERROR
 
 # Find specific error patterns
-docker-compose logs | grep -E "(OutOfMemory|Connection.*failed|Timeout)"
+docker compose logs | grep -E "(OutOfMemory|Connection.*failed|Timeout)"
 ```
 
 ### Useful Debug Information
@@ -313,32 +337,24 @@ When reporting issues, include:
 ```bash
 # System information
 docker --version
-docker-compose --version
+docker compose --version
 java -version
 node --version
 npm --version
 
 # Service status
-docker-compose ps
+docker compose ps
 docker stats --no-stream
 
 # Recent logs
-docker-compose logs --tail=50 user-service
+docker compose logs --tail=50 user-service
 ```
 
-## Reset Everything
-If all else fails, complete reset:
+## Rebuild the local stack
+
 ```bash
-# Stop all services
-docker-compose down
-
-# Remove all containers and volumes
-docker-compose down -v --remove-orphans
-
-# Clean up Docker
-docker system prune -f
-
-# Rebuild from scratch
-docker-compose build --no-cache
-docker-compose up -d
+docker compose down
+docker compose up -d --build
 ```
+
+Compose retains named database volumes during this rebuild.

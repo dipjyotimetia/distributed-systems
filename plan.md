@@ -1,14 +1,16 @@
 # Banking Application Implementation Plan
 
+The completed phases record delivery milestones. See the [README](README.md) for current deployment support.
+
 ## Phase 1: Project Setup & Infrastructure ✅ COMPLETED
 - [x] Create monorepo structure with backend services, frontend, and infrastructure directories
 - [x] Set up PostgreSQL with separate schemas for each microservice
 - [x] Configure Docker Compose environment with logging and health checks
 
 ## Phase 2: Backend Services Development ✅ COMPLETED
-- [x] Implement Spring Boot microservices (user, accounts, transactions, api-gateway)
+- [x] Implement the core identity, accounts, transactions, and gateway services
 - [x] Add JWT authentication, database persistence, and initial OpenTelemetry instrumentation
-- [x] Create comprehensive test suites with >80% code coverage
+- [x] Create service test suites
 
 ## Phase 3: Frontend Development ✅ COMPLETED
 - [x] Build Next.js frontend with TypeScript and authentication context
@@ -18,7 +20,7 @@
 ## Phase 4: Testing ✅ COMPLETED
 - [x] Complete backend testing suite (unit, integration, API tests)
 - [x] Frontend testing with Jest, React Testing Library, and Playwright E2E tests
-- [x] Achieve >80% test coverage across all services
+- [ ] Verify the repository’s >80% coverage target across all services
 - [x] **Backend Test Fixes**: Resolved JWT configuration issues in accounts-service by removing OAuth2 resource server configuration and using consistent custom JWT filter approach across all services
 
 ## Phase 5: Observability & Monitoring ✅ COMPLETED
@@ -32,7 +34,7 @@
 - [x] Validate containerized environment with comprehensive integration testing
 
 ## Phase 7: Kubernetes Development & Testing ✅ COMPLETED
-- [x] Create production-ready Kubernetes manifests with RBAC, ConfigMaps, and Secrets
+- [x] Create Kubernetes manifests with RBAC, ConfigMaps, and Secrets
 - [x] Deploy and debug full stack on minikube with automated scripts
 - [x] Build comprehensive E2E test client validating core authentication workflows
 
@@ -84,7 +86,7 @@
 - [x] Security requirements met (JWT, HTTPS, input validation)
 - [x] Kubernetes manifests created and tested on minikube/Colima
 - [x] CI/CD pipeline operational with image registry
-- [x] System ready for production deployment
+- [ ] Validate production readiness against the remaining deployment and security work
 - [x] **OpenTelemetry tracing fully functional** with pure implementation (no Speedscale dependency)
 - [x] **Clean trace filtering** removing health check noise while preserving business transaction visibility
 

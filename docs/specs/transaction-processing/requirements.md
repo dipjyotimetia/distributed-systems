@@ -1,5 +1,7 @@
 # Requirements — Transaction Processing
 
+> Historical specification. See the [current architecture](../../../architecture.md) and [project README](../../../README.md).
+
 `backend/transactions-service` (Java / Spring Boot) handles deposits, withdrawals and
 transfers. Each is screened by fraud-service (gRPC), moves money via accounts-service
 (REST), is stored in Postgres, fans out to Stripe/PayPal/ComplyAdvantage, and emits an

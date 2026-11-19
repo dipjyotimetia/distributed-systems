@@ -7,7 +7,7 @@ This file is the **single** place for AI coding assistants and other automated a
 Before working on this codebase, read:
 
 - `README.md` — Project overview, architecture, and development commands
-- `PLAN.md` — Implementation plan with phases and testing criteria for each sub-phase
+- `plan.md` — Implementation plan with phases and testing criteria for each sub-phase
 - `architecture.md` — System architecture and design decisions
 
 ## Repository Scope
@@ -76,4 +76,4 @@ Docs-only or infra-only changes can skip a `pom.xml` version bump. CI is the fin
 
 ## Current Status
 
-Check `PLAN.md` for the current implementation phase and specific tasks. Each sub-phase includes both implementation tasks and testing requirements that must be completed.
+Check `plan.md` for the current implementation phase and specific tasks. Each sub-phase includes both implementation tasks and testing requirements that must be completed.
