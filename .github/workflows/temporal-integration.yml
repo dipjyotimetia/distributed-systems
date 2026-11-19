@@ -104,7 +104,10 @@ jobs:
         run: |
           for service in api-gateway accounts-service user-service transactions-service fraud-service notification-service ai-service; do
             image="microsvc-journeys/$service:checkout"
-            docker build -t "$image" "backend/$service"
+            if ! docker build -t "$image" "backend/$service"; then
+              sleep 5
+              docker build -t "$image" "backend/$service"
+            fi
             kind load docker-image "$image" --name banking-journeys
           done
           docker build -t microsvc-journeys/frontend:checkout frontend
