@@ -1,5 +1,7 @@
 # Tasks — Authentication & User Management
 
+> Historical specification. See the [current architecture](../../../architecture.md) and [project README](../../../README.md).
+
 Registration, login, profile, availability checks, gateway enforcement and routing,
 cross-service validation and frontend token handling are implemented (requirements 1–6).
 Gateway enforcement is implemented except malformed `Authorization` headers (task 4).

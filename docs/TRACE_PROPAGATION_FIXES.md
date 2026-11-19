@@ -1,5 +1,7 @@
 # OpenTelemetry Trace Propagation Fixes
 
+> Historical engineering record. See the [current project guide](../OBSERVABILITY.md) for supported workflows.
+
 ## Problem Summary
 
 The OpenTelemetry traces were not working properly for cross-application tracing. Trace IDs were not propagating from one pod to another, resulting in disconnected traces instead of end-to-end distributed tracing.

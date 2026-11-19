@@ -1,5 +1,7 @@
 # Tasks — Observability
 
+> Historical specification. See the [current architecture](../../../architecture.md) and [project README](../../../README.md).
+
 Tracing, propagation, export topology, metrics, log correlation and access points are
 implemented for the instrumented services listed in requirements.md, except the gaps
 in tasks 1–2. Open items,

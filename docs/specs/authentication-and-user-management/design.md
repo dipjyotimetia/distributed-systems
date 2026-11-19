@@ -1,5 +1,7 @@
 # Design — Authentication & User Management
 
+> Historical specification. See the [current architecture](../../../architecture.md) and [project README](../../../README.md).
+
 `user-service` owns users and mints JWTs. `api-gateway` enforces a token on every
 non-public route. Each downstream service re-validates the token with the shared
 `JWT_SECRET`, so it is safe even if reached directly inside the cluster.

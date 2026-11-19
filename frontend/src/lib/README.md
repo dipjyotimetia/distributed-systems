@@ -8,4 +8,3 @@ This directory contains utilities and API clients for the banking application.
 - `auth/` - Authentication utilities and contexts
 - `utils/` - General utility functions
 - `types/` - TypeScript type definitions
-- `hooks/` - Custom React hooks

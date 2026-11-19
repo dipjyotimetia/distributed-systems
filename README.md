@@ -4,28 +4,31 @@ A multi-language banking application with HTTP, gRPC, Kafka, Postgres, MongoDB, 
 
 ## Quick Start
 
-### Run Everything Locally (Docker Compose)
+### Run the Local Banking Stack (Docker Compose)
 ```bash
-# Start all services and observability stack
-docker-compose up -d
+# Start the local banking stack
+docker compose up -d
 
 # Access the application and tools
-open http://localhost:3000      # Frontend (Next.js 15)
-open http://localhost:3001      # Grafana (admin/admin)
+open http://localhost:3000      # Frontend (Next.js 16)
+open http://localhost:3001      # Grafana
 open http://localhost:9090      # Prometheus
 open http://localhost:16686     # Jaeger
 ```
 
-### Deploy to Kubernetes
-```bash
-# Deploy the full app with traffic replay support
-kubectl apply -k kubernetes/overlays/speedscale/
+Docker with the Compose plugin is sufficient for the container workflow.
+Register a local user, then sign in and create an account. If the gateway
+exits with an OpenTelemetry `ContainerAttributes` error, apply the
+[local gateway workaround](TROUBLESHOOTING.md#gateway-exits-during-opentelemetry-startup).
 
-# Or deploy without Speedscale routing
-kubectl apply -k kubernetes/overlays/local/
+| Environment | Features and dependencies |
+|---|---|
+| Default Compose | Identity, accounts, transactions, fraud, disputes and statement workers, PostgreSQL, Redis, Redpanda, Jaeger, Prometheus, Grafana |
+| Kubernetes base and local overlay | Identity, accounts, transactions, fraud, AI, notifications, simulation, PostgreSQL, Redis, Redpanda and MongoDB |
+| Temporal integration stack | Isolated banking journeys with scenario-specific workers and provider fixtures |
 
-# Access the application via your cluster's ingress / load balancer
-```
+Use the [Kubernetes deployment guide](kubernetes/README.md) for cluster setup and
+[the integration test guide](tests/integration/README.md) for isolated scenarios.
 
 ## Architecture
 
@@ -41,14 +44,14 @@ Eight application backend services across four languages, a Next.js frontend, an
 | `fraud-service` | Go (gRPC h2c on :8080) | Fraud risk scoring with Sift / MaxMind / Stripe Radar |
 | `disputes-service` | Go | Transfer dispute intake, operator review, and Temporal escalation |
 | `notification-service` | Go | Slack / SendGrid / Twilio fan-out for transaction events from Kafka |
-| `frontend` | Next.js 15 / React 19 | Server-side proxy + UI |
+| `frontend` | Next.js 16 / React 19 | Server-side proxy + UI |
 | `simulation-client` | Node.js | Drives realistic user-session traffic with burst and negative-path patterns |
 
 **Storage / messaging:** PostgreSQL (per-service schemas), MongoDB, and Redpanda (Kafka-compatible transaction event stream).
 
-**Observability:** OpenTelemetry -> otel-collector -> Jaeger (traces) + Prometheus (metrics) + Loki (logs) + Grafana (dashboards).
+**Observability:** Compose sends traces directly to Jaeger. Kubernetes routes telemetry through the collector and includes Loki for logs.
 
-How **OpenTelemetry trace data** is processed in-process (SDK) and after export (OTLP -> collector on Kubernetes, or direct to Jaeger in Docker Compose) is documented with Mermaid diagrams in [OBSERVABILITY.md - OpenTelemetry trace data processing](./OBSERVABILITY.md#opentelemetry-trace-data-processing) and [architecture.md - OTel trace data processing](./architecture.md#otel-trace-data-processing).
+How **OpenTelemetry trace data** is processed in-process (SDK) and after export (OTLP -> collector on Kubernetes, or direct to Jaeger in Docker Compose) is documented with Mermaid diagrams in [OBSERVABILITY.md - OpenTelemetry trace data processing](./OBSERVABILITY.md#opentelemetry-trace-data-processing).
 
 ```mermaid
 flowchart LR
@@ -87,7 +90,7 @@ flowchart LR
   gateway --> users
   gateway --> accounts
   gateway --> transactions
-  gateway --> ai
+  frontend --> ai
   gateway --> disputes
   disputes --> transactions
   disputes --> postgres
@@ -114,7 +117,7 @@ flowchart LR
 
 ## Traffic Replay
 
-The `speedscale` overlay deploys the app alongside the Speedscale operator and binds every service to a recorded snapshot via a `TrafficReplay` (responder-only mode):
+The `speedscale` overlay requires an installed Speedscale operator and binds six workloads to recorded snapshots via responder-only `TrafficReplay` resources:
 
 | Workload | Recorded snapshot serves |
 |---|---|
@@ -137,14 +140,14 @@ Build and run a Java service from its module directory:
 
 ```bash
 cd backend/accounts-service
-mvn package
-mvn spring-boot:run
+./mvnw package
+./mvnw spring-boot:run
 ```
 
 ### Frontend Development
 ```bash
 cd frontend
-npm install
+npm ci
 npm run dev            # Development server at http://localhost:3000
 npm run build          # Production build
 npm test               # Run tests
@@ -155,10 +158,7 @@ npm test               # Run tests
 # Postgres
 psql -h localhost -p 5432 -U postgres -d banking_app
 
-# Mongo
-mongosh mongodb://localhost:27017/banking_app
-
-# Run migrations (from a Java service directory)
+# Run Flyway from accounts-service or transactions-service
 ./mvnw flyway:migrate
 ```
 
@@ -169,9 +169,8 @@ route contracts and evidence across test layers.
 
 ### Backend Tests
 ```bash
-# Java services
+# From a Java service directory
 ./mvnw test
-./mvnw verify -P integration-tests
 
 # Go services
 cd backend/fraud-service && go test ./...
@@ -251,62 +250,38 @@ These fixtures and validation scripts support application tests. Keep optional r
 
 - **Authentication**: JWT-based authentication with HttpOnly cookies
 - **Observability**: Distributed tracing (OTel + Jaeger), Prometheus metrics, Loki logs, Grafana dashboards
-- **Speedscale integration**: Responder mocks for every third party, deterministic replay
+- **Speedscale integration**: Responder mocks for configured third-party integrations
 - **Development Tools**: Service-specific build and test commands
 - **Container Ready**: Docker and Kubernetes deployment configurations
 - **Load generation**: Simulation client drives realistic burst traffic with configurable negative-path coverage
 
 ## Version Management
 
-The project uses semantic versioning with all services sharing the same version number:
-
-```bash
-# Check current version
-make version                          # Shows: 1.4.75
-
-# Bump version
-make version-bump BUMP_TYPE=patch     # 1.4.75 -> 1.4.76
-make version-bump BUMP_TYPE=minor     # 1.4.75 -> 1.5.0
-make version-bump BUMP_TYPE=major     # 1.4.75 -> 2.0.0
-
-# Update all files and Kubernetes manifests
-make version-bump BUMP_TYPE=patch && make update-k8s-version
-
-# Build and deploy with new version
-make docker-build-versioned           # Build images with version tag
-kubectl apply -k kubernetes/overlays/speedscale/
-```
+Run `make version` to read the global release version from `VERSION`.
+`make version-bump BUMP_TYPE=patch` updates that file. Java services version
+their POMs independently. On merges to `master`, CI synchronizes the
+frontend and simulation package versions and Kubernetes image tags. See
+[the version bump policy](AGENTS.md#version-bump-policy).
 
 ## Documentation
 
 - **[AGENTS.md](./AGENTS.md)** — Guidance for AI assistants and automated agents
 - **[TROUBLESHOOTING.md](./TROUBLESHOOTING.md)** — Comprehensive debugging guide
 - **[OBSERVABILITY.md](./OBSERVABILITY.md)** — Monitoring, tracing, and metrics setup
-- **[PLAN.md](./PLAN.md)** — Detailed implementation phases and testing criteria
+- **[plan.md](./plan.md)** — Detailed implementation phases and testing criteria
 - **[architecture.md](./architecture.md)** — System architecture and design decisions
 
-## Getting Started
+## Local Health Checks
 
-1. **Prerequisites**: Docker, Docker Compose, Node.js 26.13.1, Java 25, Maven 3.10.1, Go 1.27.4, Python 3.15.2, .NET SDK 10.0.404
-2. **Quick start**: Run `docker-compose up -d` to start everything
-3. **Development**: Use service-specific Makefiles for isolated development
-4. **Testing**: Run service tests and the CI replay validation above
-5. **Deployment**: Use Kubernetes manifests for production deployment
+With the default Compose stack running, use `docker compose ps` for service
+status and these HTTP checks for published endpoints:
 
-## Health Checks
-
-Verify all services are running:
 ```bash
-curl http://localhost:8080/actuator/health  # API Gateway
-curl http://localhost:8081/actuator/health  # User Service
-curl http://localhost:8082/actuator/health  # Accounts Service
-curl http://localhost:8083/actuator/health  # Transactions Service
-curl http://localhost:8084/health           # AI Service (FastAPI)
-curl http://localhost:8085/health           # Notification Service (Go)
-curl http://localhost:3000/api/health       # Frontend
-# fraud-service speaks gRPC; use `grpcurl localhost:8086 list`
+curl -fsS http://localhost:3000/api/healthz
+curl -fsS http://localhost:8080/actuator/health
+curl -fsS http://localhost:8081/actuator/health
+curl -fsS http://localhost:8082/actuator/health
+curl -fsS http://localhost:8083/actuator/health
 ```
 
----
-
-For detailed troubleshooting, monitoring setup, and development workflows, see the documentation files listed above.
+Fraud exposes its application RPCs over gRPC on host port 8086.

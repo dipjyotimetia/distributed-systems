@@ -1,7 +1,7 @@
 # Banking journey coverage
 
-This matrix inventories the 31 original method declarations in the Next.js API. The browser session also uses POST `/api/users/logout`, exercised by `real-backend.spec.ts`. Evidence
-names the current test or identifies an outstanding check.
+This matrix tracks the frontend API contracts and their test evidence.
+Bracketed catch-all route handlers expose multiple operations.
 
 | Method and frontend route | Expected outcome | Test layer | Evidence |
 | --- | --- | --- | --- |
@@ -36,6 +36,10 @@ names the current test or identifies an outstanding check.
 | POST `/api/users/login` | Authenticate valid credentials and reject invalid credentials | Temporal, Playwright | `IdentityJourney` checks accepted and rejected credentials. `real-backend.spec.ts` checks cookie-backed login |
 | GET `/api/users/profile` | Return the authenticated profile | Temporal, Playwright | `IdentityJourney.AssertLoginAndProfile` verifies different identities and `real-backend.spec.ts` verifies session restoration |
 | POST `/api/users/register` | Register synthetic identity and reject duplicates | Temporal | `IdentityJourney.Register` and `AssertIdentityConflicts` check registration and conflicts on username and email |
+| POST `/api/users/logout` | Clear the browser session cookie | Playwright | `real-backend.spec.ts` checks logout |
+| GET and POST `/api/disputes/[[...casePath]]` | File and read owned disputes and respond to evidence requests | Playwright and integration | `disputes.real-backend.spec.ts` and the disputes scenario |
+| GET and POST `/api/operations/disputes/[[...casePath]]` | List disputes, request evidence, and resolve cases for allowlisted operators | Playwright and integration | `disputes.real-backend.spec.ts` and the disputes scenario |
+| GET and POST `/api/accounts/[id]/statement-jobs/[[...jobPath]]` | Queue an export, inspect job state, and download it before expiry | Integration | Statement jobs and worker recovery in the [integration guide](../tests/integration/README.md#disputes-and-statement-worker-recovery) |
 
 ## Cross-service boundaries
 
