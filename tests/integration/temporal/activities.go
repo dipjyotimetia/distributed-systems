@@ -4,11 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"slices"
 	"time"
 )
@@ -48,11 +46,7 @@ func request(ctx context.Context, method, base, path, token string, body any) (H
 	}
 	res, err := apiClient.Do(req)
 	if err != nil {
-		var requestError *url.Error
-		if errors.As(err, &requestError) {
-			err = requestError.Unwrap()
-		}
-		return HTTPResponse{}, fmt.Errorf("%s %s request failed: %w", method, path, err)
+		return HTTPResponse{}, fmt.Errorf("%s %s request failed", method, path)
 	}
 	defer res.Body.Close()
 	const maxBody = 1 << 20
