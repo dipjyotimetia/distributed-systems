@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: banking-gateway
+  namespace: banking-app
+  labels:
+    app.kubernetes.io/name: banking-app
+    app.kubernetes.io/component: gateway
+    app.kubernetes.io/service: api-gateway
+spec:
+  type: ClusterIP  # For external access in minikube
+  ports:
+  - port: 80
+    targetPort: 8080
+    protocol: TCP
+    name: http
+  selector:
+    app: banking-gateway
+    app.kubernetes.io/name: banking-app
+    app.kubernetes.io/component: gateway

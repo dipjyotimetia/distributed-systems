@@ -1,0 +1,42 @@
+spring:
+  sql:
+    init:
+      mode: ${MICROSVC_TX_SQL_INIT:always}
+      schema-locations: classpath:db/migration/V3__Movement_decisions.sql
+  datasource:
+    url: ${MICROSVC_TX_POSTGRES_URL:jdbc:h2:mem:${random.uuid};INIT=CREATE SCHEMA IF NOT EXISTS transactions_service}
+    driver-class-name: ${MICROSVC_TX_DRIVER:org.h2.Driver}
+    username: ${MICROSVC_TX_USER:sa}
+    password: ${MICROSVC_TX_PASSWORD:password}
+  
+  jpa:
+    defer-datasource-initialization: ${MICROSVC_TX_DEFER_INIT:true}
+    hibernate:
+      ddl-auto: ${MICROSVC_TX_DDL:create-drop}
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: ${MICROSVC_TX_DIALECT:org.hibernate.dialect.H2Dialect}
+  
+  flyway:
+    enabled: ${MICROSVC_TX_FLYWAY:false}
+    url: ${MICROSVC_TX_POSTGRES_URL:}
+    user: ${MICROSVC_POSTGRES_USER:postgres}
+    password: ${MICROSVC_POSTGRES_PASSWORD:}
+
+# External Service URLs for Testing
+accounts:
+  service:
+    url: http://localhost:8082
+
+# JWT Configuration
+jwt:
+  secret: testSecretKey123456789012345678901234567890
+  expiration: 86400000
+
+logging:
+  level:
+    com.banking.transactionsservice: DEBUG
+    org.springframework.web: INFO
+    org.springframework.security: INFO
+    org.hibernate.SQL: DEBUG

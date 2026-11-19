@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: banking-accounts
+  namespace: banking-app
+  labels:
+    app.kubernetes.io/name: banking-app
+    app.kubernetes.io/component: microservice
+    app.kubernetes.io/service: accounts-service
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 8080
+    protocol: TCP
+    name: http
+  selector:
+    app: banking-accounts
+    app.kubernetes.io/name: banking-app
+    app.kubernetes.io/component: microservice

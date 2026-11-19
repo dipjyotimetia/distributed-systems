@@ -1,0 +1,120 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/../../.."
+suite=tests/integration/temporal
+if [[ -z "${MICROSVC_SCENARIO:-}" ]]; then
+  status=0
+  MICROSVC_SCENARIO=transfer-worker-replacement bash "$suite/run.sh" || status=$?
+  if [[ -z "${TEMPORAL_TEST_UI_PORT:-}" ]]; then
+    MICROSVC_SCENARIO=identity MICROSVC_REPORT_SUFFIX="${MICROSVC_REPORT:+identity}" bash "$suite/run.sh" || status=$?
+    MICROSVC_SCENARIO=ledger MICROSVC_REPORT_SUFFIX="${MICROSVC_REPORT:+ledger}" bash "$suite/run.sh" || status=$?
+    MICROSVC_SCENARIO=statement-export MICROSVC_REPORT_SUFFIX="${MICROSVC_REPORT:+statement-export}" bash "$suite/run.sh" || status=$?
+    MICROSVC_SCENARIO=ai MICROSVC_REPORT_SUFFIX="${MICROSVC_REPORT:+ai}" bash "$suite/run.sh" || status=$?
+    if [[ "${MICROSVC_BROWSER:-0}" == 1 ]]; then
+      MICROSVC_SCENARIO=disputes MICROSVC_REPORT_SUFFIX="${MICROSVC_REPORT:+disputes}" bash "$suite/run.sh" || status=$?
+    fi
+  fi
+  exit "$status"
+fi
+if [[ "$MICROSVC_SCENARIO" == statement-export ]]; then
+  export MICROSVC_STATEMENT_BUCKET=statements-test
+fi
+if [[ "$MICROSVC_SCENARIO" == consumer-recovery ]]; then
+  export MICROSVC_FAILED_PROVIDER=slack
+fi
+project="temporal-$(openssl rand -hex 8)"
+report="${MICROSVC_REPORT:-$PWD/$suite/results/$project.json}"
+if [[ -n "${MICROSVC_REPORT_SUFFIX:-}" ]]; then
+  report="${report%.json}-$MICROSVC_REPORT_SUFFIX.json"
+fi
+export MICROSVC_REPORT="$report"
+
+compose=(docker compose -p "$project" -f docker-compose.yml -f "$suite/stack/compose.yml")
+if [[ "$MICROSVC_SCENARIO" == disputes ]]; then
+  compose+=(-f "$suite/stack/disputes.compose.yml")
+fi
+if [[ "$MICROSVC_SCENARIO" == consumer-recovery ]]; then
+  compose+=(-f "$suite/stack/recovery.compose.yml")
+fi
+mkdir -p "$(dirname "$report")"
+printf '{"scenario":"%s","workflow_passed":false}\n' "$MICROSVC_SCENARIO" >"$report"
+stage=docker
+browser_verdict=skipped
+cleanup() {
+  local status=$?
+  local cleanup_passed=true
+  if [[ "$status" != 0 && "$MICROSVC_SCENARIO" == disputes ]]; then
+    "${compose[@]}" logs --tail 40 postgres disputes-schema disputes-service disputes-worker disputes-temporal statement-worker || true
+  fi
+  if ! "${compose[@]}" down --volumes --remove-orphans --rmi local; then
+    cleanup_passed=false
+    if [[ "$status" == 0 ]]; then
+      status=1
+      stage=cleanup
+    fi
+  fi
+  python3 - "$report" "$status" "$stage" "$cleanup_passed" "$browser_verdict" <<'REPORT'
+import json
+import sys
+from pathlib import Path
+
+path, status, stage, cleanup_passed, browser = sys.argv[1:]
+path = Path(path)
+report = json.loads(path.read_text()) if path.exists() else {"workflow_passed": False}
+if report.get("scenario") in ("identity", "disputes"):
+    report["browser_verdict"] = browser
+report.update(command_passed=status == "0", command_stage=stage, cleanup_passed=cleanup_passed == "true")
+path.write_text(json.dumps(report, indent=2) + "\n")
+REPORT
+  printf 'Scenario %s report %s\n' "$MICROSVC_SCENARIO" "$report"
+  exit "$status"
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+docker info --format '{{.ServerVersion}}' >/dev/null
+stage=startup
+if [[ "$MICROSVC_SCENARIO" == ai ]]; then
+  "${compose[@]}" up -d --no-deps --build frontend ai-service provider-fixtures
+elif [[ "$MICROSVC_SCENARIO" == disputes ]]; then
+  "${compose[@]}" up -d --build frontend disputes-worker statement-worker
+else
+  "${compose[@]}" up -d --build frontend notification-service
+  export MICROSVC_GATEWAY="http://$("${compose[@]}" port api-gateway 8080)"
+  export MICROSVC_NOTIFICATIONS="http://$("${compose[@]}" port notification-service 8080)"
+  export MICROSVC_BROKER_CONTAINER="$("${compose[@]}" ps -q redpanda)"
+  export MICROSVC_POSTGRES_CONTAINER="$("${compose[@]}" ps -q postgres)"
+  export MICROSVC_MONGO_CONTAINER="$("${compose[@]}" ps -q mongodb)"
+  export MICROSVC_CONSUMER_CONTAINER="$("${compose[@]}" ps -q notification-service)"
+fi
+export MICROSVC_FRONTEND="http://$("${compose[@]}" port frontend 3000)"
+if [[ "$MICROSVC_SCENARIO" == disputes ]]; then
+  stage=browser
+  export MICROSVC_DISPUTES_PROJECT="$project"
+  export MICROSVC_GATEWAY="http://$("${compose[@]}" port api-gateway 8080)"
+  browser_verdict=failed
+  (cd frontend && npm run test:e2e:real-backend -- --grep '(transfer dispute|statement export) survives' --workers=1)
+  browser_verdict=passed
+  printf '{"scenario":"disputes","workflow_passed":true}\n' >"$report"
+  stage=complete
+  exit 0
+fi
+export MICROSVC_DELIVERIES="http://$("${compose[@]}" port provider-fixtures 8081)"
+test_timeout=4m
+if [[ -n "${TEMPORAL_TEST_UI_PORT:-}" ]]; then
+  test_timeout=15m
+fi
+stage=workflow
+(
+  cd "$suite"
+  go test -count=1 -timeout="$test_timeout" -run '^TestBankingIntegration$' -v .
+)
+if [[ "$MICROSVC_SCENARIO" == identity && "${MICROSVC_BROWSER:-0}" == 1 ]]; then
+  stage=browser
+  browser_verdict=failed
+  (cd frontend && npm run test:e2e:real-backend)
+  browser_verdict=passed
+fi
+stage=complete

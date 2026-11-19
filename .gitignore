@@ -1,0 +1,132 @@
+# Banking Application .gitignore
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Logs
+logs/
+*.log
+/var/log/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Java/Maven
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.properties
+
+# .NET
+bin/
+obj/
+publish/
+*.user
+*.suo
+
+# Node.js/NPM
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+.next/
+out/
+build/
+dist/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Docker
+.dockerignore
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Test coverage
+coverage/
+*.cover
+*.py,cover
+.coverage
+.coverage.*
+.cache
+.pytest_cache/
+
+# Test results and reports
+playwright-report/
+test-results/
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+
+# Build artifacts
+*.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# Spring Boot
+*.pid
+spring-shell.log
+
+# Application specific
+application-local.yml
+application-local.properties
+
+# Local traffic recordings; existing CI fixtures remain tracked.
+proxymock/
+# The shared proxymock test tooling (not recorded traffic) is tracked.
+!scripts/proxymock/
+# Checked-in golden fixtures consumed by automated application tests (force-tracked).
+# Each service's proxymock/ dir holds ONLY recorded data (recorded-golden/) + its README;
+# replay/mock output under results/ and the .replay marker stay ignored.
+!backend/*/proxymock/
+backend/*/proxymock/*
+!backend/*/proxymock/recorded-golden/
+!backend/*/proxymock/recorded-complete/
+!backend/*/proxymock/README.md
+backend/*/proxymock/results/
+backend/*/proxymock/recorded-golden/**/.replay/
+# Parked known-gap recordings are excluded from the replay gate, so no test consumes them;
+# keep them local only (AGENTS.md: checked-in fixtures must be consumed by a test).
+backend/*/proxymock/recorded-golden/known-gaps/
+**/*proxymock*.log
+**/*.log
+
+# Claude Code
+.claude/
+thoughts/
+
+# Local Temporal integration reports
+/tests/integration/temporal/results/

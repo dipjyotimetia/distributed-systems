@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: banking-fraud
+  namespace: banking-app
+  labels:
+    app.kubernetes.io/name: banking-app
+    app.kubernetes.io/component: microservice
+    app.kubernetes.io/service: fraud-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: banking-fraud
+      app.kubernetes.io/name: banking-app
+      app.kubernetes.io/component: microservice
+  template:
+    metadata:
+      labels:
+        app: banking-fraud
+        app.kubernetes.io/name: banking-app
+        app.kubernetes.io/component: microservice
+        app.kubernetes.io/service: fraud-service
+    spec:
+      serviceAccountName: banking-app-sa
+      containers:
+      - name: fraud-service
+        image: ghcr.io/speedscale/microsvc/fraud-service:v1.4.139
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+          name: grpc
+        - containerPort: 9091
+          name: metrics
+        env:
+        - name: GRPC_PORT
+          value: "8080"
+        - name: METRICS_PORT
+          value: "9091"
+        - name: OTEL_SERVICE_NAME
+          value: "fraud-service"
+        envFrom:
+        - configMapRef:
+            name: app-config
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+        readinessProbe:
+          tcpSocket:
+            port: grpc
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 6

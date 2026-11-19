@@ -1,0 +1,121 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /
+
+spring:
+  application:
+    name: transactions-service
+  
+  datasource:
+    url: jdbc:otel:postgresql://${DB_HOST:postgres}:${DB_PORT:5432}/${DB_NAME:banking_app}
+    username: transactions_service_user
+    password: transactions_service_pass
+    driver-class-name: io.opentelemetry.instrumentation.jdbc.OpenTelemetryDriver
+  
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        jdbc:
+          batch_size: 20
+        order_inserts: true
+        order_updates: true
+        batch_versioned_data: true
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+  
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    locations: classpath:db/migration
+    schemas: transactions_service
+    user: transactions_service_user
+    password: transactions_service_pass
+    url: jdbc:postgresql://${DB_HOST:postgres}:${DB_PORT:5432}/${DB_NAME:banking_app}
+  main:
+    web-application-type: servlet
+  kafka:
+    bootstrap-servers: ${KAFKA_BROKERS:banking-kafka:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+# JWT Configuration
+jwt:
+  secret: ${JWT_SECRET:banking-app-super-secret-key-change-this-in-production-256-bit}
+  expiration: ${JWT_EXPIRATION:86400000}
+
+# Service URLs for inter-service communication
+accounts:
+  service:
+    url: ${ACCOUNTS_SERVICE_URL:http://accounts-service:8080}
+
+grpc:
+  client:
+    fraud-service:
+      address: static://${FRAUD_SERVICE_HOST:banking-fraud}:${FRAUD_SERVICE_PORT:8080}
+      negotiation-type: plaintext
+
+kafka:
+  topic:
+    transactions: ${KAFKA_TOPIC:transaction-events}
+
+# Logging Configuration
+logging:
+  level:
+    com.banking.transactionsservice: DEBUG
+    org.springframework.web: DEBUG
+    org.springframework.security: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+  pattern:
+    console: "%d{HH:mm:ss.SSS} [%thread] %-5level [%X{traceId},%X{spanId}] %logger{36} - %msg%n"
+    file: "%d{HH:mm:ss.SSS} [%thread] %-5level [%X{traceId},%X{spanId}] %logger{36} - %msg%n"
+
+# Management endpoints
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+  tracing:
+    enabled: false  # Disable Spring Boot's built-in tracing, use OpenTelemetry instead
+
+# OpenTelemetry Configuration
+otel:
+  service:
+    name: ${spring.application.name}
+  exporter:
+    otlp:
+      protocol: grpc
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4317}
+  traces:
+    exporter: otlp
+    propagators: tracecontext
+  metrics:
+    exporter: otlp
+  logs:
+    exporter: otlp
+  propagation:
+    type: tracecontext
+  # HTTP instrumentation configuration
+  instrumentation:
+    http:
+      enabled: true
+    jdbc:
+      enabled: true
+  # Span naming configuration
+  span:
+    name:
+      pattern: "{http.method} {http.route}"

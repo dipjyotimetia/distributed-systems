@@ -1,0 +1,324 @@
+{
+  "annotations": {"list": []},
+  "title": "Banking Application — Errors",
+  "uid": "banking-app-errors",
+  "tags": ["banking-app", "errors"],
+  "editable": true,
+  "schemaVersion": 39,
+  "version": 1,
+  "time": {"from": "now-30m", "to": "now"},
+  "refresh": "10s",
+  "templating": {
+    "list": [
+      {
+        "name": "service",
+        "label": "Service",
+        "type": "query",
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "definition": "label_values(http_server_requests_seconds_count{job=~\".*-service\"}, job)",
+        "query": {"qryType": 1, "query": "label_values(http_server_requests_seconds_count{job=~\".*-service\"}, job)", "refId": "PrometheusVariableQueryEditor-VariableQuery"},
+        "includeAll": true,
+        "multi": true,
+        "allValue": null,
+        "current": {"text": ["All"], "value": ["$__all"]},
+        "refresh": 2,
+        "sort": 1
+      }
+    ]
+  },
+  "links": [
+    {"title": "← Overview", "icon": "arrow-left", "type": "link", "url": "/d/banking-app-health/overview?${__url_time_range}&${__all_variables}", "targetBlank": false}
+  ],
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Total Errors",
+      "description": "Total 4xx + 5xx errors in the selected time range",
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"expr": "sum(increase(http_server_requests_seconds_count{job=~\"$service\", status=~\"[45]..\", uri!~\"/actuator.*\"}[$__range]))", "refId": "A"}
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "thresholds": {"mode": "absolute", "steps": [
+            {"color": "green", "value": null},
+            {"color": "yellow", "value": 50},
+            {"color": "red", "value": 200}
+          ]},
+          "color": {"mode": "thresholds"}
+        }
+      },
+      "options": {"graphMode": "area", "textMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "value"}
+    },
+    {
+      "type": "stat",
+      "title": "Error %",
+      "description": "Percentage of requests returning 4xx/5xx",
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"expr": "sum(rate(http_server_requests_seconds_count{job=~\"$service\", status=~\"[45]..\", uri!~\"/actuator.*\"}[5m])) / sum(rate(http_server_requests_seconds_count{job=~\"$service\", uri!~\"/actuator.*\"}[5m])) * 100", "refId": "A"}
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 1,
+          "thresholds": {"mode": "absolute", "steps": [
+            {"color": "green", "value": null},
+            {"color": "yellow", "value": 1},
+            {"color": "orange", "value": 3},
+            {"color": "red", "value": 5}
+          ]},
+          "color": {"mode": "thresholds"}
+        }
+      },
+      "options": {"graphMode": "area", "textMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "value"}
+    },
+    {
+      "type": "stat",
+      "title": "4xx Errors",
+      "description": "Client errors in selected time range",
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"expr": "sum(increase(http_server_requests_seconds_count{job=~\"$service\", status=~\"4..\", uri!~\"/actuator.*\"}[$__range]))", "refId": "A"}
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "thresholds": {"mode": "absolute", "steps": [
+            {"color": "green", "value": null},
+            {"color": "orange", "value": 10}
+          ]},
+          "color": {"mode": "thresholds"}
+        }
+      },
+      "options": {"graphMode": "area", "textMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "value"}
+    },
+    {
+      "type": "stat",
+      "title": "5xx Errors",
+      "description": "Server errors in selected time range",
+      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"expr": "sum(increase(http_server_requests_seconds_count{job=~\"$service\", status=~\"5..\", uri!~\"/actuator.*\"}[$__range]))", "refId": "A"}
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "thresholds": {"mode": "absolute", "steps": [
+            {"color": "green", "value": null},
+            {"color": "red", "value": 1}
+          ]},
+          "color": {"mode": "thresholds"}
+        }
+      },
+      "options": {"graphMode": "area", "textMode": "auto", "reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "value"}
+    },
+    {
+      "type": "timeseries",
+      "title": "Error Rate by Service",
+      "description": "4xx/5xx error percentage per service over time",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"expr": "sum by (job) (rate(http_server_requests_seconds_count{job=~\"$service\", status=~\"[45]..\", uri!~\"/actuator.*\"}[5m])) / sum by (job) (rate(http_server_requests_seconds_count{job=~\"$service\", uri!~\"/actuator.*\"}[5m])) * 100", "legendFormat": "{{job}}", "refId": "A"}
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {"drawStyle": "line", "fillOpacity": 20, "lineWidth": 2, "pointSize": 5, "showPoints": "auto"},
+          "unit": "percent",
+          "min": 0,
+          "links": [{"title": "View traces in Jaeger", "url": "/explore?schemaVersion=1&panes={%22j%22:{%22datasource%22:%22jaeger%22,%22queries%22:[{%22refId%22:%22A%22,%22queryType%22:%22search%22,%22service%22:%22${__series.name}%22,%22tags%22:%22%22}],%22range%22:{%22from%22:%22now-30m%22,%22to%22:%22now%22}}}", "targetBlank": true}]
+        }
+      },
+      "options": {"tooltip": {"mode": "multi"}}
+    },
+    {
+      "type": "timeseries",
+      "title": "Errors by Status Code",
+      "description": "Error count per status code over time",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"expr": "sum by (status) (increase(http_server_requests_seconds_count{job=~\"$service\", status=~\"[45]..\", uri!~\"/actuator.*\"}[1m]))", "legendFormat": "{{status}}", "refId": "A"}
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {"drawStyle": "bars", "fillOpacity": 80, "lineWidth": 0, "stacking": {"mode": "normal"}},
+          "unit": "short",
+          "decimals": 0
+        },
+        "overrides": [
+          {"matcher": {"id": "byRegexp", "options": "^4..$"}, "properties": [{"id": "color", "value": {"fixedColor": "orange", "mode": "fixed"}}]},
+          {"matcher": {"id": "byRegexp", "options": "^5..$"}, "properties": [{"id": "color", "value": {"fixedColor": "red", "mode": "fixed"}}]}
+        ]
+      },
+      "options": {"tooltip": {"mode": "multi"}}
+    },
+    {
+      "type": "table",
+      "title": "Errors by Endpoint",
+      "description": "Error rate as percentage of each endpoint's total traffic",
+      "gridPos": {"h": 9, "w": 24, "x": 0, "y": 12},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "expr": "(100 * sum by (job, method, uri, status) (rate(http_server_requests_seconds_count{job=~\"$service\", status=~\"[45]..\", uri!~\"/actuator.*\"}[5m])) / ignoring(status) group_left sum by (job, method, uri) (rate(http_server_requests_seconds_count{job=~\"$service\", uri!~\"/actuator.*\"}[5m]))) >= 0",
+          "format": "table", "instant": true, "refId": "A"
+        }
+      ],
+      "transformations": [
+        {"id": "organize", "options": {
+          "excludeByName": {"Time": true},
+          "renameByName": {"job": "Service", "method": "Method", "uri": "Endpoint", "status": "Status", "Value": "Error %"}
+        }},
+        {"id": "sortBy", "options": {"fields": {}, "sort": [{"field": "Error %", "desc": true}]}}
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {"align": "auto", "filterable": true, "cellOptions": {"type": "auto"}},
+          "decimals": 1
+        },
+        "overrides": [
+          {"matcher": {"id": "byName", "options": "Error %"}, "properties": [
+            {"id": "unit", "value": "percent"},
+            {"id": "custom.cellOptions", "value": {"type": "color-background"}},
+            {"id": "color", "value": {"mode": "continuous-reds"}}
+          ]},
+          {"matcher": {"id": "byName", "options": "Service"}, "properties": [
+            {"id": "links", "value": [{"title": "View traces in Jaeger", "url": "/explore?schemaVersion=1&panes={%22j%22:{%22datasource%22:%22jaeger%22,%22queries%22:[{%22refId%22:%22A%22,%22queryType%22:%22search%22,%22service%22:%22${__value.text}%22,%22tags%22:%22%22}],%22range%22:{%22from%22:%22now-30m%22,%22to%22:%22now%22}}}", "targetBlank": true}]}
+          ]},
+          {"matcher": {"id": "byName", "options": "Status"}, "properties": [{"id": "custom.width", "value": 90}]},
+          {"matcher": {"id": "byName", "options": "Method"}, "properties": [{"id": "custom.width", "value": 90}]}
+        ]
+      },
+      "options": {"showHeader": true, "cellHeight": "sm", "footer": {"show": false}}
+    },
+    {
+      "type": "timeseries",
+      "title": "AI Provider Calls (ai-service → LLMs)",
+      "description": "Outbound call rate from ai-service to the 5 LLM providers, broken out by response status. Healthy = 200 series; any non-2xx indicates provider issues, bad credentials, or rate limits.",
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 21},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"expr": "sum by (provider, status) (rate(ai_provider_requests_total[5m]))", "legendFormat": "{{provider}} {{status}}", "refId": "A"}
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {"drawStyle": "bars", "fillOpacity": 80, "lineWidth": 0, "stacking": {"mode": "normal"}},
+          "unit": "reqps",
+          "decimals": 2
+        },
+        "overrides": [
+          {"matcher": {"id": "byRegexp", "options": "anthropic"}, "properties": [{"id": "color", "value": {"fixedColor": "orange", "mode": "fixed"}}]},
+          {"matcher": {"id": "byRegexp", "options": "openai"}, "properties": [{"id": "color", "value": {"fixedColor": "green", "mode": "fixed"}}]},
+          {"matcher": {"id": "byRegexp", "options": "gemini"}, "properties": [{"id": "color", "value": {"fixedColor": "blue", "mode": "fixed"}}]},
+          {"matcher": {"id": "byRegexp", "options": "xai"}, "properties": [{"id": "color", "value": {"fixedColor": "dark-purple", "mode": "fixed"}}]},
+          {"matcher": {"id": "byRegexp", "options": "openrouter"}, "properties": [{"id": "color", "value": {"fixedColor": "red", "mode": "fixed"}}]}
+        ]
+      },
+      "options": {"tooltip": {"mode": "multi"}}
+    },
+    {
+      "type": "table",
+      "title": "Recent Requests by Status — ${service}",
+      "description": "Per-endpoint request count over the last 5 minutes, broken out by HTTP status. Status column is colored green / orange / red for 2xx / 4xx / 5xx so good and bad calls are differentiated at a glance. Click the Service cell to open Jaeger filtered to that service.",
+      "gridPos": {"h": 10, "w": 12, "x": 0, "y": 29},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"expr": "sum by (job, method, uri, status) (increase(http_server_requests_seconds_count{job=~\"$service\", uri!~\"/actuator.*\"}[5m]))", "format": "table", "instant": true, "refId": "A"}
+      ],
+      "transformations": [
+        {"id": "organize", "options": {
+          "excludeByName": {"Time": true},
+          "renameByName": {"job": "Service", "method": "Method", "uri": "Endpoint", "status": "Status", "Value": "Count (5m)"}
+        }},
+        {"id": "sortBy", "options": {"fields": {}, "sort": [{"field": "Count (5m)", "desc": true}]}}
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {"align": "auto", "filterable": true, "cellOptions": {"type": "auto"}},
+          "decimals": 0
+        },
+        "overrides": [
+          {"matcher": {"id": "byName", "options": "Status"}, "properties": [
+            {"id": "custom.width", "value": 90},
+            {"id": "custom.cellOptions", "value": {"type": "color-background", "mode": "basic"}},
+            {"id": "thresholds", "value": {"mode": "absolute", "steps": [
+              {"color": "green", "value": null},
+              {"color": "orange", "value": 400},
+              {"color": "red", "value": 500}
+            ]}}
+          ]},
+          {"matcher": {"id": "byName", "options": "Method"}, "properties": [{"id": "custom.width", "value": 90}]},
+          {"matcher": {"id": "byName", "options": "Count (5m)"}, "properties": [{"id": "custom.width", "value": 110}]},
+          {"matcher": {"id": "byName", "options": "Service"}, "properties": [
+            {"id": "links", "value": [{"title": "View traces in Jaeger", "url": "/explore?schemaVersion=1&panes={%22j%22:{%22datasource%22:%22jaeger%22,%22queries%22:[{%22refId%22:%22A%22,%22queryType%22:%22search%22,%22service%22:%22${__value.text}%22,%22tags%22:%22%22}],%22range%22:{%22from%22:%22now-30m%22,%22to%22:%22now%22}}}", "targetBlank": true}]}
+          ]}
+        ]
+      },
+      "options": {"showHeader": true, "cellHeight": "sm", "footer": {"show": false}}
+    },
+    {
+      "type": "logs",
+      "title": "Application Logs — Errors",
+      "description": "ERROR and WARN log lines from banking-app services (via Promtail → Loki)",
+      "gridPos": {"h": 10, "w": 12, "x": 12, "y": 29},
+      "datasource": {"type": "loki", "uid": "loki"},
+      "targets": [
+        {"expr": "{namespace=\"banking-app\", container=~\".+\"} |~ \"(?i)(ERROR|WARN|Exception|panic|fatal)\"", "refId": "A"}
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": true,
+        "showCommonLabels": false,
+        "wrapLogMessage": false,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "sortOrder": "Descending",
+        "dedupStrategy": "none"
+      }
+    },
+    {
+      "type": "table",
+      "title": "Trace Inspector — ${service}",
+      "description": "Recent traces for the selected service, longest first (errors usually run longer). Click a Trace ID to open the full span tree in Jaeger — the bad ones surface the exception event + stack trace right on the failing span.",
+      "gridPos": {"h": 12, "w": 24, "x": 0, "y": 39},
+      "datasource": {"type": "jaeger", "uid": "jaeger"},
+      "targets": [
+        {"refId": "A", "datasource": {"type": "jaeger", "uid": "jaeger"}, "queryType": "search", "service": "${service}", "operation": "", "tags": "", "minDuration": "", "maxDuration": "", "limit": 20}
+      ],
+      "options": {"showHeader": true, "cellHeight": "sm"},
+      "fieldConfig": {
+        "defaults": {
+          "custom": {"align": "auto", "filterable": true}
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "Duration"},
+            "properties": [
+              {"id": "unit", "value": "ms"},
+              {"id": "custom.cellOptions", "value": {"type": "color-background", "mode": "gradient"}},
+              {"id": "color", "value": {"mode": "continuous-YlOrRd"}}
+            ]
+          },
+          {
+            "matcher": {"id": "byName", "options": "Trace ID"},
+            "properties": [
+              {"id": "links", "value": [
+                {"title": "Open trace + see exception stack trace (if any)", "url": "/explore?schemaVersion=1&panes={%22j%22:{%22datasource%22:%22jaeger%22,%22queries%22:[{%22refId%22:%22A%22,%22queryType%22:%22trace%22,%22query%22:%22${__value.text}%22}],%22range%22:{%22from%22:%22now-1h%22,%22to%22:%22now%22}}}", "targetBlank": true}
+              ]}
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

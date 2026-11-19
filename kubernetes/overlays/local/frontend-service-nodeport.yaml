@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: banking-frontend-nodeport
+  namespace: banking-app
+  labels:
+    app: banking-frontend
+    app.kubernetes.io/name: banking-app
+    app.kubernetes.io/component: frontend
+    app.kubernetes.io/service: frontend
+spec:
+  type: NodePort
+  ports:
+  - port: 80
+    targetPort: 3000
+    nodePort: 30080
+    protocol: TCP
+    name: http
+  selector:
+    app: banking-frontend

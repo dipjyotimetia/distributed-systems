@@ -1,0 +1,39 @@
+name: Workflow Protobuf
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: false
+      - name: Install pinned local tools
+        run: |
+          go install github.com/bufbuild/buf/cmd/buf@v1.57.0
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.9
+          curl -fsSL https://repo.maven.apache.org/maven2/com/google/protobuf/protoc/4.31.1/protoc-4.31.1-linux-x86_64.exe -o "$(go env GOPATH)/bin/protoc"
+          chmod +x "$(go env GOPATH)/bin/protoc"
+          go env GOPATH | sed 's|$|/bin|' >> "$GITHUB_PATH"
+      - name: Verify generated bindings
+        run: |
+          generated="$(mktemp -d)"
+          bash scripts/workflow-proto.sh "$generated"
+          go_bindings=backend/disputes-service/internal/generated
+          java_bindings=backend/accounts-service/src/main/java/com/banking/accountsservice/statements/generated
+          diff -ru "$go_bindings" "$generated/$go_bindings"
+          diff -ru "$java_bindings" "$generated/$java_bindings"
+      - name: Check compatibility with PR base
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if git cat-file -e "${BASE_SHA}:proto/workflows/buf.yaml"; then
+            git archive "$BASE_SHA" proto/workflows | tar -x -C "$RUNNER_TEMP"
+            buf breaking proto/workflows --against "$RUNNER_TEMP/proto/workflows"
+          fi

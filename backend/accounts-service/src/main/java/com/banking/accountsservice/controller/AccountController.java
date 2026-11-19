@@ -1,0 +1,265 @@
+package com.banking.accountsservice.controller;
+
+import com.banking.accountsservice.dto.AccountCreateRequest;
+import com.banking.accountsservice.dto.AccountResponse;
+import com.banking.accountsservice.dto.AccountQuery;
+import com.banking.accountsservice.dto.AccountSummary;
+import com.banking.accountsservice.dto.BalanceResponse;
+import com.banking.accountsservice.entity.Account.Status;
+import com.banking.accountsservice.security.UserAuthenticationDetails;
+import com.banking.accountsservice.service.AccountService;
+import com.banking.accountsservice.service.FinancialDataService;
+import com.banking.accountsservice.service.StatementExportService;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.Tracer;
+import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.ProblemDetail;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.math.BigDecimal;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/accounts")
+public class AccountController {
+    
+    private static final Logger logger = LoggerFactory.getLogger(AccountController.class);
+    
+    @Autowired
+    private AccountService accountService;
+
+    @Autowired
+    private FinancialDataService financialDataService;
+
+    @Autowired
+    private StatementExportService statementExportService;
+
+    @Autowired
+    private Tracer tracer;
+    
+    
+    @GetMapping
+    public ResponseEntity<?> getUserAccounts(@ModelAttribute AccountQuery query) {
+        if (!query.isUnfiltered()) {
+            return ResponseEntity.ok(accountService.queryAccounts(getUserIdFromAuthentication(), query, false));
+        }
+        Span span = tracer.spanBuilder("get-user-accounts").startSpan();
+        try {
+            Long userId = getUserIdFromAuthentication();
+            logger.info("Fetching accounts for user: {}", userId);
+            
+            List<AccountResponse> accounts = accountService.getUserAccounts(userId);
+            span.setAttribute("user.id", userId);
+            span.setAttribute("accounts.count", accounts.size());
+            
+            return ResponseEntity.ok(accounts);
+        } catch (Exception e) {
+            span.recordException(e);
+            logger.error("Error fetching accounts", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        } finally {
+            span.end();
+        }
+    }
+    
+    @GetMapping("/search")
+    public Object search(@ModelAttribute AccountQuery query) {
+        return accountService.queryAccounts(getUserIdFromAuthentication(), query, true);
+    }
+
+    @GetMapping("/summary")
+    public AccountSummary summary() {
+        return accountService.summarize(getUserIdFromAuthentication());
+    }
+
+    @PostMapping
+    public ResponseEntity<AccountResponse> createAccount(
+            @Valid @RequestBody AccountCreateRequest request) {
+        Span span = tracer.spanBuilder("create-account").startSpan();
+        try {
+            Long userId = getUserIdFromAuthentication();
+            logger.info("Creating account for user: {}", userId);
+            
+            AccountResponse account = accountService.createAccount(request, userId);
+            span.setAttribute("user.id", userId);
+            span.setAttribute("account.type", request.getAccountType());
+            span.setAttribute("account.number", account.getAccountNumber());
+            
+            return ResponseEntity.status(HttpStatus.CREATED).body(account);
+        } catch (Exception e) {
+            span.recordException(e);
+            logger.error("Error creating account", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        } finally {
+            span.end();
+        }
+    }
+    
+    @GetMapping("/{accountId}")
+    public ResponseEntity<AccountResponse> getAccountById(
+            @PathVariable Long accountId) {
+        Span span = tracer.spanBuilder("get-account-by-id").startSpan();
+        try {
+            Long userId = getUserIdFromAuthentication();
+            logger.info("Fetching account {} for user: {}", accountId, userId);
+            
+            AccountResponse account = accountService.getAccountById(accountId, userId);
+            span.setAttribute("user.id", userId);
+            span.setAttribute("account.id", accountId);
+            span.setAttribute("account.number", account.getAccountNumber());
+            
+            return ResponseEntity.ok(account);
+        } catch (RuntimeException e) {
+            span.recordException(e);
+            logger.error("Account not found or access denied", e);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        } catch (Exception e) {
+            span.recordException(e);
+            logger.error("Error fetching account", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        } finally {
+            span.end();
+        }
+    }
+    
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<ProblemDetail> handleStatusException(ResponseStatusException failure) {
+        return ResponseEntity.status(failure.getStatusCode()).body(failure.getBody());
+    }
+
+    public record AccountUpdateRequest(String accountType, Status status) {}
+    public record StatusUpdateRequest(@jakarta.validation.constraints.NotNull Status status) {}
+
+    @PutMapping("/{accountId}")
+    public AccountResponse updateAccount(@PathVariable Long accountId, @RequestBody AccountUpdateRequest request) {
+        return accountService.updateAccount(accountId, getUserIdFromAuthentication(), request.accountType(), request.status());
+    }
+
+    @PatchMapping("/{accountId}/status")
+    public AccountResponse updateStatus(@PathVariable Long accountId, @Valid @RequestBody StatusUpdateRequest request) {
+        return accountService.updateAccount(accountId, getUserIdFromAuthentication(), null, request.status());
+    }
+
+    @DeleteMapping("/{accountId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void closeAccount(@PathVariable Long accountId) {
+        accountService.updateAccount(accountId, getUserIdFromAuthentication(), null, Status.CLOSED);
+    }
+
+    @GetMapping("/{accountId}/balance")
+    public ResponseEntity<BalanceResponse> getAccountBalance(
+            @PathVariable Long accountId) {
+        Span span = tracer.spanBuilder("get-account-balance").startSpan();
+        try {
+            Long userId = getUserIdFromAuthentication();
+            logger.info("Fetching balance for account {} for user: {}", accountId, userId);
+            
+            BalanceResponse balance = accountService.getAccountBalance(accountId, userId);
+            financialDataService.enrichAsync(balance.getAccountNumber());
+            span.setAttribute("user.id", userId);
+            span.setAttribute("account.id", accountId);
+            span.setAttribute("account.number", balance.getAccountNumber());
+
+            return ResponseEntity.ok(balance);
+        } catch (RuntimeException e) {
+            span.recordException(e);
+            logger.error("Account not found or access denied", e);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        } catch (Exception e) {
+            span.recordException(e);
+            logger.error("Error fetching account balance", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        } finally {
+            span.end();
+        }
+    }
+    
+    @PutMapping("/{accountId}/balance")
+    public ResponseEntity<Void> updateAccountBalance(
+            @PathVariable Long accountId,
+            @RequestBody Map<String, Object> requestBody) {
+        Span span = tracer.spanBuilder("update-account-balance").startSpan();
+        try {
+            Long userId = getUserIdFromAuthentication();
+            logger.info("Updating balance for account {} for user: {}", accountId, userId);
+            
+            Object balanceObj = requestBody.get("balance");
+            if (!(balanceObj instanceof Number)) {
+                return ResponseEntity.badRequest().build();
+            }
+            
+            BigDecimal newBalance = new BigDecimal(balanceObj.toString());
+            accountService.updateBalance(accountId, newBalance, userId);
+            
+            span.setAttribute("user.id", userId);
+            span.setAttribute("account.id", accountId);
+            
+            return ResponseEntity.ok().build();
+        } catch (RuntimeException e) {
+            span.recordException(e);
+            logger.error("Account not found or access denied", e);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        } catch (Exception e) {
+            span.recordException(e);
+            logger.error("Error updating account balance", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        } finally {
+            span.end();
+        }
+    }
+    
+    @PostMapping("/{accountId}/export-statement")
+    public ResponseEntity<Map<String, Object>> exportStatement(
+            @PathVariable Long accountId) {
+        Span span = tracer.spanBuilder("export-statement").startSpan();
+        try {
+            Long userId = getUserIdFromAuthentication();
+            span.setAttribute("user.id", userId);
+            span.setAttribute("account.id", accountId);
+
+            if (!statementExportService.isConfigured()) {
+                // No object store wired in this environment: generate the
+                // statement and return it inline (zero external egress) rather
+                // than failing the request.
+                Map<String, Object> body = new HashMap<>();
+                body.put("status", "generated");
+                body.put("statement", statementExportService.generateStatement(accountId, userId));
+                return ResponseEntity.ok(body);
+            }
+
+            logger.info("Exporting statement for account {} user {}", accountId, userId);
+            String key = statementExportService.exportStatement(accountId, userId);
+            span.setAttribute("s3.key", key);
+
+            Map<String, Object> body = new HashMap<>();
+            body.put("status", "exported");
+            body.put("key", key);
+            return ResponseEntity.ok(body);
+        } catch (RuntimeException e) {
+            span.recordException(e);
+            logger.error("Statement export failed", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        } finally {
+            span.end();
+        }
+    }
+
+    private Long getUserIdFromAuthentication() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || authentication.getDetails() == null) {
+            throw new RuntimeException("User not authenticated");
+        }
+        UserAuthenticationDetails details = (UserAuthenticationDetails) authentication.getDetails();
+        return details.getUserId();
+    }
+}

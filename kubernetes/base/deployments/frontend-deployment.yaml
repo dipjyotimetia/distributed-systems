@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: banking-frontend
+  namespace: banking-app
+  labels:
+    app: banking-frontend
+    app.kubernetes.io/name: banking-app
+    app.kubernetes.io/component: frontend
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/service: frontend
+    app.kubernetes.io/version: v1.1.2
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: banking-frontend
+  template:
+    metadata:
+      labels:
+        app: banking-frontend
+        app.kubernetes.io/name: banking-app
+        app.kubernetes.io/component: frontend
+        app.kubernetes.io/service: frontend
+    spec:
+      serviceAccountName: banking-app-sa
+      containers:
+      - name: frontend
+        image: ghcr.io/speedscale/microsvc/frontend:v1.4.139
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 3000
+          name: http
+        envFrom:
+        - configMapRef:
+            name: banking-frontend-config
+        env:
+        - name: AI_SERVICE_URL
+          value: "http://banking-ai:8080"
+        resources:
+          requests:
+            # Steady state sits near 200Mi, so the old 256Mi ceiling OOMKilled
+            # the container on every traffic burst (160 restarts in staging).
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /api/healthz
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /api/healthz
+            port: 3000
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3

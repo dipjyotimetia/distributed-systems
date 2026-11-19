@@ -1,0 +1,55 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+- ../../base
+- ../../observability
+- speedscale-metrics-services.yaml
+# In-cluster Speedscale responder mocks for every third-party call (responder-only,
+# fail-closed). The app exercises its real integration paths against recorded
+# snapshots with zero external egress; dummy keys from the base secret are fine.
+- responders/replay-banking-accounts.yaml
+- responders/replay-banking-transactions.yaml
+- responders/replay-banking-fraud.yaml
+- responders/replay-banking-notification.yaml
+- responders/replay-banking-user.yaml
+- responders/replay-banking-ai.yaml
+# PostSync hook: after every ArgoCD sync, wait for the TRs above to reach Running,
+# then rollout-restart any banking workload whose pods are missing the responder
+# init container. Without this, a rolling deploy can ship pods that skipped the
+# operator's responder injection (TR was briefly non-Running during the sync),
+# and outbound traffic escapes the cluster until somebody notices and restarts
+# the workload by hand.
+- responders/tr-postsync-reroll.yaml
+
+patches:
+# Add Istio injection and Speedscale labels to the existing banking-app namespace
+- target:
+    version: v1
+    kind: Namespace
+    name: banking-app
+  patch: |-
+    - op: add
+      path: /metadata/labels/speedscale
+      value: "true"
+    - op: add
+      path: /metadata/labels/istio-injection
+      value: enabled
+- path: user-service-annotations.yaml
+- path: accounts-service-annotations.yaml
+- path: transactions-service-annotations.yaml
+- path: ai-service-annotations.yaml
+- path: api-gateway-annotations.yaml
+- path: frontend-annotations.yaml
+- path: fraud-service-annotations.yaml
+- path: notification-service-annotations.yaml
+# Wire third-party API keys into each service (sourced from the base
+# banking-thirdparty-keys secret — dummy values; calls are responder-mocked)
+- path: accounts-service-thirdparty-env.yaml
+- path: transactions-service-thirdparty-env.yaml
+- path: fraud-service-thirdparty-env.yaml
+- path: notification-service-thirdparty-env.yaml
+- path: user-service-thirdparty-env.yaml
+- path: ai-service-thirdparty-env.yaml
+# Disable S3 statement export (not responder-mocked) to keep egress at zero
+- path: simulation-client-export-off.yaml

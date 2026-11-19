@@ -1,0 +1,20 @@
+services:
+  user-service:
+    environment:
+      SIM_USER_COUNT: "0"
+  disputes-service:
+    environment:
+      # The operator is the first registration in this isolated database.
+      DISPUTES_OPERATOR_IDS: "1"
+      DISPUTES_TEST_ESCALATION_DELAY: 35s
+      OTEL_EXPORTER_OTLP_ENDPOINT: ""
+  disputes-worker:
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: ""
+  api-gateway:
+    environment:
+      FAULT_INJECTION_RATE: "0"
+  statement-worker:
+    environment:
+      OTEL_SDK_DISABLED: "true"
+      STATEMENTS_TEST_RETENTION_SECONDS: "45"

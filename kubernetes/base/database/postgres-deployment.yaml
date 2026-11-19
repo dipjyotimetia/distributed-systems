@@ -1,0 +1,87 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: banking-postgres
+  namespace: banking-app
+  labels:
+    app.kubernetes.io/name: banking-app
+    app.kubernetes.io/component: database
+spec:
+  replicas: 1
+  # The Postgres PVC is RWO block storage (do-block-storage) and can attach to only
+  # one pod at a time. The default RollingUpdate surges a new pod that deadlocks on a
+  # Multi-Attach error against the still-running old pod, so rollouts never complete.
+  # Recreate terminates the old pod (releasing the volume) before starting the new one.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: banking-postgres
+      app.kubernetes.io/name: banking-app
+      app.kubernetes.io/component: database
+  template:
+    metadata:
+      labels:
+        app: banking-postgres
+        app.kubernetes.io/name: banking-app
+        app.kubernetes.io/component: database
+    spec:
+      serviceAccountName: banking-app-sa
+      containers:
+      - name: postgres
+        image: postgres:15-alpine
+        ports:
+        - containerPort: 5432
+          name: postgres
+        env:
+        - name: POSTGRES_DB
+          value: "banking_app"
+        - name: POSTGRES_USER
+          value: "postgres"
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: banking-postgres-secret
+              key: password
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+        volumeMounts:
+        - name: postgres-storage
+          mountPath: /var/lib/postgresql/data
+        - name: postgres-init
+          mountPath: /docker-entrypoint-initdb.d
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - postgres
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - postgres
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 1
+          successThreshold: 1
+          failureThreshold: 3
+      volumes:
+      - name: postgres-storage
+        persistentVolumeClaim:
+          claimName: banking-postgres-pvc
+      - name: postgres-init
+        configMap:
+          name: banking-postgres-init

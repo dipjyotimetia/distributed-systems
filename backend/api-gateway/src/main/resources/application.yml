@@ -1,0 +1,123 @@
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      # Routes are configured programmatically in GatewayConfig.java
+      default-filters:
+        - TraceIdInjectionFilter
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOrigins: "http://localhost:3000"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - OPTIONS
+            allowedHeaders: "*"
+            allowCredentials: true
+            maxAge: 3600
+      httpclient:
+        connect-timeout: 30000
+        response-timeout: 60s
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+server:
+  port: 8080
+
+# Management and Actuator Configuration
+management:
+  endpoints:
+    web:
+      exposure:
+        include: info,health,metrics,prometheus
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: when-authorized
+  tracing:
+    enabled: true
+    sampling:
+      probability: 1.0
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+
+# Service Discovery Configuration
+services:
+  user-service:
+    url: ${USER_SERVICE_URL:http://localhost:8081}
+  accounts-service:
+    url: ${ACCOUNTS_SERVICE_URL:http://localhost:8082}
+  disputes-service:
+    url: ${DISPUTES_SERVICE_URL:http://localhost:8087}
+  transactions-service:
+    url: ${TRANSACTIONS_SERVICE_URL:http://localhost:8083}
+
+# JWT Configuration
+jwt:
+  secret: ${JWT_SECRET:banking-app-super-secret-key-change-this-in-production-256-bit}
+  expiration: ${JWT_EXPIRATION:86400000}
+
+# Logging Configuration
+logging:
+  level:
+    com.banking.apigroup: DEBUG
+    org.springframework.cloud.gateway: DEBUG
+    org.springframework.boot.actuate.endpoint.web: WARN
+  pattern:
+    console: "%d{HH:mm:ss.SSS} [%thread] %-5level [%X{traceId},%X{spanId}] %logger{36} - %msg%n"
+    file: "%d{HH:mm:ss.SSS} [%thread] %-5level [%X{traceId},%X{spanId}] %logger{36} - %msg%n"
+# Disabled file logging for containerized deployment
+#  file:
+#    name: logs/api-gateway.log
+
+# OpenTelemetry Configuration
+otel:
+  service:
+    name: ${spring.application.name}
+  exporter:
+    otlp:
+      protocol: grpc
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4317}
+      headers: {}
+      timeout: 10s
+      compression: none
+  traces:
+    exporter: otlp
+    propagators: tracecontext
+    sampler:
+      type: always_on
+      arg: 1.0
+    processor:
+      batch:
+        enabled: true
+        maxQueueSize: 2048
+        maxExportBatchSize: 512
+        scheduleDelay: 5000
+        exportTimeout: 30000
+  metrics:
+    exporter: otlp
+  logs:
+    exporter: otlp
+  propagation:
+    type: tracecontext
+  # Span naming configuration
+  span:
+    name:
+      pattern: "{http.method} {http.route}"
+  # Instrumentation configuration
+  instrumentation:
+    http:
+      server:
+        suppress-span-names: "/actuator/**"
+    

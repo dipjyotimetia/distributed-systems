@@ -1,0 +1,28 @@
+{
+  "cluster": {
+    "cleanup": "inventory",
+    "logLevel": "info",
+    "logsCollected": false,
+    "replayMode": "responder-only",
+    "sidecarTlsOut": true
+  },
+  "generator": {
+    "evaluationIntervals": 5,
+    "stages": [
+      {
+        "virtualUsers": {
+          "requestDelay": {},
+          "virtualUsers": "1"
+        }
+      }
+    ]
+  },
+  "id": "banking-mock-fail-closed",
+  "responder": {
+    "numReplicas": 1,
+    "responseDelay": {
+      "mode": "RECORDED"
+    }
+  },
+  "version": 3
+}

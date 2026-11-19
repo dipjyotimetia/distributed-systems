@@ -1,0 +1,8 @@
+# Statement export needs object storage that is not present in this overlay.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: banking-sim-config
+  namespace: banking-app
+data:
+  EXPORT_STATEMENT_ENABLED: "false"

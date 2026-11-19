@@ -1,0 +1,351 @@
+package httpapi
+
+import (
+	"context"
+	"database/sql"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"log/slog"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
+	"unicode/utf8"
+
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/speedscale/microsvc/disputes-service/internal/cases"
+)
+
+type caseStore interface {
+	ByTransfer(context.Context, int64, int64) (cases.Case, error)
+	ByID(context.Context, int64, int64) (cases.Case, error)
+	Create(context.Context, int64, int64, string, time.Duration) (cases.Case, bool, error)
+	CustomerCases(context.Context, int64) ([]cases.Case, error)
+	OperationsQueue(context.Context, int64, int64) ([]cases.Case, error)
+	Resolve(context.Context, int64, int64, string) (cases.Case, error)
+	RequestEvidence(context.Context, int64, int64, string, string) (cases.Case, error)
+	RespondToEvidence(context.Context, int64, int64, string, string, string) (cases.Case, error)
+}
+
+type API struct {
+	caseStore
+	db              *sql.DB
+	secret          []byte
+	operators       map[int64]bool
+	transactionsURL string
+	client          *http.Client
+	delay           time.Duration
+}
+
+type claims struct {
+	UserID string `json:"userId"`
+	jwt.RegisteredClaims
+}
+
+func positiveID(value string) (int64, error) {
+	id, err := strconv.ParseInt(value, 10, 64)
+	if err != nil || id < 1 {
+		return 0, errors.New("invalid ID")
+	}
+	return id, nil
+}
+
+func (a API) authenticate(header string) (int64, error) {
+	scheme, raw, ok := strings.Cut(header, " ")
+	if !ok || !strings.EqualFold(scheme, "Bearer") {
+		return 0, errors.New("bearer token required")
+	}
+	var identity claims
+	_, err := jwt.ParseWithClaims(raw, &identity, func(*jwt.Token) (any, error) {
+		return a.secret, nil
+	}, jwt.WithValidMethods([]string{"HS256"}), jwt.WithExpirationRequired())
+	if err != nil {
+		return 0, err
+	}
+	return positiveID(identity.UserID)
+}
+
+type signedHandler func(http.ResponseWriter, *http.Request, int64)
+
+func (a API) authorized(operations bool, next signedHandler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		id, err := a.authenticate(r.Header.Get("Authorization"))
+		if err != nil {
+			fail(w, http.StatusUnauthorized, "Sign in to continue")
+			return
+		}
+		if operations && !a.operators[id] {
+			fail(w, http.StatusForbidden, "Operations access is required")
+			return
+		}
+		next(w, r, id)
+	}
+}
+
+func (a API) Routes() *http.ServeMux {
+	mux := HealthRoutes(a.db)
+	mux.HandleFunc("POST /api/disputes", a.authorized(false, a.file))
+	mux.HandleFunc("GET /api/disputes", a.authorized(false, a.customerList))
+	mux.HandleFunc("GET /api/disputes/{id}", a.authorized(false, a.customerRead))
+	mux.HandleFunc("GET /api/operations/disputes", a.authorized(true, a.queue))
+	mux.HandleFunc("POST /api/operations/disputes/{id}/resolve", a.authorized(true, a.resolveCase))
+	mux.HandleFunc("POST /api/operations/disputes/{id}/evidence-requests", a.authorized(true, a.evidence))
+	mux.HandleFunc("POST /api/disputes/{id}/evidence-requests/{requestId}/response", a.authorized(false, a.evidence))
+	return mux
+}
+
+func respond(w http.ResponseWriter, status int, value any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(value)
+}
+
+func fail(w http.ResponseWriter, status int, message string) {
+	respond(w, status, map[string]string{"message": message})
+}
+
+func storeError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		fail(w, 404, "Dispute not found")
+	case errors.Is(err, cases.ErrConflict):
+		fail(w, 409, "Dispute command conflicts with the current case")
+	default:
+		slog.Error("Dispute database operation failed", "error", err)
+		fail(w, 500, "Could not access disputes")
+	}
+}
+
+func decode(w http.ResponseWriter, r *http.Request, value any) bool {
+	d := json.NewDecoder(http.MaxBytesReader(w, r.Body, 16384))
+	d.DisallowUnknownFields()
+	return d.Decode(value) == nil && d.Decode(new(any)) == io.EOF
+}
+
+func validText(value string, limit int) bool {
+	return value != "" && !strings.ContainsRune(value, 0) && utf8.RuneCountInString(value) <= limit
+}
+
+func (a API) file(w http.ResponseWriter, r *http.Request, customer int64) {
+	var input struct {
+		TransferID int64  `json:"transferId"`
+		Reason     string `json:"reason"`
+	}
+	if !decode(w, r, &input) {
+		fail(w, 400, "Invalid dispute request")
+		return
+	}
+	reason := strings.TrimSpace(input.Reason)
+	if input.TransferID < 1 || !validText(reason, 500) {
+		fail(w, 400, "A transfer ID and a reason of 1 to 500 characters are required")
+		return
+	}
+	ctx := r.Context()
+	c, err := a.ByTransfer(ctx, customer, input.TransferID)
+	if err == nil {
+		respond(w, 200, c)
+		return
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		storeError(w, err)
+		return
+	}
+	if status := a.eligible(ctx, r.Header.Get("Authorization"), customer, input.TransferID); status != 200 {
+		switch status {
+		case 404:
+			fail(w, status, "Transfer not found")
+		case 422:
+			fail(w, status, "Only completed transfers can be disputed")
+		default:
+			fail(w, status, "Could not verify transfer eligibility")
+		}
+		return
+	}
+	c, created, err := a.Create(ctx, customer, input.TransferID, reason, a.delay)
+	if err != nil {
+		storeError(w, err)
+		return
+	}
+	if created {
+		respond(w, 201, c)
+		return
+	}
+	respond(w, 200, c)
+}
+
+func (a API) eligible(ctx context.Context, auth string, customer, id int64) int {
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/api/transactions/%d", a.transactionsURL, id), nil)
+	if err != nil {
+		return 502
+	}
+	request.Header.Set("Authorization", auth)
+	response, err := a.client.Do(request)
+	if err != nil {
+		return 502
+	}
+	defer response.Body.Close()
+	switch response.StatusCode {
+	case 404, 403:
+		return 404
+	case 200:
+	default:
+		return 502
+	}
+	var transfer struct {
+		ID     int64
+		UserID int64
+		Type   string
+		Status string
+	}
+	if json.NewDecoder(io.LimitReader(response.Body, 65536)).Decode(&transfer) != nil || transfer.ID != id {
+		return 502
+	}
+	if transfer.UserID != customer {
+		return 404
+	}
+	if transfer.Type != "TRANSFER" || transfer.Status != "COMPLETED" {
+		return 422
+	}
+	return 200
+}
+
+func (a API) customerList(w http.ResponseWriter, r *http.Request, customer int64) {
+	items, err := a.CustomerCases(r.Context(), customer)
+	if err != nil {
+		storeError(w, err)
+		return
+	}
+	respond(w, 200, items)
+}
+
+func (a API) customerRead(w http.ResponseWriter, r *http.Request, customer int64) {
+	id, err := positiveID(r.PathValue("id"))
+	if err != nil {
+		storeError(w, sql.ErrNoRows)
+		return
+	}
+	c, err := a.ByID(r.Context(), customer, id)
+	if err != nil {
+		storeError(w, err)
+		return
+	}
+	respond(w, 200, c)
+}
+
+func (a API) queue(w http.ResponseWriter, r *http.Request, _ int64) {
+	page := int64(1)
+	if value := r.URL.Query().Get("page"); value != "" {
+		var err error
+		page, err = positiveID(value)
+		if err != nil || page > 1_000_000 {
+			fail(w, 400, "Invalid page")
+			return
+		}
+	}
+	const pageSize = 20
+	items, err := a.OperationsQueue(r.Context(), pageSize+1, (page-1)*pageSize)
+	if err != nil {
+		storeError(w, err)
+		return
+	}
+	hasMore := len(items) > pageSize
+	if hasMore {
+		items = items[:pageSize]
+	}
+	respond(w, 200, struct {
+		Items   []cases.Case `json:"items"`
+		HasMore bool         `json:"hasMore"`
+	}{items, hasMore})
+}
+
+func (a API) resolveCase(w http.ResponseWriter, r *http.Request, operator int64) {
+	id, err := positiveID(r.PathValue("id"))
+	if err != nil {
+		storeError(w, sql.ErrNoRows)
+		return
+	}
+	var input struct {
+		Resolution string `json:"resolution"`
+	}
+	if !decode(w, r, &input) {
+		fail(w, 400, "Invalid resolution request")
+		return
+	}
+	summary := strings.TrimSpace(input.Resolution)
+	if !validText(summary, 2000) {
+		fail(w, 400, "A resolution summary of 1 to 2000 characters is required")
+		return
+	}
+	c, err := a.Resolve(r.Context(), id, operator, summary)
+	if err != nil {
+		storeError(w, err)
+		return
+	}
+	respond(w, 200, c)
+}
+func HealthRoutes(db *sql.DB) *http.ServeMux {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), time.Second)
+		defer cancel()
+		if err := db.PingContext(ctx); err != nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+	return mux
+}
+
+func OperatorIDs(value string) (map[int64]bool, error) {
+	ids := make(map[int64]bool)
+	if strings.TrimSpace(value) == "" {
+		return ids, nil
+	}
+	for _, item := range strings.Split(value, ",") {
+		id, err := positiveID(strings.TrimSpace(item))
+		if err != nil {
+			return nil, errors.New("DISPUTES_OPERATOR_IDS must contain comma-separated positive user IDs")
+		}
+		ids[id] = true
+	}
+	return ids, nil
+}
+
+func New(db *sql.DB, store caseStore, secret []byte, operators map[int64]bool, transactionsURL string, client *http.Client, delay time.Duration) API {
+	return API{caseStore: store, db: db, secret: secret, operators: operators, transactionsURL: transactionsURL, client: client, delay: delay}
+}
+
+func (a API) evidence(w http.ResponseWriter, r *http.Request, actor int64) {
+	id, err := positiveID(r.PathValue("id"))
+	if err != nil {
+		storeError(w, sql.ErrNoRows)
+		return
+	}
+	key := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
+	if !validText(key, 128) {
+		fail(w, 400, "An Idempotency-Key of 1 to 128 characters is required")
+		return
+	}
+	var input struct {
+		Text string `json:"text"`
+	}
+	if !decode(w, r, &input) || !validText(strings.TrimSpace(input.Text), 2000) {
+		fail(w, 400, "Evidence text of 1 to 2000 characters is required")
+		return
+	}
+	var c cases.Case
+	if requestID := r.PathValue("requestId"); requestID != "" {
+		c, err = a.RespondToEvidence(r.Context(), id, actor, requestID, key, strings.TrimSpace(input.Text))
+	} else {
+		c, err = a.RequestEvidence(r.Context(), id, actor, key, strings.TrimSpace(input.Text))
+	}
+	if err != nil {
+		storeError(w, err)
+		return
+	}
+	respond(w, 200, c)
+}

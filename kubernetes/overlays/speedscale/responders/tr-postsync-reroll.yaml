@@ -1,0 +1,210 @@
+---
+# PostSync hook: after ArgoCD syncs the app, verify every TrafficReplay-backed
+# workload has Speedscale routing attached. If any active pod is missing it,
+# restart that deployment after the TrafficReplay objects settle.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: speedscale-postsync-reroll
+  namespace: banking-app
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: speedscale-postsync-reroll
+  namespace: banking-app
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["get", "list", "patch", "watch"]
+- apiGroups: ["speedscale.com"]
+  resources: ["trafficreplays"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: speedscale-postsync-reroll
+  namespace: banking-app
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+subjects:
+- kind: ServiceAccount
+  name: speedscale-postsync-reroll
+  namespace: banking-app
+roleRef:
+  kind: Role
+  name: speedscale-postsync-reroll
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: speedscale-postsync-reroll
+  namespace: banking-app
+  annotations:
+    # BeforeHookCreation deletes the prior Job (same name) before the next sync
+    # creates a new one, so a static name is safe across repeated syncs.
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation,HookSucceeded
+spec:
+  ttlSecondsAfterFinished: 600
+  backoffLimit: 2
+  template:
+    metadata:
+      annotations:
+        sidecar.istio.io/inject: "true"
+    spec:
+      serviceAccountName: speedscale-postsync-reroll
+      restartPolicy: Never
+      containers:
+      - name: reroll
+        # bitnami/kubectl:1.30 doesn't exist on Docker Hub (Broadcom pulled the
+        # Bitnami catalog). alpine/k8s:1.34.0 matches the staging-decoy server
+        # version (v1.34.8) and ships kubectl + bash.
+        image: alpine/k8s:1.34.0
+        command: ["/bin/bash", "-c"]
+        args:
+        - |
+          set -eo pipefail
+
+          DEPLOYMENTS=(banking-accounts banking-ai banking-fraud banking-notification banking-transactions banking-user)
+          TRS=(replay-banking-accounts replay-banking-ai replay-banking-fraud replay-banking-notification replay-banking-transactions replay-banking-user)
+          NS=banking-app
+
+          count_pods() {
+            kubectl -n "$NS" get pod -l app="$1" \
+              --field-selector=status.phase=Running \
+              -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null | sed '/^$/d' | wc -l | tr -d ' '
+          }
+
+          count_pods_with_speedscale() {
+            # Responder routing needs only the initproxy init container. Do NOT
+            # require the goproxy sidecar here: this overlay captures via eBPF
+            # annotations (capture.speedscale.com/*), and the operator webhook
+            # rejects sidecar injection on those workloads, so a goproxy check
+            # can never pass and wedges the sync.
+            kubectl -n "$NS" get pod -l app="$1" \
+              --field-selector=status.phase=Running \
+              -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.spec.initContainers[*].name}{" "}{.spec.containers[*].name}{"\n"}{end}' 2>/dev/null \
+              | awk '/speedscale-initproxy-responder/ { n++ } END { print n+0 }'
+          }
+
+          tr_report_id() {
+            kubectl -n "$NS" get trafficreplay "$1" \
+              -o go-template='{{ .status.reportID }}' 2>/dev/null || true
+          }
+
+          deployment_replay_env() {
+            kubectl -n "$NS" get deployment "$1" \
+              -o go-template='{{ index .metadata.labels "replay.speedscale.com/env-id" }}' 2>/dev/null || true
+          }
+
+          deployment_replay_report() {
+            kubectl -n "$NS" get deployment "$1" \
+              -o go-template='{{ index .metadata.labels "replay.speedscale.com/report-id" }}' 2>/dev/null || true
+          }
+
+          deployment_responder_ip() {
+            kubectl -n "$NS" get deployment "$1" \
+              -o go-template='{{ index .metadata.annotations "replay.speedscale.com/responder-ip" }}' 2>/dev/null || true
+          }
+
+          echo "[$(date -u +%FT%TZ)] waiting for TrafficReplays to reach Running..."
+          for i in {1..60}; do
+            running=0
+            for tr in "${TRS[@]}"; do
+              # The TR CRD does not expose .status.statusName; the printer-column
+              # "Status" shown in `kubectl get trafficreplay` reads from
+              # .status.conditions[-1:].message. Check the Running condition's
+              # `status` field directly — that's the authoritative signal.
+              s=$(kubectl -n "$NS" get trafficreplay "$tr" -o jsonpath='{.status.conditions[?(@.type=="Running")].status}' 2>/dev/null || echo "")
+              if [[ "$s" == "True" ]]; then running=$((running+1)); fi
+            done
+            echo "[$(date -u +%FT%TZ)]   ${running}/${#TRS[@]} TRs Running"
+            if [[ "$running" -eq "${#TRS[@]}" ]]; then break; fi
+            sleep 5
+          done
+          if [[ "$running" -ne "${#TRS[@]}" ]]; then
+            echo "[$(date -u +%FT%TZ)] WARN: only ${running}/${#TRS[@]} TRs Running after 300s; rolling anyway"
+          fi
+
+          echo "[$(date -u +%FT%TZ)] claiming workloads for their intended TrafficReplays..."
+          for i in "${!DEPLOYMENTS[@]}"; do
+            d="${DEPLOYMENTS[$i]}"
+            tr="${TRS[$i]}"
+            report_id=$(tr_report_id "$tr")
+            env_id=$(deployment_replay_env "$d")
+            active_report_id=$(deployment_replay_report "$d")
+
+            if [[ -z "$report_id" ]]; then
+              echo "[$(date -u +%FT%TZ)]   $d: $tr has no report id yet; rollout will verify later"
+              continue
+            fi
+
+            if [[ "$env_id" != "$tr" || "$active_report_id" != "$report_id" ]]; then
+              echo "[$(date -u +%FT%TZ)]   $d: claiming $tr report $report_id (was env=${env_id:-none} report=${active_report_id:-none})"
+              kubectl -n "$NS" label deployment/"$d" \
+                "replay.speedscale.com/env-id=$tr" \
+                "replay.speedscale.com/report-id=$report_id" \
+                --overwrite
+            else
+              echo "[$(date -u +%FT%TZ)]   $d: already claimed by $tr"
+            fi
+          done
+
+          echo "[$(date -u +%FT%TZ)] checking each workload for Speedscale routing..."
+          for i in "${!DEPLOYMENTS[@]}"; do
+            d="${DEPLOYMENTS[$i]}"
+            tr="${TRS[$i]}"
+            pods=$(count_pods "$d")
+            with_speedscale=$(count_pods_with_speedscale "$d")
+            env_id=$(deployment_replay_env "$d")
+            responder_ip=$(deployment_responder_ip "$d")
+            if [[ "$pods" -gt 0 && "$with_speedscale" -eq "$pods" && "$env_id" == "$tr" && -n "$responder_ip" ]]; then
+              echo "[$(date -u +%FT%TZ)]   $d: responder routing OK on ${with_speedscale}/${pods} pods; skipping rollout"
+            else
+              echo "[$(date -u +%FT%TZ)]   $d: responder routing incomplete (pods=${with_speedscale}/${pods}, env=${env_id:-none}, responder_ip=${responder_ip:-none}); rollout restart"
+              kubectl -n "$NS" rollout restart deployment/"$d"
+            fi
+          done
+
+          echo "[$(date -u +%FT%TZ)] waiting for rollouts to complete..."
+          for d in "${DEPLOYMENTS[@]}"; do
+            kubectl -n "$NS" rollout status deployment/"$d" --timeout=180s || echo "[$(date -u +%FT%TZ)]   $d: rollout-status timed out"
+          done
+
+          echo "[$(date -u +%FT%TZ)] verifying Speedscale routing landed on every workload..."
+          fail=0
+          for i in "${!DEPLOYMENTS[@]}"; do
+            d="${DEPLOYMENTS[$i]}"
+            tr="${TRS[$i]}"
+            pods=$(count_pods "$d")
+            with_speedscale=$(count_pods_with_speedscale "$d")
+            env_id=$(deployment_replay_env "$d")
+            responder_ip=$(deployment_responder_ip "$d")
+            if [[ "$pods" -gt 0 && "$with_speedscale" -eq "$pods" && "$env_id" == "$tr" && -n "$responder_ip" ]]; then
+              echo "[$(date -u +%FT%TZ)]   $d: responder attached on ${with_speedscale}/${pods} pods"
+            else
+              echo "[$(date -u +%FT%TZ)]   $d: still missing responder routing (pods=${with_speedscale}/${pods}, env=${env_id:-none}, responder_ip=${responder_ip:-none})"
+              fail=$((fail+1))
+            fi
+          done
+          exit "$fail"
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi

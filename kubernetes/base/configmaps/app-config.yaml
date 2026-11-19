@@ -1,0 +1,205 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: banking-app
+  labels:
+    app.kubernetes.io/name: banking-app
+    app.kubernetes.io/component: config
+data:
+  # Database configuration
+  DB_HOST: "banking-postgres"
+  DB_PORT: "5432"
+  DB_NAME: "banking_app"
+  
+  # Service URLs (for inter-service communication)
+  USER_SERVICE_URL: "http://banking-user:80"
+  ACCOUNTS_SERVICE_URL: "http://banking-accounts:80"
+  TRANSACTIONS_SERVICE_URL: "http://banking-transactions:80"
+  FRAUD_SERVICE_HOST: "banking-fraud"
+  FRAUD_SERVICE_PORT: "8080"
+  NOTIFICATION_SERVICE_URL: "http://banking-notification:80"
+  KAFKA_BROKERS: "banking-kafka:9092"
+
+  # Third-party endpoints — real hosts; Speedscale responder mocks intercept them.
+  # SLACK_WEBHOOK_URL here is a dead, non-secret fallback (no token path); the
+  # notification service gets the live hooks.slack.com webhook URL from the
+  # banking-thirdparty-keys secret. The responder /etc/hosts redirect is driven by
+  # the recorded snapshot's hosts, not by this value.
+  SLACK_WEBHOOK_URL: "https://hooks.slack.com/services/SET-VIA-SECRET"
+  MOODYS_API_URL: "https://api.ratings.moodys.com/research/v1/ratings?identifier=test"
+
+  # Observability (language-agnostic OTel)
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector.observability:4317"
+  OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
+  OTEL_TRACES_EXPORTER: "otlp"
+  OTEL_METRICS_EXPORTER: "otlp"
+  OTEL_LOGS_EXPORTER: "otlp"
+  OTEL_TRACES_SAMPLER: "always_on"
+  OTEL_PROPAGATORS: "tracecontext"
+  OTEL_RESOURCE_ATTRIBUTES: "service.namespace=banking-app,deployment.environment=decoy"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: banking-user-config
+  namespace: banking-app
+  labels:
+    app.kubernetes.io/name: banking-app
+    app.kubernetes.io/component: config
+    app.kubernetes.io/service: user-service
+data:
+  DB_USERNAME: "user_service_user"
+  DB_SCHEMA: "user_service"
+  SERVER_PORT: "8080"
+  OTEL_SERVICE_NAME: "user-service"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector.observability:4317"
+  OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
+  OTEL_TRACES_EXPORTER: "otlp"
+  OTEL_METRICS_EXPORTER: "otlp"
+  OTEL_LOGS_EXPORTER: "otlp"
+  OTEL_TRACES_SAMPLER: "always_on"
+  OTEL_PROPAGATORS: "tracecontext"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: banking-accounts-config
+  namespace: banking-app
+  labels:
+    app.kubernetes.io/name: banking-app
+    app.kubernetes.io/component: config
+    app.kubernetes.io/service: accounts-service
+data:
+  DB_USERNAME: "accounts_service_user"
+  DB_SCHEMA: "accounts_service"
+  SERVER_PORT: "8080"
+  SPRING_PROFILES_ACTIVE: "docker"
+  MANAGEMENT_TRACING_ENABLED: "true"
+  MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED: "true"
+  MANAGEMENT_TRACING_SAMPLING_PROBABILITY: "1.0"
+  LOGGING_LEVEL_ROOT: "INFO"
+  LOGGING_LEVEL_COM_BANKING: "DEBUG"
+  LOGGING_LEVEL_IO_OPENTELEMETRY: "DEBUG"
+  OTEL_SERVICE_NAME: "accounts-service"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector.observability:4317"
+  OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
+  OTEL_TRACES_EXPORTER: "otlp"
+  OTEL_METRICS_EXPORTER: "otlp"
+  OTEL_LOGS_EXPORTER: "otlp"
+  OTEL_TRACES_SAMPLER: "always_on"
+  OTEL_PROPAGATORS: "tracecontext"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: banking-transactions-config
+  namespace: banking-app
+  labels:
+    app.kubernetes.io/name: banking-app
+    app.kubernetes.io/component: config
+    app.kubernetes.io/service: transactions-service
+data:
+  DB_USERNAME: "transactions_service_user"
+  DB_SCHEMA: "transactions_service"
+  SERVER_PORT: "8080"
+  SPRING_PROFILES_ACTIVE: "docker"
+  ERROR_SPIKE_ENABLED: "false"
+  MANAGEMENT_TRACING_ENABLED: "true"
+  MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED: "true"
+  MANAGEMENT_TRACING_SAMPLING_PROBABILITY: "1.0"
+  LOGGING_LEVEL_ROOT: "INFO"
+  LOGGING_LEVEL_COM_BANKING: "DEBUG"
+  LOGGING_LEVEL_IO_OPENTELEMETRY: "DEBUG"
+  OTEL_SERVICE_NAME: "transactions-service"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector.observability:4317"
+  OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
+  OTEL_TRACES_EXPORTER: "otlp"
+  OTEL_METRICS_EXPORTER: "otlp"
+  OTEL_LOGS_EXPORTER: "otlp"
+  OTEL_TRACES_SAMPLER: "always_on"
+  OTEL_PROPAGATORS: "tracecontext"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: banking-gateway-config
+  namespace: banking-app
+  labels:
+    app.kubernetes.io/name: banking-app
+    app.kubernetes.io/component: config
+    app.kubernetes.io/service: api-gateway
+data:
+  SERVER_PORT: "8080"
+  REDIS_HOST: "banking-redis"
+  REDIS_PORT: "6379"
+  SPRING_PROFILES_ACTIVE: "docker"
+  MANAGEMENT_TRACING_ENABLED: "true"
+  MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED: "true"
+  MANAGEMENT_TRACING_SAMPLING_PROBABILITY: "1.0"
+  LOGGING_LEVEL_ROOT: "INFO"
+  LOGGING_LEVEL_COM_BANKING: "DEBUG"
+  LOGGING_LEVEL_IO_OPENTELEMETRY: "DEBUG"
+  OTEL_SERVICE_NAME: "api-gateway"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector.observability:4317"
+  OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
+  OTEL_TRACES_EXPORTER: "otlp"
+  OTEL_METRICS_EXPORTER: "otlp"
+  OTEL_LOGS_EXPORTER: "otlp"
+  OTEL_TRACES_SAMPLER: "always_on"
+  OTEL_PROPAGATORS: "tracecontext"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: banking-frontend-config
+  namespace: banking-app
+  labels:
+    app.kubernetes.io/name: banking-app
+    app.kubernetes.io/component: config
+    app.kubernetes.io/service: frontend
+data:
+  # Backend API configuration
+  # Service was renamed to banking-gateway in the banking- prefix rename; the
+  # frontend's Next.js proxy routes resolve this host server-side, so a stale
+  # name here makes every /api/* call fail with ENOTFOUND -> HTTP 500.
+  API_GATEWAY_URL: "http://banking-gateway:80"
+  BACKEND_API_URL: "http://banking-gateway:80"
+  
+  # OpenTelemetry configuration
+  OTEL_SERVICE_NAME: "frontend"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector.observability:4318/v1/traces"
+  OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf"
+  OTEL_TRACES_EXPORTER: "otlp"
+  OTEL_METRICS_EXPORTER: "otlp"
+  OTEL_LOGS_EXPORTER: "otlp"
+  OTEL_TRACES_SAMPLER: "always_on"
+  OTEL_PROPAGATORS: "tracecontext"
+  OTEL_RESOURCE_ATTRIBUTES: "service.namespace=banking-app,deployment.environment=decoy"
+  
+  # Next.js configuration
+  NODE_ENV: "production"
+  NEXT_TELEMETRY_DISABLED: "1"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: banking-ai-config
+  namespace: banking-app
+  labels:
+    app.kubernetes.io/name: banking-app
+    app.kubernetes.io/component: config
+    app.kubernetes.io/service: ai-service
+data:
+  # Python OTel uses http/protobuf to the otel-collector (same shape the
+  # frontend uses) — the SDK appends /v1/traces itself when given the base URL,
+  # but the exporter we pass in main.py is explicit.
+  OTEL_SERVICE_NAME: "ai-service"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector.observability:4318"
+  OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf"
+  OTEL_TRACES_EXPORTER: "otlp"
+  OTEL_METRICS_EXPORTER: "none"
+  OTEL_LOGS_EXPORTER: "none"
+  OTEL_TRACES_SAMPLER: "always_on"
+  OTEL_PROPAGATORS: "tracecontext"
+  OTEL_RESOURCE_ATTRIBUTES: "service.namespace=banking-app,deployment.environment=decoy"

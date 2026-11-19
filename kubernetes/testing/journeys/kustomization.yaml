@@ -1,0 +1,42 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../overlays/local
+
+images:
+  - name: ghcr.io/speedscale/microsvc/frontend
+    newName: microsvc-journeys/frontend
+    newTag: checkout
+  - name: ghcr.io/speedscale/microsvc/api-gateway
+    newName: microsvc-journeys/api-gateway
+    newTag: checkout
+  - name: ghcr.io/speedscale/microsvc/accounts-service
+    newName: microsvc-journeys/accounts-service
+    newTag: checkout
+  - name: ghcr.io/speedscale/microsvc/user-service
+    newName: microsvc-journeys/user-service
+    newTag: checkout
+
+patches:
+  - target:
+      kind: Deployment
+      name: banking-(frontend|gateway|accounts|user)
+    patch: |
+      - op: replace
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: Never
+  - patch: |
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: banking-sim
+        namespace: banking-app
+      $patch: delete
+  - patch: |
+      apiVersion: batch/v1
+      kind: Job
+      metadata:
+        name: seed-user-pool
+        namespace: banking-app
+      $patch: delete

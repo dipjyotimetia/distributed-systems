@@ -1,0 +1,367 @@
+services:
+  # Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: banking-postgres
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "postgres", "-d", "banking_app"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    environment:
+      POSTGRES_DB: banking_app
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d
+    networks:
+      - banking-network
+
+  # Backend Services
+  disputes-schema:
+    image: postgres:15-alpine
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: password
+    command: ["psql", "-h", "postgres", "-U", "postgres", "-d", "banking_app", "-v", "disputes_password=disputes_service_pass", "-f", "/migrations/bootstrap.sql"]
+    volumes:
+      - ./database/migrations/disputes-service:/migrations:ro
+    networks:
+      - banking-network
+
+  disputes-service:
+    build: ./backend/disputes-service
+    depends_on:
+      disputes-schema:
+        condition: service_completed_successfully
+    restart: on-failure
+    environment:
+      DATABASE_URL: postgres://disputes_service_user:disputes_service_pass@postgres:5432/banking_app?sslmode=disable
+      JWT_SECRET: banking-app-super-secret-key-change-this-in-production-256-bit
+      TRANSACTIONS_SERVICE_URL: http://transactions-service:8080
+      DISPUTES_OPERATOR_IDS: ${DISPUTES_OPERATOR_IDS:-}
+      OTEL_SERVICE_NAME: disputes-service
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
+    healthcheck:
+      test: ["CMD", "disputes-service", "healthcheck"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    networks:
+      - banking-network
+
+  disputes-worker:
+    build: ./backend/disputes-service
+    depends_on:
+      disputes-service:
+        condition: service_healthy
+      disputes-temporal:
+        condition: service_healthy
+    restart: on-failure
+    environment:
+      DISPUTES_MODE: worker
+      DATABASE_URL: postgres://disputes_service_user:disputes_service_pass@postgres:5432/banking_app?sslmode=disable
+      TEMPORAL_ADDRESS: disputes-temporal:7233
+      OTEL_SERVICE_NAME: disputes-worker
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
+    healthcheck:
+      test: ["CMD", "disputes-service", "healthcheck"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    networks:
+      - banking-network
+
+  disputes-temporal:
+    image: temporalio/temporal:1.4.1
+    command: ["server", "start-dev", "--ip", "0.0.0.0", "--db-filename", "/home/temporal/disputes.db", "--headless"]
+    volumes:
+      - disputes_temporal_data:/home/temporal
+    healthcheck:
+      test: ["CMD", "temporal", "operator", "cluster", "health"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    networks:
+      - banking-network
+
+  user-service:
+    build:
+      context: ./backend/user-service
+      dockerfile: Dockerfile
+    container_name: banking-user-service
+    depends_on:
+      - postgres
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=banking_app
+      - DB_USERNAME=user_service_user
+      - DB_PASSWORD=user_service_pass
+      - DB_SCHEMA=user_service
+      # JWT Configuration
+      - JWT_SECRET=banking-app-super-secret-key-change-this-in-production-256-bit
+      - JWT_EXPIRATION=86400000
+      # OpenTelemetry Configuration
+      - OTEL_SERVICE_NAME=user-service
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+      - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_METRICS_EXPORTER=otlp
+      - OTEL_LOGS_EXPORTER=otlp
+      - OTEL_TRACES_SAMPLER=always_on
+      - OTEL_PROPAGATORS=tracecontext
+      - OTEL_RESOURCE_ATTRIBUTES=service.namespace=banking-app
+    ports:
+      - "8081:8080"
+    networks:
+      - banking-network
+
+  accounts-service:
+    build:
+      context: ./backend/accounts-service
+      dockerfile: Dockerfile
+    container_name: banking-accounts-service
+    depends_on:
+      - postgres
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=banking_app
+      - DB_USERNAME=accounts_service_user
+      - DB_PASSWORD=accounts_service_pass
+      - DB_SCHEMA=accounts_service
+      # JWT Configuration
+      - JWT_SECRET=banking-app-super-secret-key-change-this-in-production-256-bit
+      - JWT_EXPIRATION=86400000
+      # OpenTelemetry Configuration
+      - OTEL_SERVICE_NAME=accounts-service
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+      - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_METRICS_EXPORTER=otlp
+      - OTEL_LOGS_EXPORTER=otlp
+      - OTEL_TRACES_SAMPLER=always_on
+      - OTEL_PROPAGATORS=tracecontext
+      - OTEL_RESOURCE_ATTRIBUTES=service.namespace=banking-app
+    ports:
+      - "8082:8080"
+    networks:
+      - banking-network
+
+  statement-worker:
+    build: ./backend/accounts-service
+    depends_on:
+      accounts-service:
+        condition: service_started
+      disputes-temporal:
+        condition: service_healthy
+    restart: on-failure
+    environment:
+      SPRING_PROFILES_ACTIVE: docker,statement-worker
+      SPRING_MAIN_LAZY_INITIALIZATION: "false"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: banking_app
+      TEMPORAL_ADDRESS: disputes-temporal:7233
+      OTEL_SERVICE_NAME: statement-worker
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      OTEL_RESOURCE_ATTRIBUTES: service.namespace=banking-app
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8080/actuator/health"]
+      interval: 5s
+      timeout: 4s
+      retries: 12
+      start_period: 20s
+    networks:
+      - banking-network
+
+  transactions-service:
+    build:
+      context: ./backend/transactions-service
+      dockerfile: Dockerfile
+    container_name: banking-transactions-service
+    depends_on:
+      - postgres
+      - fraud-service
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=banking_app
+      - DB_USERNAME=transactions_service_user
+      - DB_PASSWORD=transactions_service_pass
+      - DB_SCHEMA=transactions_service
+      # JWT Configuration
+      - JWT_SECRET=banking-app-super-secret-key-change-this-in-production-256-bit
+      - JWT_EXPIRATION=86400000
+      # Service URLs
+      - ACCOUNTS_SERVICE_URL=http://accounts-service:8080
+      - FRAUD_SERVICE_HOST=fraud-service
+      - FRAUD_SERVICE_PORT=8080
+      # OpenTelemetry Configuration
+      - OTEL_SERVICE_NAME=transactions-service
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+      - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_METRICS_EXPORTER=otlp
+      - OTEL_LOGS_EXPORTER=otlp
+      - OTEL_TRACES_SAMPLER=always_on
+      - OTEL_PROPAGATORS=tracecontext
+      - OTEL_RESOURCE_ATTRIBUTES=service.namespace=banking-app
+      - JAVA_TOOL_OPTIONS=-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
+    ports:
+      - "8083:8080"
+      - "5005:5005"
+    networks:
+      - banking-network
+
+  # Fraud detection (gRPC) — transactions-service calls this for every transaction.
+  # Without it the fraud gRPC call fails and the client fails open (no fraud checks).
+  fraud-service:
+    build:
+      context: ./backend/fraud-service
+      dockerfile: Dockerfile
+    container_name: banking-fraud-service
+    environment:
+      - GRPC_PORT=8080
+      - METRICS_PORT=9091
+    ports:
+      - "8086:8080"
+    networks:
+      - banking-network
+
+  # Redis for rate limiting
+  redis:
+    image: redis:7-alpine
+    container_name: banking-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - banking-network
+
+  api-gateway:
+    build:
+      context: ./backend/api-gateway
+      dockerfile: Dockerfile
+    container_name: banking-api-gateway
+    depends_on:
+      - user-service
+      - accounts-service
+      - transactions-service
+      - redis
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - USER_SERVICE_URL=http://user-service:8080
+      - ACCOUNTS_SERVICE_URL=http://accounts-service:8080
+      - TRANSACTIONS_SERVICE_URL=http://transactions-service:8080
+      - DISPUTES_SERVICE_URL=http://disputes-service:8080
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      # JWT Configuration
+      - JWT_SECRET=banking-app-super-secret-key-change-this-in-production-256-bit
+      - JWT_EXPIRATION=86400000
+      # OpenTelemetry Configuration
+      - OTEL_SERVICE_NAME=api-gateway
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+      - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_METRICS_EXPORTER=otlp
+      - OTEL_LOGS_EXPORTER=otlp
+      - OTEL_TRACES_SAMPLER=always_on
+      - OTEL_PROPAGATORS=tracecontext
+      - OTEL_RESOURCE_ATTRIBUTES=service.namespace=banking-app
+      - OTEL_EXPORTER_OTLP_TIMEOUT=10000
+      - OTEL_EXPORTER_OTLP_COMPRESSION=none
+    ports:
+      - "8080:8080"
+    networks:
+      - banking-network
+
+  # Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: banking-frontend
+    depends_on:
+      - api-gateway
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8080
+      - API_GATEWAY_URL=http://api-gateway:8080
+      - NODE_ENV=development
+      # OpenTelemetry Configuration
+      - OTEL_SERVICE_NAME=frontend
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
+      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_METRICS_EXPORTER=otlp
+      - OTEL_LOGS_EXPORTER=otlp
+      - OTEL_TRACES_SAMPLER=always_on
+      - OTEL_PROPAGATORS=tracecontext
+      - OTEL_RESOURCE_ATTRIBUTES=service.namespace=banking-app
+      # Debug logging for OpenTelemetry
+      - OTEL_LOG_LEVEL=DEBUG
+      - OTEL_TRACES_SAMPLER_ARG=1.0
+      - OTEL_EXPORTER_OTLP_TIMEOUT=10000
+      - OTEL_EXPORTER_OTLP_COMPRESSION=none
+      # Node.js debug logging
+      - DEBUG=*
+      - NODE_OPTIONS=--trace-warnings
+    ports:
+      - "3000:3000"
+    networks:
+      - banking-network
+
+  # Observability Stack
+  jaeger:
+    image: jaegertracing/all-in-one:1.57
+    container_name: banking-jaeger
+    ports:
+      - "16686:16686"
+      - "14268:14268"
+      - "4318:4318"
+      - "4317:4317"
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+      - COLLECTOR_OTLP_GRPC_HOST_PORT=:4317
+    networks:
+      - banking-network
+
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    container_name: banking-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - banking-network
+
+  grafana:
+    image: grafana/grafana:10.0.0
+    container_name: banking-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./config/grafana/provisioning:/etc/grafana/provisioning
+    networks:
+      - banking-network
+
+volumes:
+  postgres_data:
+  disputes_temporal_data:
+  grafana_data:
+
+networks:
+  banking-network:
+    driver: bridge

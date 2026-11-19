@@ -1,0 +1,8 @@
+services:
+  redpanda:
+    tmpfs: !reset []
+    volumes:
+      - recovery_broker_data:/var/lib/redpanda/data
+
+volumes:
+  recovery_broker_data:

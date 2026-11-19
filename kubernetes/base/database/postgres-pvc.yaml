@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: banking-postgres-pvc
+  namespace: banking-app
+  labels:
+    app.kubernetes.io/name: banking-app
+    app.kubernetes.io/component: database
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      # 1Gi filled during a db-fixture restore and crashed postgres (banking-replay
+      # on dev-decoy, expanded by hand 2026-08-28); banking-app sits at ~80% and grows.
+      storage: 3Gi

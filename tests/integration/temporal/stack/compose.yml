@@ -1,0 +1,154 @@
+services:
+  postgres:
+    container_name: !reset null
+    ports: !reset []
+    tmpfs: ["/var/lib/postgresql/data:size=384m"]
+    volumes: !override
+      - ./database/init:/docker-entrypoint-initdb.d:ro
+  redis:
+    container_name: !reset null
+    ports: !reset []
+  user-service:
+    container_name: !reset null
+    ports: !reset []
+    environment:
+      OTEL_SDK_DISABLED: "true"
+  accounts-service:
+    tmpfs: ["/tmp:size=64m"]
+    container_name: !reset null
+    ports: !reset []
+    environment:
+      OTEL_SDK_DISABLED: "true"
+      MANAGEMENT_HEALTH_DISKSPACE_PATH: /tmp
+      MANAGEMENT_HEALTH_DISKSPACE_THRESHOLD: 10MB
+      PLAID_BASE_URL: http://provider-fixtures:8081/plaid
+      EXCHANGE_RATES_URL: http://provider-fixtures:8081/exchange
+      MOODYS_API_URL: http://provider-fixtures:8081/ratings
+      AWS_S3_BUCKET: ${MICROSVC_STATEMENT_BUCKET:-}
+      AWS_S3_ENDPOINT_URL: http://provider-fixtures:8081
+      AWS_ACCESS_KEY_ID: synthetic-access
+      AWS_SECRET_ACCESS_KEY: synthetic-secret
+  transactions-service:
+    tmpfs: ["/tmp:size=64m"]
+    container_name: !reset null
+    ports: !reset []
+    environment:
+      ERROR_SPIKE_ENABLED: "false"
+      OTEL_SDK_DISABLED: "true"
+      MANAGEMENT_HEALTH_DISKSPACE_PATH: /tmp
+      MANAGEMENT_HEALTH_DISKSPACE_THRESHOLD: 10MB
+      JAVA_TOOL_OPTIONS: ""
+      PAYMENT_COMPLY_BASE_URL: http://provider-fixtures:8081
+      FRAUD_TRANSFER_MERCHANT_CATEGORY: "5812"
+      PAYMENT_STRIPE_URL: http://provider-fixtures:8081/v1/payment_intents
+      PAYMENT_PAYPAL_URL: http://provider-fixtures:8081/v2/checkout/orders
+      KAFKA_BROKERS: redpanda:9092
+    depends_on:
+      redpanda:
+        condition: service_healthy
+      postgres:
+        condition: service_started
+      fraud-service:
+        condition: service_started
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:v26.2.1
+    networks: [banking-network]
+    tmpfs: ["/var/lib/redpanda/data:size=512m,uid=101,gid=101,mode=0700"]
+    command:
+      - redpanda
+      - start
+      - --mode=dev-container
+      - --smp=1
+      - --kafka-addr=0.0.0.0:9092
+      - --advertise-kafka-addr=redpanda:9092
+    healthcheck:
+      test: ["CMD-SHELL", "rpk topic describe transaction-events -X brokers=redpanda:9092 >/dev/null 2>&1 || rpk topic create transaction-events --partitions 1 --replicas 1 -X brokers=redpanda:9092"]
+      interval: 5s
+      timeout: 10s
+      retries: 15
+  mongodb:
+    image: mongo:7.0
+    tmpfs: ["/data/db:size=384m"]
+    networks: [banking-network]
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "quit(db.adminCommand({ping: 1}).ok ? 0 : 1)"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+  notification-service:
+    build: ./backend/notification-service
+    networks: [banking-network, test-edge]
+    ports: ["127.0.0.1::8080"]
+    depends_on:
+      redpanda:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKERS: redpanda:9092
+      MONGO_URI: mongodb://mongodb:27017
+      SLACK_WEBHOOK_URL: http://provider-fixtures:8081/slack
+      SENDGRID_API_URL: http://provider-fixtures:8081/v3/mail/send
+      TWILIO_API_BASE_URL: http://provider-fixtures:8081
+  fraud-service:
+    container_name: !reset null
+    ports: !reset []
+    environment:
+      STRIPE_RADAR_URL: http://provider-fixtures:8081/radar
+      SIFT_EVENTS_URL: http://provider-fixtures:8081/sift
+      MAXMIND_SCORE_URL: http://provider-fixtures:8081/maxmind
+    depends_on:
+      provider-fixtures:
+        condition: service_started
+  provider-fixtures:
+    environment:
+      FAILED_NOTIFICATION_PROVIDER: ${MICROSVC_FAILED_PROVIDER:-}
+    networks: [banking-network, test-edge]
+    ports: ["127.0.0.1::8081"]
+    build:
+      context: .
+      dockerfile: tests/integration/temporal/stack/Dockerfile
+  api-gateway:
+    tmpfs: ["/tmp:size=64m"]
+    networks:
+      - banking-network
+      - test-edge
+    container_name: !reset null
+    ports: !override
+      - "127.0.0.1::8080"
+    environment:
+      OTEL_SDK_DISABLED: "true"
+      MANAGEMENT_HEALTH_DISKSPACE_PATH: /tmp
+      MANAGEMENT_HEALTH_DISKSPACE_THRESHOLD: 10MB
+  ai-service:
+    build: ./backend/ai-service
+    networks: [banking-network]
+    environment:
+      OTEL_SDK_DISABLED: "true"
+      ANTHROPIC_URL: http://provider-fixtures:8081/ai/anthropic
+      OPENAI_URL: http://provider-fixtures:8081/ai/openai
+      GEMINI_URL: http://provider-fixtures:8081/ai/gemini
+      XAI_URL: http://provider-fixtures:8081/ai/xai
+      OPENROUTER_URL: http://provider-fixtures:8081/ai/openrouter
+      AI_API_KEY: synthetic-key
+      OPENAI_API_KEY: synthetic-key
+      GEMINI_API_KEY: synthetic-key
+      XAI_API_KEY: synthetic-key
+      OPENROUTER_API_KEY: synthetic-key
+  frontend:
+    networks:
+      - banking-network
+      - test-edge
+    container_name: !reset null
+    ports: !override
+      - "127.0.0.1::3000"
+    environment:
+      OTEL_SDK_DISABLED: "true"
+      DEBUG: ""
+      NODE_OPTIONS: ""
+      AI_SERVICE_URL: http://ai-service:8080
+networks:
+  banking-network:
+    internal: true
+  test-edge:
+    driver: bridge

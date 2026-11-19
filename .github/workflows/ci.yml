@@ -1,0 +1,440 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ master, develop, feature/* ]
+  pull_request:
+    branches: [ master, develop ]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  test-backend:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: banking_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: maven
+    
+    - name: Setup test database
+      run: |
+        PGPASSWORD=password psql -h localhost -U postgres -d banking_test -c "
+          CREATE SCHEMA IF NOT EXISTS user_service;
+          CREATE SCHEMA IF NOT EXISTS accounts_service;
+          CREATE SCHEMA IF NOT EXISTS transactions_service;
+        "
+    
+    - name: Test Backend Services
+      run: make test-backend
+
+    - name: Test movement reservations, statement jobs, and reconciliation against PostgreSQL
+      env:
+        PGPASSWORD: password
+        MICROSVC_POSTGRES_PASSWORD: password
+      run: |
+        createdb -h localhost -U postgres microsvc_accounts_test
+        createdb -h localhost -U postgres microsvc_transactions_test
+        (
+          cd backend/accounts-service
+          MICROSVC_ACCOUNTS_POSTGRES_URL=jdbc:postgresql://localhost:5432/microsvc_accounts_test \
+          STATEMENTS_TEST_DATABASE_URL=jdbc:postgresql://localhost:5432/microsvc_accounts_test \
+            ./mvnw -B -Dtest=MovementReservationsPostgresTest,StatementJobsPostgresTest test
+        )
+        (
+          cd backend/transactions-service
+          MICROSVC_TX_POSTGRES_URL=jdbc:postgresql://localhost:5432/microsvc_transactions_test \
+          MICROSVC_TX_SQL_INIT=never MICROSVC_TX_DEFER_INIT=false MICROSVC_TX_FLYWAY=true \
+          MICROSVC_TX_DRIVER=org.postgresql.Driver MICROSVC_TX_USER=postgres MICROSVC_TX_PASSWORD=password \
+          MICROSVC_TX_DDL=validate MICROSVC_TX_DIALECT=org.hibernate.dialect.PostgreSQLDialect \
+            ./mvnw -B -Dtest=TransactionRollbackTest test
+        )
+
+  test-frontend:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+
+    - name: Set up kubectl
+      uses: azure/setup-kubectl@v4
+    
+    - name: Test Frontend
+      run: make test-frontend
+
+    - name: Verify frontend isolation
+      run: ./scripts/verify-frontend-isolation.sh
+
+  proxymock-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up .NET 8
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Proxymock validation (install, init, build, mock+replay)
+      env:
+        PROXYMOCK_API_KEY: ${{ secrets.PROXYMOCK_API_KEY }}
+      run: ./scripts/run-proxymock-validation.sh
+  
+  # Replays recorded traffic against a service built from this change, with its
+  # dependencies mocked, so a regression is caught before merge.
+  replay-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [api-gateway]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: maven
+
+    - name: Install proxymock
+      run: curl -Lfs https://downloads.speedscale.com/proxymock/install-proxymock | sh
+
+    - name: Replay recorded traffic against ${{ matrix.service }}
+      env:
+        PROXYMOCK_API_KEY: ${{ secrets.PROXYMOCK_API_KEY }}
+        # Fork PRs get no secret and skip; everywhere else a missing proxymock fails the job.
+        PROXYMOCK_REQUIRED: ${{ secrets.PROXYMOCK_API_KEY != '' && '1' || '' }}
+      run: ./scripts/proxymock/replay-service.sh ${{ matrix.service }}
+
+  test-go-services:
+    runs-on: ubuntu-latest
+    services:
+      disputes_postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_PASSWORD: password
+        ports:
+          - 5432/tcp
+        options: --health-cmd=pg_isready --health-interval=5s --health-retries=10
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version-file: backend/fraud-service/go.mod
+        cache-dependency-path: |
+          backend/fraud-service/go.sum
+          backend/notification-service/go.sum
+          backend/disputes-service/go.sum
+
+    - name: Test fraud-service
+      run: |
+        cd backend/fraud-service
+        go test ./...
+
+    - name: Test notification-service
+      run: |
+        cd backend/notification-service
+        go test ./...
+
+    - name: Start disputes test Temporal
+      run: |
+        docker run -d --name disputes-test-temporal -p 127.0.0.1:7233:7233 temporalio/temporal:1.4.1 server start-dev --ip 0.0.0.0 --headless
+        for attempt in {1..30}; do
+          if docker exec disputes-test-temporal temporal operator cluster health; then exit 0; fi
+          sleep 1
+        done
+        docker logs disputes-test-temporal
+        exit 1
+
+    - name: Test disputes-service
+      working-directory: backend/disputes-service
+      env:
+        DISPUTES_TEST_TEMPORAL_ADDRESS: 127.0.0.1:7233
+        DISPUTES_TEST_DATABASE_URL: postgres://postgres:password@127.0.0.1:${{ job.services.disputes_postgres.ports[5432] }}/postgres?sslmode=disable
+      run: |
+        go test -race -coverpkg=./cmd/...,./internal/cases,./internal/httpapi,./internal/postgres,./internal/temporal -coverprofile=coverage.out ./...
+        go tool cover -func=coverage.out | awk '/^total:/ { coverage=$3+0 } END { if (coverage <= 80) exit 1 }'
+
+  build-and-push:
+    needs: [test-backend, test-frontend, test-go-services, proxymock-validation, replay-gate, e2e-test]
+    runs-on: ubuntu-latest
+    # Runs on PRs too (amd64-only, no push) so the image build gates the merge,
+    # and on push to master (full multi-arch, pushed). Platforms/push are set
+    # per-event on the build step below.
+
+    permissions:
+      contents: read
+      packages: write
+
+    strategy:
+      # Don't let one service's transient registry flake cancel the other 7.
+      fail-fast: false
+      matrix:
+        service:
+          - user-service
+          - accounts-service
+          - transactions-service
+          - api-gateway
+          - ai-service
+          - frontend
+          - simulation-client
+          - fraud-service
+          - notification-service
+          - disputes-service
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    # QEMU is only needed for arm64 emulation, which we only build on master push.
+    - name: Set up QEMU
+      if: github.event_name == 'push'
+      uses: docker/setup-qemu-action@v3
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    # No registry login on PRs — PR builds validate only and do not push.
+    - name: Log in to Container Registry
+      if: github.event_name == 'push'
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Get version
+      id: version
+      run: |
+        if [[ "${{ github.ref }}" == "refs/heads/master" ]]; then
+          # On master: auto-increment patch unless VERSION was manually bumped
+          if git diff HEAD~1 --name-only 2>/dev/null | grep -q '^VERSION$'; then
+            echo "VERSION manually bumped in this commit, using as-is"
+            VERSION=$(./scripts/version.sh get)
+          else
+            CURRENT=$(./scripts/version.sh get)
+            IFS='.' read -r major minor patch <<< "$CURRENT"
+            VERSION="${major}.${minor}.$((patch + 1))"
+            echo "Auto-incrementing to $VERSION for deploy"
+          fi
+        else
+          VERSION=$(./scripts/version.sh get)
+        fi
+        SIMPLE_TAG="v${VERSION}"
+        SHA_TAG="v${VERSION}-$(git rev-parse --short HEAD)"
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "simple_tag=$SIMPLE_TAG" >> $GITHUB_OUTPUT
+        echo "sha_tag=$SHA_TAG" >> $GITHUB_OUTPUT
+        echo "Building version: $SIMPLE_TAG ($SHA_TAG)"
+    
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ghcr.io/speedscale/microsvc/${{ matrix.service }}
+        tags: |
+          type=raw,value=${{ steps.version.outputs.simple_tag }}
+          type=raw,value=${{ steps.version.outputs.sha_tag }}
+          type=raw,value=latest,enable={{is_default_branch}}
+          type=ref,event=branch
+          type=ref,event=pr
+    
+    # PR: build amd64 only, no push (fast merge gate). Master push: full
+    # multi-arch and push to GHCR.
+    - name: Build and push Docker image
+      id: build
+      uses: docker/build-push-action@v5
+      continue-on-error: ${{ github.event_name == 'push' }}
+      with:
+        context: ${{
+          matrix.service == 'frontend' && './frontend' ||
+          matrix.service == 'simulation-client' && './simulation-client' ||
+          format('./backend/{0}', matrix.service) }}
+        platforms: ${{ github.event_name == 'push' && 'linux/amd64,linux/arm64' || 'linux/amd64' }}
+        push: ${{ github.event_name == 'push' }}
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    # Retry once on master to absorb transient GHCR push errors
+    # (e.g. "error writing layer blob: not_found"). Cache makes this fast.
+    - name: Retry build and push (transient registry errors)
+      if: github.event_name == 'push' && steps.build.outcome == 'failure'
+      uses: docker/build-push-action@v5
+      with:
+        context: ${{
+          matrix.service == 'frontend' && './frontend' ||
+          matrix.service == 'simulation-client' && './simulation-client' ||
+          format('./backend/{0}', matrix.service) }}
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  update-k8s-manifests:
+    needs: [build-and-push]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    
+    permissions:
+      contents: write
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Auto-bump and sync all versions
+      run: |
+        # Auto-increment patch unless VERSION was manually bumped in this merge
+        if git diff HEAD~1 --name-only 2>/dev/null | grep -q '^VERSION$'; then
+          echo "VERSION manually bumped in this commit, syncing manifests only"
+        else
+          ./scripts/version.sh bump patch
+        fi
+
+        NEW_TAG=$(./scripts/version.sh tag)
+        echo "Releasing $NEW_TAG"
+
+        make update-k8s-version
+        make update-frontend-version
+        make update-backend-version
+
+        # Always commit — the bump itself guarantees a diff
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add VERSION kubernetes/base/deployments/ frontend/package.json simulation-client/package.json backend/*/pom.xml
+
+        if git diff --cached --quiet; then
+          echo "No changes to commit (manifests already at $NEW_TAG)"
+          exit 0
+        fi
+
+        git commit -m "CI: release $NEW_TAG [skip ci]"
+
+        # Retry with rebase if another merge landed between build and now
+        for i in 1 2 3; do
+          if git push; then
+            echo "Released $NEW_TAG"
+            exit 0
+          fi
+          echo "Push conflicted, rebasing (attempt $i/3)..."
+          git pull --rebase origin master
+        done
+        echo "Failed to push after 3 attempts"
+        exit 1
+
+  e2e-test:
+    needs: [test-frontend]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+    
+    - name: Install dependencies
+      run: |
+        cd frontend
+        npm ci
+    
+    - name: Install Playwright browsers
+      run: |
+        cd frontend
+        npx playwright install --with-deps chromium
+    
+    - name: Create test results directory
+      run: |
+        cd frontend
+        mkdir -p test-results
+    
+    - name: Run simplified E2E tests
+      run: |
+        cd frontend
+        npx playwright test --config=playwright.config.ci.ts
+      timeout-minutes: 15
+    
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: playwright-report
+        path: |
+          frontend/playwright-report/
+          frontend/test-results/
+        retention-days: 30
+
+  # Single aggregate check for branch protection. Require ONLY this context on
+  # master instead of every test + per-service build matrix leg — it stays green
+  # only if all of them pass, and automatically covers services added later.
+  ci-gate:
+    needs:
+      - test-backend
+      - test-frontend
+      - test-go-services
+      - proxymock-validation
+      - replay-gate
+      - e2e-test
+      - build-and-push
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if any required job did not succeed
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+        run: |
+          echo "One or more required jobs failed or were cancelled:"
+          echo "  test-backend=${{ needs.test-backend.result }}"
+          echo "  test-frontend=${{ needs.test-frontend.result }}"
+          echo "  test-go-services=${{ needs.test-go-services.result }}"
+          echo "  proxymock-validation=${{ needs.proxymock-validation.result }}"
+          echo "  replay-gate=${{ needs.replay-gate.result }}"
+          echo "  e2e-test=${{ needs.e2e-test.result }}"
+          echo "  build-and-push=${{ needs.build-and-push.result }}"
+          exit 1
+      - name: All required checks passed
+        run: echo "All required jobs succeeded."

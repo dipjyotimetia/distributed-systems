@@ -1,0 +1,308 @@
+package com.banking.transactionsservice.service;
+
+import com.banking.transactions.grpc.FraudCheckResponse;
+import com.banking.transactionsservice.client.FraudServiceClient;
+import com.banking.transactionsservice.dto.*;
+import com.banking.transactionsservice.event.TransactionEventProducer;
+import com.banking.transactionsservice.entity.Transaction;
+import com.banking.transactionsservice.repository.TransactionRepository;
+import io.opentelemetry.api.metrics.DoubleHistogram;
+import jakarta.servlet.http.HttpServletRequest;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.time.LocalDateTime;
+import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
+class TransactionServiceTest {
+
+    @Mock
+    private TransactionRepository transactionRepository;
+
+    @Mock
+    private MovementCoordinator movementCoordinator;
+
+    @Mock
+    private FraudServiceClient fraudServiceClient;
+
+    @Mock
+    private TransactionEventProducer transactionEventProducer;
+
+    @Mock
+    private PaymentComplianceService paymentComplianceService;
+
+    @Mock
+    private DoubleHistogram depositAmountHistogram;
+
+    @Mock
+    private DoubleHistogram withdrawAmountHistogram;
+
+    @Mock
+    private DoubleHistogram transferAmountHistogram;
+
+    @InjectMocks
+    private TransactionService transactionService;
+
+    @Mock
+    private HttpServletRequest httpServletRequest;
+
+    private Transaction testTransaction;
+    private Long testUserId = 1L;
+    private Long testAccountId = 1L;
+
+    @BeforeEach
+    void setUp() {
+        // Fraud service approves all transactions by default in unit tests
+        when(fraudServiceClient.checkTransaction(anyString(), anyString(), anyDouble(), anyString(), anyString()))
+                .thenReturn(FraudCheckResponse.newBuilder().setApproved(true).setRiskScore(0.0).setReason("OK").build());
+
+        testTransaction = new Transaction();
+        testTransaction.setId(1L);
+        testTransaction.setUserId(testUserId);
+        testTransaction.setToAccountId(testAccountId);
+        testTransaction.setAmount(100.00);
+        testTransaction.setType(Transaction.TransactionType.DEPOSIT);
+        testTransaction.setDescription("Test deposit");
+        testTransaction.setStatus(Transaction.TransactionStatus.COMPLETED);
+        testTransaction.setCreatedAt(LocalDateTime.now());
+        testTransaction.setProcessedAt(LocalDateTime.now());
+    }
+
+    @Test
+    void testGetUserTransactions() {
+        // Arrange
+        List<Transaction> transactions = Arrays.asList(testTransaction);
+        when(transactionRepository.findByUserIdOrderByCreatedAtDesc(testUserId)).thenReturn(transactions);
+
+        // Act
+        List<TransactionResponse> result = transactionService.getUserTransactions(testUserId);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(1, result.size());
+        assertEquals(testTransaction.getId(), result.get(0).getId());
+        assertEquals(testTransaction.getAmount(), result.get(0).getAmount());
+        assertEquals(testTransaction.getType(), result.get(0).getType());
+        
+        verify(transactionRepository, times(1)).findByUserIdOrderByCreatedAtDesc(testUserId);
+    }
+
+    @Test
+    void testDepositSuccess() {
+        // Arrange
+        DepositRequest request = new DepositRequest(testAccountId, 100.00, "Test deposit");
+        when(movementCoordinator.execute(any(Transaction.class))).thenReturn(testTransaction);
+
+        // Act
+        TransactionResponse result = transactionService.deposit(request, testUserId, httpServletRequest);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(testTransaction.getId(), result.getId());
+        assertEquals(testTransaction.getAmount(), result.getAmount());
+        assertEquals(Transaction.TransactionType.DEPOSIT, result.getType());
+        
+        verify(movementCoordinator).execute(any(Transaction.class));
+    }
+
+    @Test
+    void testDepositAccountNotOwned() {
+        // Arrange
+        DepositRequest request = new DepositRequest(testAccountId, 100.00, "Test deposit");
+
+        when(movementCoordinator.execute(any())).thenThrow(new IllegalStateException("Unknown account"));
+
+        // Act & Assert
+        assertThrows(RuntimeException.class, () -> {
+            transactionService.deposit(request, testUserId, httpServletRequest);
+        });
+        
+        verifyNoInteractions(transactionEventProducer);
+    }
+
+    @Test
+    void testWithdrawSuccess() {
+        // Arrange
+        WithdrawRequest request = new WithdrawRequest(testAccountId, 100.00, "Test withdrawal");
+        
+        Transaction withdrawalTransaction = new Transaction();
+        withdrawalTransaction.setId(2L);
+        withdrawalTransaction.setUserId(testUserId);
+        withdrawalTransaction.setFromAccountId(testAccountId);
+        withdrawalTransaction.setAmount(100.00);
+        withdrawalTransaction.setType(Transaction.TransactionType.WITHDRAWAL);
+        withdrawalTransaction.setStatus(Transaction.TransactionStatus.COMPLETED);
+        withdrawalTransaction.setCreatedAt(LocalDateTime.now());
+        withdrawalTransaction.setProcessedAt(LocalDateTime.now());
+        
+        when(movementCoordinator.execute(any(Transaction.class))).thenReturn(withdrawalTransaction);
+
+        // Act
+        TransactionResponse result = transactionService.withdraw(request, testUserId, httpServletRequest);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(withdrawalTransaction.getId(), result.getId());
+        assertEquals(withdrawalTransaction.getAmount(), result.getAmount());
+        assertEquals(Transaction.TransactionType.WITHDRAWAL, result.getType());
+        
+        verify(movementCoordinator).execute(any(Transaction.class));
+    }
+
+    @Test
+    void testWithdrawInsufficientBalance() {
+        // Arrange
+        WithdrawRequest request = new WithdrawRequest(testAccountId, 600.00, "Test withdrawal");
+
+        when(movementCoordinator.execute(any())).thenThrow(new InsufficientFundsException("Insufficient funds"));
+
+        // Act & Assert
+        assertThrows(RuntimeException.class, () -> {
+            transactionService.withdraw(request, testUserId, httpServletRequest);
+        });
+        
+    }
+
+    @Test
+    void testTransferSuccess() {
+        // Arrange
+        Long fromAccountId = 1L;
+        Long toAccountId = 2L;
+        TransferRequest request = new TransferRequest(fromAccountId, toAccountId, 100.00, "Test transfer");
+        
+        
+        Transaction transferTransaction = new Transaction();
+        transferTransaction.setId(3L);
+        transferTransaction.setUserId(testUserId);
+        transferTransaction.setFromAccountId(fromAccountId);
+        transferTransaction.setToAccountId(toAccountId);
+        transferTransaction.setAmount(100.00);
+        transferTransaction.setType(Transaction.TransactionType.TRANSFER);
+        transferTransaction.setStatus(Transaction.TransactionStatus.COMPLETED);
+        transferTransaction.setCreatedAt(LocalDateTime.now());
+        transferTransaction.setProcessedAt(LocalDateTime.now());
+        
+        when(movementCoordinator.execute(any(Transaction.class))).thenReturn(transferTransaction);
+
+        // Act
+        TransactionResponse result = transactionService.transfer(request, testUserId, httpServletRequest);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(transferTransaction.getId(), result.getId());
+        assertEquals(transferTransaction.getAmount(), result.getAmount());
+        assertEquals(Transaction.TransactionType.TRANSFER, result.getType());
+        
+        verify(paymentComplianceService, times(1)).verifyTransferCompliance(fromAccountId, toAccountId);
+        verify(movementCoordinator).execute(any(Transaction.class));
+    }
+
+    @Test
+    void testTransferInsufficientBalance() {
+        // Arrange
+        Long fromAccountId = 1L;
+        Long toAccountId = 2L;
+        TransferRequest request = new TransferRequest(fromAccountId, toAccountId, 600.00, "Test transfer");
+        
+
+        when(movementCoordinator.execute(any())).thenThrow(new InsufficientFundsException("Insufficient funds"));
+
+        // Act & Assert
+        assertThrows(RuntimeException.class, () -> {
+            transactionService.transfer(request, testUserId, httpServletRequest);
+        });
+        
+    }
+
+    @Test
+    void testTransferComplianceReview() {
+        // Arrange
+        Long fromAccountId = 1L;
+        Long toAccountId = 2L;
+        TransferRequest request = new TransferRequest(fromAccountId, toAccountId, 100.00, "Test transfer");
+
+        doThrow(new RuntimeException("Compliance screening requires review"))
+                .when(paymentComplianceService).verifyTransferCompliance(fromAccountId, toAccountId);
+
+        // Act & Assert
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+            transactionService.transfer(request, testUserId, httpServletRequest);
+        });
+        assertTrue(exception.getMessage().contains("Compliance screening requires review"));
+
+        verify(paymentComplianceService, times(1)).verifyTransferCompliance(fromAccountId, toAccountId);
+        verify(movementCoordinator, never()).execute(any(Transaction.class));
+    }
+
+    @Test
+    void testDepositDoesNotBlockUnrelatedAccountDuringSlowFraudCheck() throws Exception {
+        Long slowAccountId = 1L;
+        Long fastAccountId = 2L;
+        CountDownLatch slowFraudStarted = new CountDownLatch(1);
+        CountDownLatch releaseSlowFraud = new CountDownLatch(1);
+        AtomicLong transactionIds = new AtomicLong(1L);
+
+        when(fraudServiceClient.checkTransaction(anyString(), anyString(), anyDouble(), anyString(), anyString()))
+                .thenAnswer(invocation -> {
+                    if (String.valueOf(slowAccountId).equals(invocation.getArgument(0))) {
+                        slowFraudStarted.countDown();
+                        assertTrue(releaseSlowFraud.await(2, TimeUnit.SECONDS));
+                    }
+                    return FraudCheckResponse.newBuilder()
+                            .setApproved(true)
+                            .setRiskScore(0.0)
+                            .setReason("OK")
+                            .build();
+                });
+        when(movementCoordinator.execute(any(Transaction.class))).thenAnswer(invocation -> {
+            Transaction transaction = invocation.getArgument(0);
+            transaction.setId(transactionIds.getAndIncrement());
+            return transaction;
+        });
+
+        ExecutorService executorService = Executors.newFixedThreadPool(2);
+        try {
+            Future<TransactionResponse> slowDeposit = executorService.submit(() ->
+                    transactionService.deposit(
+                            new DepositRequest(slowAccountId, 100.00, "Slow fraud check"),
+                            testUserId,
+                            httpServletRequest));
+
+            assertTrue(slowFraudStarted.await(1, TimeUnit.SECONDS));
+
+            Future<TransactionResponse> fastDeposit = executorService.submit(() ->
+                    transactionService.deposit(
+                            new DepositRequest(fastAccountId, 50.00, "Fast unrelated deposit"),
+                            testUserId,
+                            httpServletRequest));
+
+            assertNotNull(fastDeposit.get(500, TimeUnit.MILLISECONDS));
+            releaseSlowFraud.countDown();
+            assertNotNull(slowDeposit.get(1, TimeUnit.SECONDS));
+        } finally {
+            releaseSlowFraud.countDown();
+            executorService.shutdownNow();
+        }
+    }
+}
