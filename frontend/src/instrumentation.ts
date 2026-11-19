@@ -67,10 +67,10 @@ export async function register() {
 
     // Use a minimal approach that avoids NodeSDK to prevent bundling issues
     const { NodeTracerProvider } = await import('@opentelemetry/sdk-trace-node');
-    const { SimpleSpanProcessor } = await import('@opentelemetry/sdk-trace-base');
+    const { ConsoleSpanExporter, SimpleSpanProcessor } = await import('@opentelemetry/sdk-trace-base');
     const { OTLPTraceExporter } = await import('@opentelemetry/exporter-trace-otlp-http');
-    const { Resource } = await import('@opentelemetry/resources');
-    const { SemanticResourceAttributes } = await import('@opentelemetry/semantic-conventions');
+    const { resourceFromAttributes } = await import('@opentelemetry/resources');
+    const { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION, ATTR_SERVICE_NAMESPACE } = await import('@opentelemetry/semantic-conventions');
     const { trace, context, propagation } = await import('@opentelemetry/api');
     
     log('🔧 OpenTelemetry packages loaded successfully');
@@ -78,63 +78,24 @@ export async function register() {
     // Note: W3C Trace Context propagator is set by default in OpenTelemetry
     // No need to explicitly set it as it's the default propagator
     
-    // Create a custom tracer provider for Next.js
-    const tracerProvider = new NodeTracerProvider({
-      resource: new Resource({
-        [SemanticResourceAttributes.SERVICE_NAME]: process.env.OTEL_SERVICE_NAME || 'frontend',
-        [SemanticResourceAttributes.SERVICE_VERSION]: '1.0.0',
-        [SemanticResourceAttributes.SERVICE_NAMESPACE]: resourceAttribute('service.namespace', 'banking-app'),
-        'deployment.environment': resourceAttribute('deployment.environment', 'decoy'),
-      }),
-    });
-
-    // Configure OTLP exporter with error handling
     const otlpExporter = new OTLPTraceExporter({
       url: process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4318/v1/traces',
     });
-
-    log('🔧 OTLP Exporter configured with URL:', process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4318/v1/traces');
-    
-    // Test OTLP exporter connectivity
-    log('🔧 Testing OTLP exporter connectivity...');
-    try {
-      // Create a test span to export
-      const testTracer = trace.getTracer('connectivity-test');
-      const testSpan = testTracer.startSpan('connectivity-test');
-      testSpan.setAttribute('test.connectivity', 'true');
-      testSpan.end();
-      
-      // Force export with error handling
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      otlpExporter.export([testSpan as any], (result) => {
-        log('🔧 OTLP Export test result:', result);
-        if (result.code !== 0) {
-          log('❌ OTLP Export failed:', result);
-        } else {
-          log('✅ OTLP Export test successful');
-        }
-      });
-    } catch (error) {
-      log('❌ OTLP Export test error:', error);
-    }
-
-    // Add ConsoleSpanExporter for debugging only in debug mode
+    const spanProcessors = [new SimpleSpanProcessor(otlpExporter)];
     if (isDebugMode) {
-      const { ConsoleSpanExporter } = await import('@opentelemetry/sdk-trace-base');
-      const consoleExporter = new ConsoleSpanExporter();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      tracerProvider.addSpanProcessor(new SimpleSpanProcessor(consoleExporter as any));
+      spanProcessors.push(new SimpleSpanProcessor(new ConsoleSpanExporter()));
     }
-    
-    // Add OTLP exporter
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    tracerProvider.addSpanProcessor(new SimpleSpanProcessor(otlpExporter as any));
-    
-    log('🔧 Console and OTLP span processors added to tracer provider');
-    
-    // Register the tracer provider
+
+    const tracerProvider = new NodeTracerProvider({
+      resource: resourceFromAttributes({
+        [ATTR_SERVICE_NAME]: process.env.OTEL_SERVICE_NAME || 'frontend',
+        [ATTR_SERVICE_VERSION]: '1.0.0',
+        [ATTR_SERVICE_NAMESPACE]: resourceAttribute('service.namespace', 'banking-app'),
+        'deployment.environment': resourceAttribute('deployment.environment', 'decoy'),
+      }),
+      spanProcessors,
+    });
     tracerProvider.register();
-    trace.setGlobalTracerProvider(tracerProvider);
 
     log('✅ OpenTelemetry instrumentation registered successfully for frontend server');
     log('🔧 Service name:', process.env.OTEL_SERVICE_NAME || 'frontend');

@@ -1,4 +1,4 @@
-FROM node:18-alpine
+FROM node:26.13.1-alpine
 
 # Install dependencies for Playwright
 RUN apk add --no-cache \
@@ -18,10 +18,10 @@ ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
 WORKDIR /app
 
 # Copy package files
-COPY package.json ./
+COPY package*.json ./
 
 # Install dependencies
-RUN npm install
+RUN npm ci
 
 # Copy test script
 COPY test-script.js ./

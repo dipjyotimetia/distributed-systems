@@ -40,18 +40,6 @@ Object.defineProperty(window, 'sessionStorage', {
   writable: true,
 })
 
-// Mock window.location
-Object.defineProperty(window, 'location', {
-  value: {
-    href: 'http://localhost:3000',
-    pathname: '/',
-    search: '',
-    hash: '',
-    reload: jest.fn(),
-    assign: jest.fn(),
-  },
-  writable: true,
-})
 
 // Mock axios
 jest.mock('axios', () => ({
