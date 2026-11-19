@@ -50,9 +50,9 @@ echo "PASS: banking-app-sa cannot read namespace secrets"
 node - "$repo_root/frontend/package-lock.json" <<'NODE'
 const lock = require(process.argv[2]);
 const expected = {
-  next: '16.2.6',
-  react: '19.2.7',
-  'react-dom': '19.2.7',
+  next: '16.4.6',
+  react: '19.3.1',
+  'react-dom': '19.3.1',
 };
 for (const [name, version] of Object.entries(expected)) {
   const actual = lock.packages[`node_modules/${name}`]?.version;

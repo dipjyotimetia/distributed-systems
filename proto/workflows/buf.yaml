@@ -3,3 +3,6 @@ lint:
   use: [STANDARD]
 breaking:
   use: [FILE]
+  ignore_only:
+    FILE_SAME_GO_PACKAGE:
+      - banking/disputes/v1/investigation.proto

@@ -3,25 +3,27 @@ spring:
     name: api-gateway
   cloud:
     gateway:
-      # Routes are configured programmatically in GatewayConfig.java
-      default-filters:
-        - TraceIdInjectionFilter
-      globalcors:
-        cors-configurations:
-          '[/**]':
-            allowedOrigins: "http://localhost:3000"
-            allowedMethods:
-              - GET
-              - POST
-              - PUT
-              - DELETE
-              - OPTIONS
-            allowedHeaders: "*"
-            allowCredentials: true
-            maxAge: 3600
-      httpclient:
-        connect-timeout: 30000
-        response-timeout: 60s
+      server:
+        webflux:
+          # Routes are configured programmatically in GatewayConfig.java
+          default-filters:
+            - TraceIdInjectionFilter
+          globalcors:
+            cors-configurations:
+              '[/**]':
+                allowedOrigins: "http://localhost:3000"
+                allowedMethods:
+                  - GET
+                  - POST
+                  - PUT
+                  - DELETE
+                  - OPTIONS
+                allowedHeaders: "*"
+                allowCredentials: true
+                maxAge: 3600
+          httpclient:
+            connect-timeout: 30000
+            response-timeout: 60s
   data:
     redis:
       host: ${REDIS_HOST:localhost}

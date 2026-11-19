@@ -15,20 +15,20 @@ services:
     ports: !reset []
   user-service:
     build: !reset null
-    image: ghcr.io/speedscale/microsvc/user-service:${MICROSVC_TAG:-v1.4.53}
+    image: ghcr.io/dipjyotimetia/distributed-systems/user-service:${MICROSVC_TAG:-v1.4.53}
     environment: { OTEL_SDK_DISABLED: "true" }
   accounts-service:
     build: !reset null
-    image: ghcr.io/speedscale/microsvc/accounts-service:${MICROSVC_TAG:-v1.4.53}
+    image: ghcr.io/dipjyotimetia/distributed-systems/accounts-service:${MICROSVC_TAG:-v1.4.53}
     environment: { OTEL_SDK_DISABLED: "true" }
   transactions-service:
     build: !reset null
-    image: ghcr.io/speedscale/microsvc/transactions-service:${MICROSVC_TAG:-v1.4.53}
+    image: ghcr.io/dipjyotimetia/distributed-systems/transactions-service:${MICROSVC_TAG:-v1.4.53}
     environment: { OTEL_SDK_DISABLED: "true" }
   fraud-service:
     build: !reset null
-    image: ghcr.io/speedscale/microsvc/fraud-service:${MICROSVC_TAG:-v1.4.53}
+    image: ghcr.io/dipjyotimetia/distributed-systems/fraud-service:${MICROSVC_TAG:-v1.4.53}
   api-gateway:
     build: !reset null
-    image: ghcr.io/speedscale/microsvc/api-gateway:${MICROSVC_TAG:-v1.4.53}
+    image: ghcr.io/dipjyotimetia/distributed-systems/api-gateway:${MICROSVC_TAG:-v1.4.53}
     environment: { OTEL_SDK_DISABLED: "true" }

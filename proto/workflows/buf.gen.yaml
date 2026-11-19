@@ -2,7 +2,7 @@ version: v2
 plugins:
   - local: protoc-gen-go
     out: backend/disputes-service
-    opt: module=github.com/speedscale/microsvc/disputes-service
+    opt: module=github.com/dipjyotimetia/distributed-systems/backend/disputes-service
     types: [banking.disputes.v1.CaseRevision, banking.disputes.v1.InvestigationState]
   - protoc_builtin: java
     protoc_path: protoc

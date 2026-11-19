@@ -5,7 +5,7 @@ import com.banking.transactionsservice.entity.Transaction;
 import com.banking.transactionsservice.security.UserAuthenticationDetails;
 import com.banking.transactionsservice.service.InsufficientFundsException;
 import com.banking.transactionsservice.service.TransactionService;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import io.opentelemetry.api.metrics.LongCounter;
 import io.opentelemetry.api.metrics.LongCounterBuilder;
 import io.opentelemetry.api.metrics.Meter;
@@ -17,9 +17,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
@@ -49,8 +49,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @ExtendWith(MockitoExtension.class)
 @WebMvcTest(value = TransactionController.class, excludeAutoConfiguration = {
-    org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration.class,
-    org.springframework.boot.autoconfigure.security.servlet.SecurityFilterAutoConfiguration.class
+    org.springframework.boot.security.autoconfigure.SecurityAutoConfiguration.class,
+    org.springframework.boot.security.autoconfigure.web.servlet.SecurityFilterAutoConfiguration.class
 })
 @ContextConfiguration(classes = {TransactionController.class, TransactionControllerTest.TestConfig.class})
 @WithMockUser(username="testuser")
@@ -59,11 +59,11 @@ class TransactionControllerTest {
     @Autowired
     private MockMvc mockMvc;
 
-    @MockBean
+    @MockitoBean
     private TransactionService transactionService;
 
     @Autowired
-    private ObjectMapper objectMapper;
+    private JsonMapper objectMapper;
 
     private TransactionResponse testTransactionResponse;
     private DepositRequest depositRequest;

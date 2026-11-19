@@ -58,16 +58,6 @@ data:
             - 'name == "security filterchain after"'
             - 'name == "authorize exchange"'
             - 'name == "secured request"'
-      attributes/loki-hints:
-        actions:
-          - key: loki.attribute.labels
-            value: service,namespace
-            action: insert
-      resource/loki-hints:
-        attributes:
-          - key: loki.resource.labels
-            value: cluster
-            action: insert
       transform/rrpair-attrs:
         log_statements:
           - context: log
@@ -104,11 +94,8 @@ data:
         endpoint: "jaeger:4317"
         tls:
           insecure: true
-      loki:
-        endpoint: http://loki:3100/loki/api/v1/push
-        default_labels_enabled:
-          exporter: true
-          job: true
+      otlphttp/loki:
+        endpoint: http://loki:3100/otlp
       prometheusremotewrite:
         endpoint: http://prometheus:9090/api/v1/write
         tls:
@@ -129,8 +116,8 @@ data:
           exporters: [otlp]
         logs:
           receivers: [otlp]
-          processors: [resource/loki-hints, attributes/loki-hints, batch]
-          exporters: [loki, debug]
+          processors: [batch]
+          exporters: [otlphttp/loki, debug]
         logs/metrics:
           receivers: [otlp]
           processors: [transform/rrpair-attrs, filter/http-only, batch]
@@ -162,7 +149,7 @@ spec:
     spec:
       containers:
         - name: otel-collector
-          image: otel/opentelemetry-collector-contrib:0.120.0
+          image: otel/opentelemetry-collector-contrib:0.165.0
           args:
             - --config=/conf/otel-collector-config.yaml
           volumeMounts:

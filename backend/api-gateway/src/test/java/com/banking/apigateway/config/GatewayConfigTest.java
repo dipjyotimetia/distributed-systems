@@ -29,7 +29,8 @@ class GatewayConfigTest {
         ReflectionTestUtils.setField(config, "disputesServiceUrl", "http://disputes:8080");
 
         try (StaticApplicationContext context = new StaticApplicationContext()) {
-            context.registerSingleton("pathPredicate", PathRoutePredicateFactory.class);
+            context.getBeanFactory().registerSingleton("pathPredicate",
+                    new PathRoutePredicateFactory(new org.springframework.boot.webflux.autoconfigure.WebFluxProperties()));
             context.registerSingleton("rewritePathFilter", RewritePathGatewayFilterFactory.class);
             Route route = config.routes(new RouteLocatorBuilder(context)).getRoutes()
                     .filter(candidate -> candidate.getId().equals("disputes-service"))

@@ -9,12 +9,12 @@ import (
 	"sync"
 	"time"
 
-	kafka "github.com/segmentio/kafka-go"
-	"github.com/segmentio/kafka-go/sasl"
-	"github.com/segmentio/kafka-go/sasl/plain"
+	"github.com/twmb/franz-go/pkg/kgo"
+	"github.com/twmb/franz-go/pkg/sasl"
+	"github.com/twmb/franz-go/pkg/sasl/plain"
 
-	"github.com/speedscale/microsvc/notification-service/internal/metrics"
-	"github.com/speedscale/microsvc/notification-service/internal/notify"
+	"github.com/dipjyotimetia/distributed-systems/backend/notification-service/internal/metrics"
+	"github.com/dipjyotimetia/distributed-systems/backend/notification-service/internal/notify"
 )
 
 const ringSize = 1000
@@ -91,7 +91,8 @@ type Store interface {
 
 // Consumer reads from Kafka and populates both the ring buffer and a durable store.
 type Consumer struct {
-	reader   *kafka.Reader
+	client   *kgo.Client
+	topic    string
 	Buffer   *RingBuffer
 	store    Store
 	notifier *notify.Notifier
@@ -112,29 +113,31 @@ func New(brokers []string, topic, groupID string, store Store) *Consumer {
 }
 
 func NewWithAuth(brokers []string, topic, groupID string, store Store, auth AuthConfig) (*Consumer, error) {
-	cfg := kafka.ReaderConfig{
-		Brokers:  brokers,
-		Topic:    topic,
-		GroupID:  groupID,
-		MinBytes: 1,
-		MaxBytes: 10e6,
+	opts := []kgo.Opt{
+		kgo.SeedBrokers(brokers...),
+		kgo.ConsumeTopics(topic),
+		kgo.ConsumerGroup(groupID),
+		kgo.ConsumeResetOffset(kgo.NewOffset().AtStart()),
+		kgo.FetchMinBytes(1),
+		kgo.FetchMaxBytes(10_000_000),
+		kgo.DisableAutoCommit(),
+		kgo.BlockRebalanceOnPoll(),
 	}
-
 	if auth.Mechanism != "" {
 		mechanism, err := saslMechanism(auth)
 		if err != nil {
 			return nil, err
 		}
-		cfg.Dialer = &kafka.Dialer{
-			Timeout:       10 * time.Second,
-			DualStack:     true,
-			SASLMechanism: mechanism,
-		}
+		opts = append(opts, kgo.SASL(mechanism))
 	}
 
-	r := kafka.NewReader(cfg)
+	client, err := kgo.NewClient(opts...)
+	if err != nil {
+		return nil, fmt.Errorf("configure Kafka consumer: %w", err)
+	}
 	return &Consumer{
-		reader:   r,
+		client:   client,
+		topic:    topic,
 		Buffer:   &RingBuffer{},
 		store:    store,
 		notifier: notify.NewNotifier(),
@@ -147,10 +150,7 @@ func saslMechanism(auth AuthConfig) (sasl.Mechanism, error) {
 		if auth.Username == "" || auth.Password == "" {
 			return nil, fmt.Errorf("KAFKA_SASL_USERNAME and KAFKA_SASL_PASSWORD are required for PLAIN")
 		}
-		return plain.Mechanism{
-			Username: auth.Username,
-			Password: auth.Password,
-		}, nil
+		return plain.Auth{User: auth.Username, Pass: auth.Password}.AsMechanism(), nil
 	default:
 		return nil, fmt.Errorf("unsupported Kafka SASL mechanism %q", auth.Mechanism)
 	}
@@ -161,12 +161,16 @@ func (c *Consumer) Run(ctx context.Context) error {
 	if c.store == nil {
 		return fmt.Errorf("notification event store is required")
 	}
-	log.Printf("kafka consumer started (topic=%s)", c.reader.Config().Topic)
+	log.Printf("kafka consumer started (topic=%s)", c.topic)
 	for {
-		message, err := c.reader.FetchMessage(ctx)
+		fetches := c.client.PollRecords(ctx, 1)
+		err := fetches.Err()
 		if err == nil {
-			err = c.process(ctx, message)
+			fetches.EachRecord(func(record *kgo.Record) {
+				err = c.process(ctx, record)
+			})
 		}
+		c.client.AllowRebalance()
 		if ctx.Err() != nil {
 			return nil
 		}
@@ -177,7 +181,7 @@ func (c *Consumer) Run(ctx context.Context) error {
 	}
 }
 
-func (c *Consumer) process(ctx context.Context, message kafka.Message) error {
+func (c *Consumer) process(ctx context.Context, message *kgo.Record) error {
 	var event TransactionEvent
 	if err := json.Unmarshal(message.Value, &event); err != nil || event.TransactionID == "" || event.Status == "" {
 		metrics.ConsumeErrors.Inc()
@@ -187,7 +191,7 @@ func (c *Consumer) process(ctx context.Context, message kafka.Message) error {
 			return err
 		}
 	}
-	if err := c.reader.CommitMessages(ctx, message); err != nil {
+	if err := c.client.CommitRecords(ctx, message); err != nil {
 		return fmt.Errorf("commit transaction event offset: %w", err)
 	}
 	return nil
@@ -215,7 +219,8 @@ func (c *Consumer) deliver(ctx context.Context, event *TransactionEvent) error {
 	return nil
 }
 
-// Close shuts the Kafka reader.
+// Close shuts the Kafka client.
 func (c *Consumer) Close() error {
-	return c.reader.Close()
+	c.client.CloseAllowingRebalance()
+	return nil
 }

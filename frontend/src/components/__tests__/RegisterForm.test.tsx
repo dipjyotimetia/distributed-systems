@@ -17,7 +17,7 @@ jest.mock('@/lib/auth/context', () => ({
 
 // Mock Next.js Link component
 jest.mock('next/link', () => {
-  return function MockLink({ children, href, ...props }: Record<string, unknown>) {
+  return function MockLink({ children, href, ...props }: React.ComponentProps<"a">) {
     return <a href={href} {...props}>{children}</a>;
   };
 });

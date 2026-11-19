@@ -25,7 +25,7 @@ spec:
       serviceAccountName: banking-app-sa
       containers:
       - name: user-service
-        image: ghcr.io/speedscale/microsvc/user-service:v1.4.139
+        image: ghcr.io/dipjyotimetia/distributed-systems/user-service:v1.4.139
         imagePullPolicy: Always
         ports:
         - containerPort: 8080
@@ -71,5 +71,5 @@ spec:
           failureThreshold: 3
       initContainers:
       - name: wait-for-postgres
-        image: postgres:15-alpine
+        image: postgres:18.7-alpine
         command: ['sh', '-c', 'echo "[user-service] Waiting for PostgreSQL..."; until pg_isready -h banking-postgres -p 5432 -q; do sleep 1; done; echo "[user-service] PostgreSQL ready!"']

@@ -25,10 +25,15 @@ spec:
       serviceAccountName: banking-app-sa
       containers:
       - name: accounts-service
-        image: ghcr.io/speedscale/microsvc/accounts-service:v1.4.139
+        image: ghcr.io/dipjyotimetia/distributed-systems/accounts-service:v1.4.139
         imagePullPolicy: Always
         command: ["/bin/sh", "-c"]
-        args: ["exec java $JAVA_OPTS org.springframework.boot.loader.launch.JarLauncher"]
+        args:
+          - |
+            if [ -f /app/application.jar ]; then
+              exec java $JAVA_OPTS -jar /app/application.jar
+            fi
+            exec java $JAVA_OPTS org.springframework.boot.loader.launch.JarLauncher
         ports:
         - containerPort: 8080
           name: http
@@ -85,5 +90,5 @@ spec:
           failureThreshold: 6
       initContainers:
       - name: wait-for-postgres
-        image: postgres:15-alpine
+        image: postgres:18.7-alpine
         command: ['sh', '-c', 'echo "[accounts-service] Waiting for PostgreSQL..."; until pg_isready -h banking-postgres -p 5432 -q; do sleep 1; done; echo "[accounts-service] PostgreSQL ready!"']

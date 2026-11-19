@@ -4,7 +4,7 @@ import com.banking.transactionsservice.client.FraudServiceClient;
 import com.banking.transactionsservice.event.TransactionEventProducer;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.ActiveProfiles;
 
 @SpringBootTest
@@ -12,10 +12,10 @@ import org.springframework.test.context.ActiveProfiles;
 class TransactionsServiceApplicationTests {
 
     // Prevent Spring from wiring the real gRPC client and Kafka producer during context load
-    @MockBean
+    @MockitoBean
     private FraudServiceClient fraudServiceClient;
 
-    @MockBean
+    @MockitoBean
     private TransactionEventProducer transactionEventProducer;
 
     @Test

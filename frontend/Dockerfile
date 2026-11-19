@@ -1,5 +1,5 @@
 # Multi-stage build for Next.js frontend
-FROM --platform=$BUILDPLATFORM node:20-slim AS builder
+FROM --platform=$BUILDPLATFORM node:26.13.1-slim AS builder
 
 WORKDIR /app
 
@@ -19,7 +19,7 @@ ENV NODE_ENV=production
 RUN npm run build
 
 # Runtime image - use Alpine for Colima compatibility
-FROM node:20-alpine
+FROM node:26.13.1-alpine
 
 WORKDIR /app
 

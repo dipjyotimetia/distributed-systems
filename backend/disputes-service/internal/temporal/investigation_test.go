@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	disputesv1 "github.com/speedscale/microsvc/disputes-service/internal/generated/disputes/v1"
+	disputesv1 "github.com/dipjyotimetia/distributed-systems/backend/disputes-service/internal/generated/disputes/v1"
 	"go.temporal.io/sdk/activity"
 	"go.temporal.io/sdk/testsuite"
 )

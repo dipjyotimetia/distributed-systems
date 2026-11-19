@@ -1,5 +1,5 @@
 # Multi-stage build for optimal image size
-FROM node:18-alpine AS builder
+FROM node:26.13.1-alpine AS builder
 
 WORKDIR /app
 
@@ -10,7 +10,7 @@ COPY package*.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
 # Production stage
-FROM node:18-alpine AS production
+FROM node:26.13.1-alpine AS production
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \

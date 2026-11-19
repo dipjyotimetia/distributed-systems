@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"time"
 
-	disputesv1 "github.com/speedscale/microsvc/disputes-service/internal/generated/disputes/v1"
-	"github.com/speedscale/microsvc/disputes-service/internal/postgres"
+	disputesv1 "github.com/dipjyotimetia/distributed-systems/backend/disputes-service/internal/generated/disputes/v1"
+	"github.com/dipjyotimetia/distributed-systems/backend/disputes-service/internal/postgres"
 	"go.opentelemetry.io/otel"
 	"go.temporal.io/api/serviceerror"
 	"go.temporal.io/sdk/workflow"

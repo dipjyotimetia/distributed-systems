@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
-	"github.com/speedscale/microsvc/notification-service/internal/consumer"
+	"github.com/dipjyotimetia/distributed-systems/backend/notification-service/internal/consumer"
 )
 
 type MongoStore struct {
@@ -20,7 +20,7 @@ func NewMongoStore(ctx context.Context, uri, db, collection string) (*MongoStore
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri))
+	client, err := mongo.Connect(options.Client().ApplyURI(uri))
 	if err != nil {
 		return nil, err
 	}

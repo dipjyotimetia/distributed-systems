@@ -6,18 +6,19 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7.1.0
         with:
-          go-version: '1.25'
+          go-version-file: backend/disputes-service/go.mod
           cache: false
       - name: Install pinned local tools
         run: |
-          go install github.com/bufbuild/buf/cmd/buf@v1.57.0
-          go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.9
-          curl -fsSL https://repo.maven.apache.org/maven2/com/google/protobuf/protoc/4.31.1/protoc-4.31.1-linux-x86_64.exe -o "$(go env GOPATH)/bin/protoc"
+          go install github.com/bufbuild/buf/cmd/buf@v1.75.0
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.12
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.2
+          curl -fsSL https://repo.maven.apache.org/maven2/com/google/protobuf/protoc/4.36.2/protoc-4.36.2-linux-x86_64.exe -o "$(go env GOPATH)/bin/protoc"
           chmod +x "$(go env GOPATH)/bin/protoc"
           go env GOPATH | sed 's|$|/bin|' >> "$GITHUB_PATH"
       - name: Verify generated bindings
@@ -28,6 +29,15 @@ jobs:
           java_bindings=backend/accounts-service/src/main/java/com/banking/accountsservice/statements/generated
           diff -ru "$go_bindings" "$generated/$go_bindings"
           diff -ru "$java_bindings" "$generated/$java_bindings"
+      - name: Verify fraud gRPC bindings
+        run: |
+          generated="$(mktemp -d)"
+          module=github.com/dipjyotimetia/distributed-systems/backend/fraud-service
+          protoc -I proto/fraud \
+            --go_out="$generated" --go_opt=module="$module" \
+            --go-grpc_out="$generated" --go-grpc_opt=module="$module" \
+            proto/fraud/fraud.proto
+          diff -ru backend/fraud-service/gen "$generated/gen"
       - name: Check compatibility with PR base
         if: github.event_name == 'pull_request'
         env:

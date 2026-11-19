@@ -6,7 +6,7 @@
 set -e
 
 VERSION_FILE="VERSION"
-REGISTRY="ghcr.io/speedscale/microsvc"
+REGISTRY="ghcr.io/dipjyotimetia/distributed-systems"
 SERVICES=("user-service" "accounts-service" "transactions-service" "api-gateway" "ai-service" "frontend" "simulation-client" "fraud-service" "notification-service")
 BACKEND_SERVICES=("user-service" "accounts-service" "transactions-service" "api-gateway")
 FRONTEND_SERVICES=("frontend")

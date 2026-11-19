@@ -7,7 +7,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import jakarta.annotation.PostConstruct;
-import java.security.Key;
+import javax.crypto.SecretKey;
 
 @Component
 public class JwtUtil {
@@ -15,7 +15,7 @@ public class JwtUtil {
     @Value("${jwt.secret}")
     private String secret;
 
-    private Key key;
+    private SecretKey key;
 
     @PostConstruct
     public void init() {
@@ -23,7 +23,7 @@ public class JwtUtil {
     }
 
     public Claims getAllClaimsFromToken(String token) {
-        return Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(token).getBody();
+        return Jwts.parser().verifyWith(key).build().parseSignedClaims(token).getPayload();
     }
 
     private boolean isTokenExpired(String token) {

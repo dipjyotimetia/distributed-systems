@@ -1,7 +1,7 @@
 # Banking Application Makefile
 
 # Configuration
-REGISTRY ?= ghcr.io/speedscale/microsvc
+REGISTRY ?= ghcr.io/dipjyotimetia/distributed-systems
 IMAGE_TAG ?= $(shell ./scripts/version.sh tag)
 NAMESPACE ?= banking-app
 KUSTOMIZE_DIR ?= kubernetes/base
@@ -313,7 +313,7 @@ help:
 	@echo "  help               - Show this help"
 	@echo ""
 	@echo "Environment Variables:"
-	@echo "  REGISTRY           - Docker registry (default: ghcr.io/speedscale/microsvc)"
+	@echo "  REGISTRY           - Docker registry (default: ghcr.io/dipjyotimetia/distributed-systems)"
 	@echo "  IMAGE_TAG          - Docker image tag (default: latest)"
 	@echo "  NAMESPACE          - Kubernetes namespace (default: banking-app)"
 	@echo "  KUSTOMIZE_DIR      - Kustomize directory (default: kubernetes/base)"

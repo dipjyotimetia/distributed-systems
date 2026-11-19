@@ -25,10 +25,15 @@ spec:
       serviceAccountName: banking-app-sa
       containers:
       - name: api-gateway
-        image: ghcr.io/speedscale/microsvc/api-gateway:v1.4.139
+        image: ghcr.io/dipjyotimetia/distributed-systems/api-gateway:v1.4.139
         imagePullPolicy: Always
         command: ["/bin/sh", "-c"]
-        args: ["exec java $JAVA_OPTS org.springframework.boot.loader.launch.JarLauncher"]
+        args:
+          - |
+            if [ -f /app/application.jar ]; then
+              exec java $JAVA_OPTS -jar /app/application.jar
+            fi
+            exec java $JAVA_OPTS org.springframework.boot.loader.launch.JarLauncher
         ports:
         - containerPort: 8080
           name: http
@@ -79,5 +84,5 @@ spec:
           failureThreshold: 6
       initContainers:
       - name: wait-for-services
-        image: busybox:1.35
+        image: busybox:1.38.0
         command: ['sh', '-c', 'echo "[api-gateway] Waiting for microservices..."; services="banking-user:80 banking-accounts:80 banking-transactions:80"; for service in $services; do while ! nc -z ${service%:*} ${service#*:}; do echo "[api-gateway] Waiting for $service..."; sleep 1; done; echo "[api-gateway] ✓ $service ready"; done; echo "[api-gateway] All services ready!"']

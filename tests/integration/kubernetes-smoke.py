@@ -23,7 +23,7 @@ def get_json(base, path, expected=200, body=None, headers=None):
         raise RuntimeError(f"{path} returned HTTP {error.code}, expected {expected}") from None
 
 
-def main(frontend, jaeger):
+def main(frontend, jaeger, notifications):
     health = get_json(frontend, "/api/healthz")
     assert health["status"] == "UP" and health["service"] == "frontend"
 
@@ -61,9 +61,29 @@ def main(frontend, jaeger):
             observed = services
             if expected_services <= services:
                 print(f"Trace {trace_id} contained spans from all three services")
+                verify_notification(frontend, notifications, login)
                 return
         time.sleep(2)
     raise SystemExit(f"Trace {trace_id} missing spans from {', '.join(sorted(expected_services - observed))}")
+
+
+def verify_notification(frontend, notifications, login):
+    auth = {"Authorization": "Bearer " + login["token"]}
+    account = get_json(frontend, "/api/accounts", 201, {
+        "accountType": "CHECKING", "initialBalance": 0,
+    }, auth)
+    transaction = get_json(frontend, "/api/transactions/deposit", 201, {
+        "accountId": account["id"], "amount": 10, "description": "Kubernetes smoke deposit",
+    }, auth)
+    deadline = time.monotonic() + 45
+    while time.monotonic() < deadline:
+        events = get_json(notifications, f"/notifications/{login['id']}") or []
+        if any(event["transaction_id"] == transaction["id"] and event["status"] == "COMPLETED"
+               for event in events):
+            print("The deposit notification reached the consumer through Redpanda")
+            return
+        time.sleep(2)
+    raise SystemExit("The deposit notification did not reach the consumer")
 
 
 if __name__ == "__main__":

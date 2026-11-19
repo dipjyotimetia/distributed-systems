@@ -7,7 +7,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/speedscale/microsvc/notification-service/internal/consumer"
+	"github.com/dipjyotimetia/distributed-systems/backend/notification-service/internal/consumer"
 )
 
 const defaultLimit = 20

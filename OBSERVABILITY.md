@@ -90,7 +90,7 @@ docker-compose up -d prometheus grafana jaeger
 
 # Verify services are running
 curl http://localhost:9090/api/v1/targets  # Prometheus targets
-curl http://localhost:16686/api/services   # Jaeger services
+curl http://localhost:16686/api/v3/services   # Jaeger services
 curl http://localhost:3001                 # Grafana (admin/admin)
 ```
 

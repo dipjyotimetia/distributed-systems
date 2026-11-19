@@ -1,7 +1,7 @@
 services:
   # Database
   postgres:
-    image: postgres:15-alpine
+    image: postgres:18.7-alpine
     container_name: banking-postgres
     healthcheck:
       test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "postgres", "-d", "banking_app"]
@@ -9,6 +9,7 @@ services:
       timeout: 3s
       retries: 20
     environment:
+      PGDATA: /var/lib/postgresql/data
       POSTGRES_DB: banking_app
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
@@ -22,7 +23,7 @@ services:
 
   # Backend Services
   disputes-schema:
-    image: postgres:15-alpine
+    image: postgres:18.7-alpine
     depends_on:
       postgres:
         condition: service_healthy
@@ -78,7 +79,7 @@ services:
       - banking-network
 
   disputes-temporal:
-    image: temporalio/temporal:1.4.1
+    image: temporalio/temporal:1.10.1
     command: ["server", "start-dev", "--ip", "0.0.0.0", "--db-filename", "/home/temporal/disputes.db", "--headless"]
     volumes:
       - disputes_temporal_data:/home/temporal
@@ -183,14 +184,34 @@ services:
     networks:
       - banking-network
 
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:v26.2.2
+    networks: [banking-network]
+    command:
+      - redpanda
+      - start
+      - --mode=dev-container
+      - --smp=1
+      - --kafka-addr=0.0.0.0:9092
+      - --advertise-kafka-addr=redpanda:9092
+    healthcheck:
+      test: ["CMD-SHELL", "rpk topic describe transaction-events -X brokers=redpanda:9092 >/dev/null 2>&1 || rpk topic create transaction-events --partitions 1 --replicas 1 -X brokers=redpanda:9092"]
+      interval: 5s
+      timeout: 10s
+      retries: 15
+
   transactions-service:
     build:
       context: ./backend/transactions-service
       dockerfile: Dockerfile
     container_name: banking-transactions-service
     depends_on:
-      - postgres
-      - fraud-service
+      postgres:
+        condition: service_started
+      fraud-service:
+        condition: service_started
+      redpanda:
+        condition: service_healthy
     environment:
       - SPRING_PROFILES_ACTIVE=docker
       - DB_HOST=postgres
@@ -206,6 +227,7 @@ services:
       - ACCOUNTS_SERVICE_URL=http://accounts-service:8080
       - FRAUD_SERVICE_HOST=fraud-service
       - FRAUD_SERVICE_PORT=8080
+      - KAFKA_BROKERS=redpanda:9092
       # OpenTelemetry Configuration
       - OTEL_SERVICE_NAME=transactions-service
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
@@ -240,7 +262,7 @@ services:
 
   # Redis for rate limiting
   redis:
-    image: redis:7-alpine
+    image: redis:8.10.3-alpine
     container_name: banking-redis
     ports:
       - "6379:6379"
@@ -321,21 +343,18 @@ services:
 
   # Observability Stack
   jaeger:
-    image: jaegertracing/all-in-one:1.57
+    image: jaegertracing/jaeger:2.23.0
     container_name: banking-jaeger
     ports:
       - "16686:16686"
       - "14268:14268"
       - "4318:4318"
       - "4317:4317"
-    environment:
-      - COLLECTOR_OTLP_ENABLED=true
-      - COLLECTOR_OTLP_GRPC_HOST_PORT=:4317
     networks:
       - banking-network
 
   prometheus:
-    image: prom/prometheus:v2.45.0
+    image: prom/prometheus:v3.16.0
     container_name: banking-prometheus
     ports:
       - "9090:9090"
@@ -345,7 +364,7 @@ services:
       - banking-network
 
   grafana:
-    image: grafana/grafana:10.0.0
+    image: grafana/grafana:13.3.1
     container_name: banking-grafana
     ports:
       - "3001:3000"

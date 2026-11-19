@@ -44,7 +44,7 @@ Eight application backend services across four languages, a Next.js frontend, an
 | `frontend` | Next.js 15 / React 19 | Server-side proxy + UI |
 | `simulation-client` | Node.js | Drives realistic user-session traffic with burst and negative-path patterns |
 
-**Storage / messaging:** PostgreSQL (per-service schemas), MongoDB, Kafka (transaction event stream).
+**Storage / messaging:** PostgreSQL (per-service schemas), MongoDB, and Redpanda (Kafka-compatible transaction event stream).
 
 **Observability:** OpenTelemetry -> otel-collector -> Jaeger (traces) + Prometheus (metrics) + Loki (logs) + Grafana (dashboards).
 
@@ -232,8 +232,8 @@ be requested again. The existing synchronous export endpoint remains available.
 The [integration test guide](./tests/integration/README.md) covers both
 browser journeys and worker replacement. Run
 `bash scripts/workflow-proto.sh` from the repository root to verify and
-regenerate the workflow bindings with Buf 1.57.0, protoc 31.1, and
-protoc-gen-go 1.36.9.
+regenerate the workflow bindings with Buf 1.75.0, protoc 36.2, and
+protoc-gen-go 1.36.12.
 
 ### CI Replay Validation
 
@@ -287,7 +287,7 @@ kubectl apply -k kubernetes/overlays/speedscale/
 
 ## Getting Started
 
-1. **Prerequisites**: Docker, Docker Compose, Node.js 20+, Java 17+, Maven 3.8+, Go 1.21+, Python 3.12+
+1. **Prerequisites**: Docker, Docker Compose, Node.js 26.13.1, Java 25, Maven 3.10.1, Go 1.27.4, Python 3.15.2, .NET SDK 10.0.404
 2. **Quick start**: Run `docker-compose up -d` to start everything
 3. **Development**: Use service-specific Makefiles for isolated development
 4. **Testing**: Run service tests and the CI replay validation above

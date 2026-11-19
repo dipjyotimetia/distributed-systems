@@ -1,4 +1,4 @@
-module github.com/speedscale/microsvc/simulation-client
+module github.com/dipjyotimetia/distributed-systems/simulation-client
 
 go 1.21
 

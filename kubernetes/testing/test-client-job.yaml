@@ -32,6 +32,6 @@ spec:
           value: "test"
       initContainers:
       - name: wait-for-api-gateway
-        image: busybox:1.35
+        image: busybox:1.38.0
         command: ['sh', '-c', 'until nc -z api-gateway 80; do echo waiting for api-gateway; sleep 5; done;']
   backoffLimit: 3

@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	fraudv1 "github.com/speedscale/microsvc/fraud-service/gen/fraud/v1"
-	"github.com/speedscale/microsvc/fraud-service/internal/metrics"
+	fraudv1 "github.com/dipjyotimetia/distributed-systems/backend/fraud-service/gen/fraud/v1"
+	"github.com/dipjyotimetia/distributed-systems/backend/fraud-service/internal/metrics"
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
 )

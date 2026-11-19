@@ -10,8 +10,8 @@ import (
 	"os"
 	"time"
 
-	disputesv1 "github.com/speedscale/microsvc/disputes-service/internal/generated/disputes/v1"
-	"github.com/speedscale/microsvc/disputes-service/internal/postgres"
+	disputesv1 "github.com/dipjyotimetia/distributed-systems/backend/disputes-service/internal/generated/disputes/v1"
+	"github.com/dipjyotimetia/distributed-systems/backend/disputes-service/internal/postgres"
 	"go.opentelemetry.io/otel"
 	enumspb "go.temporal.io/api/enums/v1"
 	"go.temporal.io/api/serviceerror"

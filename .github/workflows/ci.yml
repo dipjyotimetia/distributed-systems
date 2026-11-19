@@ -2,9 +2,9 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ master, develop, feature/* ]
+    branches: [ main, master, develop, feature/* ]
   pull_request:
-    branches: [ master, develop ]
+    branches: [ main, master, develop ]
 
 env:
   REGISTRY: ghcr.io
@@ -16,7 +16,7 @@ jobs:
     
     services:
       postgres:
-        image: postgres:15
+        image: postgres:18.7
         env:
           POSTGRES_PASSWORD: password
           POSTGRES_DB: banking_test
@@ -29,12 +29,12 @@ jobs:
           - 5432:5432
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7.0.1
     
     - name: Set up JDK 17
-      uses: actions/setup-java@v4
+      uses: actions/setup-java@v6.3.0
       with:
-        java-version: '17'
+        java-version: '25'
         distribution: 'temurin'
         cache: maven
     
@@ -75,17 +75,17 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7.0.1
     
     - name: Setup Node.js
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v7.1.0
       with:
-        node-version: '20'
+        node-version: '26.13.1'
         cache: 'npm'
         cache-dependency-path: frontend/package-lock.json
 
     - name: Set up kubectl
-      uses: azure/setup-kubectl@v4
+      uses: azure/setup-kubectl@v5.2.0
     
     - name: Test Frontend
       run: make test-frontend
@@ -98,12 +98,12 @@ jobs:
     timeout-minutes: 10
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7.0.1
 
     - name: Set up .NET 8
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@v6.1.0
       with:
-        dotnet-version: '8.0.x'
+        dotnet-version: '10.0.404'
 
     - name: Proxymock validation (install, init, build, mock+replay)
       env:
@@ -121,12 +121,12 @@ jobs:
         service: [api-gateway]
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7.0.1
 
     - name: Set up JDK 17
-      uses: actions/setup-java@v4
+      uses: actions/setup-java@v6.3.0
       with:
-        java-version: '17'
+        java-version: '25'
         distribution: 'temurin'
         cache: maven
 
@@ -144,7 +144,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       disputes_postgres:
-        image: postgres:15-alpine
+        image: postgres:18.7-alpine
         env:
           POSTGRES_PASSWORD: password
         ports:
@@ -152,10 +152,10 @@ jobs:
         options: --health-cmd=pg_isready --health-interval=5s --health-retries=10
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7.0.1
 
     - name: Set up Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v7.1.0
       with:
         go-version-file: backend/fraud-service/go.mod
         cache-dependency-path: |
@@ -175,7 +175,7 @@ jobs:
 
     - name: Start disputes test Temporal
       run: |
-        docker run -d --name disputes-test-temporal -p 127.0.0.1:7233:7233 temporalio/temporal:1.4.1 server start-dev --ip 0.0.0.0 --headless
+        docker run -d --name disputes-test-temporal -p 127.0.0.1:7233:7233 temporalio/temporal:1.10.1 server start-dev --ip 0.0.0.0 --headless
         for attempt in {1..30}; do
           if docker exec disputes-test-temporal temporal operator cluster health; then exit 0; fi
           sleep 1
@@ -187,7 +187,7 @@ jobs:
       working-directory: backend/disputes-service
       env:
         DISPUTES_TEST_TEMPORAL_ADDRESS: 127.0.0.1:7233
-        DISPUTES_TEST_DATABASE_URL: postgres://postgres:password@127.0.0.1:${{ job.services.disputes_postgres.ports[5432] }}/postgres?sslmode=disable
+        DISPUTES_TEST_DATABASE_URL: postgres://postgres:password@127.0.0.1:${{ job.services.disputes_postgres.ports['5432'] }}/postgres?sslmode=disable
       run: |
         go test -race -coverpkg=./cmd/...,./internal/cases,./internal/httpapi,./internal/postgres,./internal/temporal -coverprofile=coverage.out ./...
         go tool cover -func=coverage.out | awk '/^total:/ { coverage=$3+0 } END { if (coverage <= 80) exit 1 }'
@@ -220,20 +220,20 @@ jobs:
           - disputes-service
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7.0.1
     
     # QEMU is only needed for arm64 emulation, which we only build on master push.
     - name: Set up QEMU
-      if: github.event_name == 'push'
-      uses: docker/setup-qemu-action@v3
+      if: github.event_name == 'push' && github.ref != 'refs/heads/main'
+      uses: docker/setup-qemu-action@v4.4.0
 
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      uses: docker/setup-buildx-action@v4.4.1
 
     # No registry login on PRs — PR builds validate only and do not push.
     - name: Log in to Container Registry
-      if: github.event_name == 'push'
-      uses: docker/login-action@v3
+      if: github.event_name == 'push' && github.ref != 'refs/heads/main'
+      uses: docker/login-action@v4.8.0
       with:
         registry: ${{ env.REGISTRY }}
         username: ${{ github.actor }}
@@ -265,9 +265,9 @@ jobs:
     
     - name: Extract metadata
       id: meta
-      uses: docker/metadata-action@v5
+      uses: docker/metadata-action@v6.2.0
       with:
-        images: ghcr.io/speedscale/microsvc/${{ matrix.service }}
+        images: ghcr.io/dipjyotimetia/distributed-systems/${{ matrix.service }}
         tags: |
           type=raw,value=${{ steps.version.outputs.simple_tag }}
           type=raw,value=${{ steps.version.outputs.sha_tag }}
@@ -279,15 +279,15 @@ jobs:
     # multi-arch and push to GHCR.
     - name: Build and push Docker image
       id: build
-      uses: docker/build-push-action@v5
-      continue-on-error: ${{ github.event_name == 'push' }}
+      uses: docker/build-push-action@v7.4.0
+      continue-on-error: ${{ github.event_name == 'push' && github.ref != 'refs/heads/main' }}
       with:
         context: ${{
           matrix.service == 'frontend' && './frontend' ||
           matrix.service == 'simulation-client' && './simulation-client' ||
           format('./backend/{0}', matrix.service) }}
-        platforms: ${{ github.event_name == 'push' && 'linux/amd64,linux/arm64' || 'linux/amd64' }}
-        push: ${{ github.event_name == 'push' }}
+        platforms: ${{ github.event_name == 'push' && github.ref != 'refs/heads/main' && 'linux/amd64,linux/arm64' || 'linux/amd64' }}
+        push: ${{ github.event_name == 'push' && github.ref != 'refs/heads/main' }}
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
         cache-from: type=gha
@@ -296,8 +296,8 @@ jobs:
     # Retry once on master to absorb transient GHCR push errors
     # (e.g. "error writing layer blob: not_found"). Cache makes this fast.
     - name: Retry build and push (transient registry errors)
-      if: github.event_name == 'push' && steps.build.outcome == 'failure'
-      uses: docker/build-push-action@v5
+      if: github.event_name == 'push' && github.ref != 'refs/heads/main' && steps.build.outcome == 'failure'
+      uses: docker/build-push-action@v7.4.0
       with:
         context: ${{
           matrix.service == 'frontend' && './frontend' ||
@@ -319,7 +319,7 @@ jobs:
       contents: write
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7.0.1
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
     
@@ -369,12 +369,12 @@ jobs:
     timeout-minutes: 20
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7.0.1
     
     - name: Setup Node.js
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v7.1.0
       with:
-        node-version: '20'
+        node-version: '26.13.1'
         cache: 'npm'
         cache-dependency-path: frontend/package-lock.json
     
@@ -386,6 +386,7 @@ jobs:
     - name: Install Playwright browsers
       run: |
         cd frontend
+        sudo sed -i 's|http://\(archive\|security\).ubuntu.com/ubuntu|https://\1.ubuntu.com/ubuntu|g' /etc/apt/sources.list.d/ubuntu.sources
         npx playwright install --with-deps chromium
     
     - name: Create test results directory
@@ -400,7 +401,7 @@ jobs:
       timeout-minutes: 15
     
     - name: Upload test results
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7.0.2
       if: always()
       with:
         name: playwright-report
@@ -425,7 +426,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Fail if any required job did not succeed
-        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped') }}
         run: |
           echo "One or more required jobs failed or were cancelled:"
           echo "  test-backend=${{ needs.test-backend.result }}"

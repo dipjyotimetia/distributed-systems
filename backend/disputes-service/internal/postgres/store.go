@@ -7,7 +7,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/speedscale/microsvc/disputes-service/internal/cases"
+	"github.com/dipjyotimetia/distributed-systems/backend/disputes-service/internal/cases"
 )
 
 const caseColumns = "id, transfer_id, reason, status, created_at, escalated_at, resolved_at, resolved_by, resolution, evidence - 'requestKey' - 'responseKey', evidence_closed_at, escalation_deadline IS NOT NULL"
