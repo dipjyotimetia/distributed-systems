@@ -140,6 +140,6 @@ jobs:
             kubectl -n "$namespace" get pods,services,pvc
             kubectl -n "$namespace" get events --sort-by=.lastTimestamp
           done
-          for name in banking-postgres banking-kafka banking-transactions banking-notification; do
+          for name in banking-postgres banking-kafka mongodb banking-accounts banking-gateway banking-transactions banking-notification; do
             kubectl -n banking-app logs "deployment/$name" --all-containers --tail=80 || true
           done

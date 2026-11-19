@@ -28,7 +28,12 @@ spec:
         image: ghcr.io/speedscale/microsvc/transactions-service:v1.4.139
         imagePullPolicy: Always
         command: ["/bin/sh", "-c"]
-        args: ["exec java $JAVA_OPTS org.springframework.boot.loader.launch.JarLauncher"]
+        args:
+          - |
+            if [ -f /app/application.jar ]; then
+              exec java $JAVA_OPTS -jar /app/application.jar
+            fi
+            exec java $JAVA_OPTS org.springframework.boot.loader.launch.JarLauncher
         ports:
         - containerPort: 8080
           name: http
