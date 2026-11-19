@@ -232,8 +232,8 @@ be requested again. The existing synchronous export endpoint remains available.
 The [integration test guide](./tests/integration/README.md) covers both
 browser journeys and worker replacement. Run
 `bash scripts/workflow-proto.sh` from the repository root to verify and
-regenerate the workflow bindings with Buf 1.57.0, protoc 31.1, and
-protoc-gen-go 1.36.9.
+regenerate the workflow bindings with Buf 1.75.0, protoc 36.2, and
+protoc-gen-go 1.36.12.
 
 ### CI Replay Validation
 
@@ -287,7 +287,7 @@ kubectl apply -k kubernetes/overlays/speedscale/
 
 ## Getting Started
 
-1. **Prerequisites**: Docker, Docker Compose, Node.js 20+, Java 17+, Maven 3.8+, Go 1.21+, Python 3.12+
+1. **Prerequisites**: Docker, Docker Compose, Node.js 26.13.1, Java 25, Maven 3.10.1, Go 1.27.4, Python 3.15.2, .NET SDK 10.0.404
 2. **Quick start**: Run `docker-compose up -d` to start everything
 3. **Development**: Use service-specific Makefiles for isolated development
 4. **Testing**: Run service tests and the CI replay validation above
