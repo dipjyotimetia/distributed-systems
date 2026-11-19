@@ -32,6 +32,10 @@ function resourceAttribute(name: string, fallback: string): string {
 // Register the SDK - only runs on the server side
 export async function register() {
   // Only initialize on server side to avoid bundling issues with browser
+  if (process.env.OTEL_SDK_DISABLED === 'true') {
+    return;
+  }
+
   if (typeof window !== 'undefined') {
     return;
   }

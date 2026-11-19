@@ -63,7 +63,10 @@ services:
       retries: 20
   notification-service:
     build: ./backend/notification-service
-    networks: [banking-network, test-edge]
+    networks:
+      banking-network: {}
+      test-edge:
+        gw_priority: 1
     ports: ["127.0.0.1::8080"]
     depends_on:
       redpanda:
@@ -89,7 +92,10 @@ services:
   provider-fixtures:
     environment:
       FAILED_NOTIFICATION_PROVIDER: ${MICROSVC_FAILED_PROVIDER:-}
-    networks: [banking-network, test-edge]
+    networks:
+      banking-network: {}
+      test-edge:
+        gw_priority: 1
     ports: ["127.0.0.1::8081"]
     build:
       context: .
@@ -97,8 +103,9 @@ services:
   api-gateway:
     tmpfs: ["/tmp:size=64m"]
     networks:
-      - banking-network
-      - test-edge
+      banking-network: {}
+      test-edge:
+        gw_priority: 1
     container_name: !reset null
     ports: !override
       - "127.0.0.1::8080"
@@ -123,15 +130,17 @@ services:
       OPENROUTER_API_KEY: synthetic-key
   frontend:
     networks:
-      - banking-network
-      - test-edge
+      banking-network: {}
+      test-edge:
+        gw_priority: 1
     container_name: !reset null
     ports: !override
       - "127.0.0.1::3000"
     environment:
       OTEL_SDK_DISABLED: "true"
       DEBUG: ""
-      NODE_OPTIONS: ""
+      NODE_OPTIONS: "--dns-result-order=ipv4first"
+      OTEL_LOG_LEVEL: "WARN"
       AI_SERVICE_URL: http://ai-service:8080
 networks:
   banking-network:
