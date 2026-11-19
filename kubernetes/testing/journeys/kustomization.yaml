@@ -17,11 +17,23 @@ images:
   - name: ghcr.io/speedscale/microsvc/user-service
     newName: microsvc-journeys/user-service
     newTag: checkout
+  - name: ghcr.io/speedscale/microsvc/transactions-service
+    newName: microsvc-journeys/transactions-service
+    newTag: checkout
+  - name: ghcr.io/speedscale/microsvc/fraud-service
+    newName: microsvc-journeys/fraud-service
+    newTag: checkout
+  - name: ghcr.io/speedscale/microsvc/notification-service
+    newName: microsvc-journeys/notification-service
+    newTag: checkout
+  - name: ghcr.io/speedscale/microsvc/ai-service
+    newName: microsvc-journeys/ai-service
+    newTag: checkout
 
 patches:
   - target:
       kind: Deployment
-      name: banking-(frontend|gateway|accounts|user)
+      name: banking-(frontend|gateway|accounts|user|transactions|fraud|notification|ai)
     patch: |
       - op: replace
         path: /spec/template/spec/containers/0/imagePullPolicy
@@ -38,5 +50,12 @@ patches:
       kind: Job
       metadata:
         name: seed-user-pool
+        namespace: banking-app
+      $patch: delete
+  - patch: |
+      apiVersion: autoscaling/v2
+      kind: HorizontalPodAutoscaler
+      metadata:
+        name: simulation-client-hpa
         namespace: banking-app
       $patch: delete

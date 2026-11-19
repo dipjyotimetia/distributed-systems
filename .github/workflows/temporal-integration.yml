@@ -86,17 +86,22 @@ jobs:
           PROXYMOCK_REQUIRED=1 make proxymock-replay
 
   kubernetes-smoke:
-    if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7.0.1
-      - uses: helm/kind-action@v1.15.2
+      - uses: actions/setup-go@v7.1.0
         with:
-          cluster_name: banking-journeys
+          go-version-file: tests/integration/temporal/go.mod
+          cache: false
+      - name: Create Kind cluster
+        run: |
+          go install sigs.k8s.io/kind@v0.33.0
+          "$(go env GOPATH)/bin/kind" create cluster --name banking-journeys --wait 120s
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
       - name: Build and load the services used by the smoke test
         run: |
-          for service in api-gateway accounts-service user-service; do
+          for service in api-gateway accounts-service user-service transactions-service fraud-service notification-service ai-service; do
             image="microsvc-journeys/$service:checkout"
             docker build -t "$image" "backend/$service"
             kind load docker-image "$image" --name banking-journeys
@@ -107,7 +112,14 @@ jobs:
         run: |
           kubectl apply -k kubernetes/observability
           kubectl apply -k kubernetes/testing/journeys
-          for name in banking-frontend banking-user banking-gateway banking-accounts; do
+          kubectl -n banking-app rollout status deployment/banking-kafka --timeout=5m
+          broker() { kubectl -n banking-app exec "$@" ; }
+          broker deployment/banking-kafka -- rpk topic describe transaction-events -X brokers=banking-kafka:9092 ||
+            broker deployment/banking-kafka -- rpk topic create transaction-events --partitions 1 --replicas 1 -X brokers=banking-kafka:9092
+          broker deployment/banking-kafka -- rpk topic create ci-round-trip --partitions 1 --replicas 1 -X brokers=banking-kafka:9092
+          printf 'ci-fixture\n' | broker -i deployment/banking-kafka -- rpk topic produce ci-round-trip -X brokers=banking-kafka:9092
+          timeout 30s kubectl -n banking-app exec deployment/banking-kafka -- rpk topic consume ci-round-trip -n 1 -X brokers=banking-kafka:9092 | grep -q ci-fixture
+          for name in banking-postgres banking-kafka redis mongodb banking-frontend banking-user banking-gateway banking-accounts banking-transactions banking-fraud banking-notification banking-ai; do
             kubectl -n banking-app rollout status "deployment/$name" --timeout=5m
           done
           kubectl -n observability rollout status deployment/jaeger --timeout=3m
@@ -116,6 +128,18 @@ jobs:
           frontend_pid=$!
           kubectl -n observability port-forward svc/jaeger 33686:16686 >/tmp/forward-jaeger.log 2>&1 &
           jaeger_pid=$!
-          trap 'kill "$frontend_pid" "$jaeger_pid" 2>/dev/null || true' EXIT
+          kubectl -n banking-app port-forward svc/banking-notification 33001:80 >/tmp/forward-notification.log 2>&1 &
+          notification_pid=$!
+          trap 'kill "$frontend_pid" "$jaeger_pid" "$notification_pid" 2>/dev/null || true' EXIT
           curl -fsS --retry 20 --retry-connrefused --retry-delay 1 http://127.0.0.1:33000/api/healthz >/dev/null
-          python3 tests/integration/kubernetes-smoke.py http://127.0.0.1:33000 http://127.0.0.1:33686 | tee -a "$GITHUB_STEP_SUMMARY"
+          python3 tests/integration/kubernetes-smoke.py http://127.0.0.1:33000 http://127.0.0.1:33686 http://127.0.0.1:33001 | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Collect cluster diagnostics
+        if: failure()
+        run: |
+          for namespace in banking-app observability; do
+            kubectl -n "$namespace" get pods,services,pvc
+            kubectl -n "$namespace" get events --sort-by=.lastTimestamp
+          done
+          for name in banking-postgres banking-kafka banking-transactions banking-notification; do
+            kubectl -n banking-app logs "deployment/$name" --all-containers --tail=80 || true
+          done

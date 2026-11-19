@@ -2,7 +2,7 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ master, develop, feature/* ]
+    branches: [ main, master, develop, feature/* ]
   pull_request:
     branches: [ main, master, develop ]
 
@@ -224,7 +224,7 @@ jobs:
     
     # QEMU is only needed for arm64 emulation, which we only build on master push.
     - name: Set up QEMU
-      if: github.event_name == 'push'
+      if: github.event_name == 'push' && github.ref != 'refs/heads/main'
       uses: docker/setup-qemu-action@v4.4.0
 
     - name: Set up Docker Buildx
@@ -232,7 +232,7 @@ jobs:
 
     # No registry login on PRs — PR builds validate only and do not push.
     - name: Log in to Container Registry
-      if: github.event_name == 'push'
+      if: github.event_name == 'push' && github.ref != 'refs/heads/main'
       uses: docker/login-action@v4.8.0
       with:
         registry: ${{ env.REGISTRY }}
@@ -280,14 +280,14 @@ jobs:
     - name: Build and push Docker image
       id: build
       uses: docker/build-push-action@v7.4.0
-      continue-on-error: ${{ github.event_name == 'push' }}
+      continue-on-error: ${{ github.event_name == 'push' && github.ref != 'refs/heads/main' }}
       with:
         context: ${{
           matrix.service == 'frontend' && './frontend' ||
           matrix.service == 'simulation-client' && './simulation-client' ||
           format('./backend/{0}', matrix.service) }}
-        platforms: ${{ github.event_name == 'push' && 'linux/amd64,linux/arm64' || 'linux/amd64' }}
-        push: ${{ github.event_name == 'push' }}
+        platforms: ${{ github.event_name == 'push' && github.ref != 'refs/heads/main' && 'linux/amd64,linux/arm64' || 'linux/amd64' }}
+        push: ${{ github.event_name == 'push' && github.ref != 'refs/heads/main' }}
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
         cache-from: type=gha
@@ -296,7 +296,7 @@ jobs:
     # Retry once on master to absorb transient GHCR push errors
     # (e.g. "error writing layer blob: not_found"). Cache makes this fast.
     - name: Retry build and push (transient registry errors)
-      if: github.event_name == 'push' && steps.build.outcome == 'failure'
+      if: github.event_name == 'push' && github.ref != 'refs/heads/main' && steps.build.outcome == 'failure'
       uses: docker/build-push-action@v7.4.0
       with:
         context: ${{
@@ -425,7 +425,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Fail if any required job did not succeed
-        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped') }}
         run: |
           echo "One or more required jobs failed or were cancelled:"
           echo "  test-backend=${{ needs.test-backend.result }}"

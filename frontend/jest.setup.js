@@ -18,28 +18,29 @@ jest.mock('next/navigation', () => ({
 process.env.NEXT_PUBLIC_API_URL = 'http://localhost:8080'
 process.env.NEXT_PUBLIC_API_TIMEOUT = '30000'
 
-// Mock localStorage
-Object.defineProperty(window, 'localStorage', {
-  value: {
-    getItem: jest.fn(),
-    setItem: jest.fn(),
-    removeItem: jest.fn(),
-    clear: jest.fn(),
-  },
-  writable: true,
-})
+if (typeof window !== 'undefined') {
+  // Mock localStorage
+  Object.defineProperty(window, 'localStorage', {
+    value: {
+      getItem: jest.fn(),
+      setItem: jest.fn(),
+      removeItem: jest.fn(),
+      clear: jest.fn(),
+    },
+    writable: true,
+  })
 
-// Mock sessionStorage
-Object.defineProperty(window, 'sessionStorage', {
-  value: {
-    getItem: jest.fn(),
-    setItem: jest.fn(),
-    removeItem: jest.fn(),
-    clear: jest.fn(),
-  },
-  writable: true,
-})
-
+  // Mock sessionStorage
+  Object.defineProperty(window, 'sessionStorage', {
+    value: {
+      getItem: jest.fn(),
+      setItem: jest.fn(),
+      removeItem: jest.fn(),
+      clear: jest.fn(),
+    },
+    writable: true,
+  })
+}
 
 // Mock axios
 jest.mock('axios', () => ({
