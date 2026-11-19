@@ -1,4 +1,4 @@
-FROM golang:1.26 AS build
+FROM golang:1.27.4 AS build
 WORKDIR /src
 COPY tests/integration/temporal/cmd/provider-fixtures/ ./
 RUN --mount=type=tmpfs,target=/tmp --mount=type=tmpfs,target=/root/.cache/go-build \

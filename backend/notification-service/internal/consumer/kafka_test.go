@@ -4,9 +4,12 @@ import (
 	"context"
 	"errors"
 	"testing"
+
+	"github.com/twmb/franz-go/pkg/kgo"
+	"github.com/twmb/franz-go/pkg/sasl"
 )
 
-func TestNewWithAuthPlainConfiguresDialer(t *testing.T) {
+func TestNewWithAuthPlainConfiguresSASL(t *testing.T) {
 	c, err := NewWithAuth(
 		[]string{"banking-kafka:9092"},
 		"transaction-events",
@@ -23,8 +26,9 @@ func TestNewWithAuthPlainConfiguresDialer(t *testing.T) {
 	}
 	defer c.Close()
 
-	if c.reader.Config().Dialer == nil {
-		t.Fatal("expected SASL dialer")
+	mechanisms := c.client.OptValue(kgo.SASL).([]sasl.Mechanism)
+	if len(mechanisms) != 1 || mechanisms[0].Name() != "PLAIN" {
+		t.Fatal("expected the PLAIN SASL mechanism")
 	}
 }
 
