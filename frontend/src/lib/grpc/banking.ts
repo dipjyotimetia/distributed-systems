@@ -1,44 +1,122 @@
 import fs from 'fs';
-import path from 'path';
-import * as grpc from '@grpc/grpc-js';
-import * as protoLoader from '@grpc/proto-loader';
+import { createClient, type CallOptions } from '@connectrpc/connect';
+import { createGrpcTransport } from '@connectrpc/connect-node';
+import {
+  fromJson,
+  toJson,
+  type DescMessage,
+  type JsonValue,
+  type MessageShape,
+} from '@bufbuild/protobuf';
+import {
+  ApplyRequestSchema,
+  CaseSchema,
+  DecideRequestSchema,
+  GetStatusRequestSchema,
+  Kyc,
+  QueueRequestSchema,
+  QueueResponseSchema,
+  StatusSchema,
+} from '@/gen/kyc/kyc_pb';
+import {
+  AuthorizationSchema,
+  AuthorizeRequestSchema,
+  CardSchema,
+  Cards,
+  IssueCardRequestSchema,
+} from '@/gen/cards/cards_pb';
 
-type Unary = (request: Record<string, unknown>, metadata: grpc.Metadata, callback: (error: grpc.ServiceError | null, response: Record<string, unknown>) => void) => void;
+const jsonWrite = { alwaysEmitImplicit: true };
 
-function credentials() {
-  if (process.env.MTLS_ENABLED !== 'true') return grpc.credentials.createInsecure();
-  return grpc.credentials.createSsl(
-    fs.readFileSync(process.env.MTLS_CA || ''),
-    fs.readFileSync(process.env.MTLS_KEY || ''),
-    fs.readFileSync(process.env.MTLS_CERT || ''),
+function endpoint(address: string, tls: boolean) {
+  if (address.includes('://')) return address;
+  return `${tls ? 'https' : 'http'}://${address}`;
+}
+
+function transport(address: string, serverName: string) {
+  const tls = process.env.MTLS_ENABLED === 'true';
+  return createGrpcTransport({
+    baseUrl: endpoint(address, tls),
+    nodeOptions: tls
+      ? {
+          ca: fs.readFileSync(process.env.MTLS_CA || ''),
+          key: fs.readFileSync(process.env.MTLS_KEY || ''),
+          cert: fs.readFileSync(process.env.MTLS_CERT || ''),
+          servername: serverName,
+        }
+      : undefined,
+  });
+}
+
+function callOptions(authorization: string | null): CallOptions {
+  return authorization ? { headers: { authorization } } : {};
+}
+
+function responseJson(schema: DescMessage, message: MessageShape<DescMessage>) {
+  return toJson(schema, message, jsonWrite) as Record<string, unknown>;
+}
+
+export async function call(
+  target: 'kyc' | 'cards',
+  method: string,
+  authorization: string | null,
+  request: Record<string, unknown>,
+) {
+  const options = callOptions(authorization);
+  const body = request as JsonValue;
+  if (target === 'kyc') {
+    const client = createClient(
+      Kyc,
+      transport(process.env.KYC_GRPC_ADDR || 'kyc-service:8091', 'kyc-service'),
+    );
+    switch (method) {
+      case 'Apply':
+        return responseJson(
+          CaseSchema,
+          await client.apply(fromJson(ApplyRequestSchema, body), options),
+        );
+      case 'GetStatus':
+        return responseJson(
+          StatusSchema,
+          await client.getStatus(
+            fromJson(GetStatusRequestSchema, body),
+            options,
+          ),
+        );
+      case 'Queue':
+        return responseJson(
+          QueueResponseSchema,
+          await client.queue(fromJson(QueueRequestSchema, body), options),
+        );
+      case 'Decide':
+        return responseJson(
+          CaseSchema,
+          await client.decide(fromJson(DecideRequestSchema, body), options),
+        );
+      default:
+        throw new Error(`unknown kyc method ${method}`);
+    }
+  }
+
+  const client = createClient(
+    Cards,
+    transport(
+      process.env.CARDS_GRPC_ADDR || 'cards-service:8092',
+      'cards-service',
+    ),
   );
-}
-
-function service(protoFile: string, packageName: string, serviceName: string, address: string, serverName: string) {
-  const definition = protoLoader.loadSync(path.join(process.cwd(), 'proto', protoFile), {
-    keepCase: false,
-    longs: String,
-    defaults: true,
-  });
-  const loaded = grpc.loadPackageDefinition(definition) as Record<string, unknown>;
-  const Service = packageName.split('.').reduce<unknown>((node, part) => (node as Record<string, unknown>)[part], loaded) as Record<string, grpc.ServiceClientConstructor>;
-  const Client = Service[serviceName];
-  return new Client(address, credentials(), {
-    'grpc.ssl_target_name_override': serverName,
-  });
-}
-
-const kyc = () => service('kyc/kyc.proto', 'kyc.v1', 'Kyc', process.env.KYC_GRPC_ADDR || 'kyc-service:8091', 'kyc-service');
-const cards = () => service('cards/cards.proto', 'cards.v1', 'Cards', process.env.CARDS_GRPC_ADDR || 'cards-service:8092', 'cards-service');
-
-export function call(target: 'kyc' | 'cards', method: string, authorization: string | null, request: Record<string, unknown>) {
-  const client = (target === 'kyc' ? kyc() : cards()) as unknown as Record<string, Unary>;
-  const metadata = new grpc.Metadata();
-  if (authorization) metadata.set('authorization', authorization);
-  return new Promise<Record<string, unknown>>((resolve, reject) => {
-    client[method](request, metadata, (error, response) => {
-      if (error) reject(error);
-      else resolve(response);
-    });
-  });
+  switch (method) {
+    case 'IssueCard':
+      return responseJson(
+        CardSchema,
+        await client.issueCard(fromJson(IssueCardRequestSchema, body), options),
+      );
+    case 'Authorize':
+      return responseJson(
+        AuthorizationSchema,
+        await client.authorize(fromJson(AuthorizeRequestSchema, body), options),
+      );
+    default:
+      throw new Error(`unknown cards method ${method}`);
+  }
 }

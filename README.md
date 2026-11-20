@@ -17,7 +17,7 @@ open http://localhost:16686     # Jaeger
 ```
 
 Docker with the Compose plugin is sufficient for the container workflow.
-Register a local user, then sign in and create an account. `scripts/demo/walkthrough.sh` does that path against the frontend, including a retried transfer, a dispute, a statement job, KYC approval, a virtual card purchase, and fixture AI chat. Cards and KYC are Go gRPC services. `scripts/certs/dev-ca.sh` and `docker compose -f docker-compose.yml -f docker-compose.mtls.yml up` enable mutual TLS for those calls. `scripts/demo/failure-scenarios.sh` pauses Kafka, stops fraud, and points at the Grafana outbox panel. Outbound payments stay on the optional Compose overlay. If the gateway
+Register a local user, then sign in and create an account. `scripts/demo/walkthrough.sh` does that path against the frontend, including a retried transfer, a dispute, a statement job, KYC approval, a virtual card purchase, and fixture AI chat. Cards and KYC are Go gRPC services. The Next.js server calls them with TypeScript generated from `proto/kyc/kyc.proto` and `proto/cards/cards.proto`. `scripts/certs/dev-ca.sh` and `docker compose -f docker-compose.yml -f docker-compose.mtls.yml up` enable mutual TLS for those calls. `scripts/demo/failure-scenarios.sh` pauses Kafka, stops fraud, and points at the Grafana outbox panel. Outbound payments stay on the optional Compose overlay. If the gateway
 exits with an OpenTelemetry `ContainerAttributes` error, apply the
 [local gateway workaround](TROUBLESHOOTING.md#gateway-exits-during-opentelemetry-startup).
 
@@ -33,7 +33,7 @@ Use the [Kubernetes deployment guide](kubernetes/README.md) for cluster setup an
 
 ## Architecture
 
-Eight application backend services across four languages, a Next.js frontend, and a load-generating simulation client.
+Ten application backend services across four languages, a Next.js frontend, and a load-generating simulation client.
 
 | Service | Language | Purpose |
 |---|---|---|
@@ -43,6 +43,8 @@ Eight application backend services across four languages, a Next.js frontend, an
 | `transactions-service` | Java (Spring Boot) | Transaction processing, Stripe / PayPal / ComplyAdvantage integrations |
 | `ai-service` | Python (FastAPI) | Chat endpoint that fans out to 5 LLM providers (Anthropic, OpenAI, Gemini, xAI, OpenRouter) and aggregates the replies |
 | `fraud-service` | Go (gRPC h2c on :8080) | Fraud risk scoring with Sift / MaxMind / Stripe Radar |
+| `kyc-service` | Go (gRPC on :8091) | Customer identity review, with a Temporal worker |
+| `cards-service` | Go (gRPC on :8092) | Virtual cards; calls fraud over gRPC and accounts over HTTP |
 | `disputes-service` | Go | Transfer dispute intake, operator review, and Temporal escalation |
 | `notification-service` | Go | Slack / SendGrid / Twilio fan-out for transaction events from Kafka |
 | `frontend` | Next.js 16 / React 19 | Server-side proxy + UI |
@@ -68,6 +70,9 @@ flowchart LR
   users[user-service<br/>.NET]
   ai[ai-service<br/>Python]
   fraud[fraud-service<br/>Go gRPC]
+  kyc[kyc-service<br/>Go gRPC]
+  kycworker[kyc-worker<br/>Go]
+  cards[cards-service<br/>Go gRPC]
   notif[notification-service<br/>Go]
   disputes[disputes-service<br/>Go]
   worker[disputes-worker<br/>Go]
@@ -87,6 +92,20 @@ flowchart LR
 
   browser --> frontend
   sim --> frontend
+  frontend -->|gRPC| kyc
+  frontend -->|gRPC| cards
+  kyc --> temporal
+  kycworker --> temporal
+  cards -->|gRPC| fraud
+  cards -->|HTTP| accounts
+
+  subgraph mtls["optional mTLS overlay"]
+    frontend
+    kyc
+    cards
+    fraud
+  end
+
   frontend --> gateway
   gateway --> users
   gateway --> accounts
@@ -156,6 +175,8 @@ npm run dev            # Development server at http://localhost:3000
 npm run build          # Production build
 npm test               # Run tests
 ```
+
+`proto/` is the only protobuf contract. From the repository root, `bash scripts/frontend-proto.sh` regenerates the checked-in clients in `frontend/src/gen` with Buf 1.75.0 and `protoc-gen-es` 2.16.0 (`npm ci` in `frontend/` installs the plugin). CI fails if those files drift from the protos.
 
 ### Database Operations
 ```bash

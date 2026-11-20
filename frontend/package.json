@@ -24,11 +24,13 @@
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:with-backend": "../scripts/run-e2e-tests.sh",
-    "test:e2e:real-backend": "playwright test --config=playwright.config.real-backend.ts"
+    "test:e2e:real-backend": "playwright test --config=playwright.config.real-backend.ts",
+    "proto:generate": "cd .. && bash scripts/frontend-proto.sh"
   },
   "dependencies": {
-    "@grpc/grpc-js": "^1.14.3",
-    "@grpc/proto-loader": "^0.8.0",
+    "@bufbuild/protobuf": "2.16.0",
+    "@connectrpc/connect": "2.3.0",
+    "@connectrpc/connect-node": "2.3.0",
     "@hookform/resolvers": "^7.0.7",
     "@opentelemetry/api": "~1.9.0",
     "@opentelemetry/exporter-trace-otlp-http": "0.223.2",
@@ -47,6 +49,7 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@bufbuild/protoc-gen-es": "2.16.0",
     "@playwright/test": "^1.65.1",
     "@tailwindcss/postcss": "^4.3.5",
     "@testing-library/jest-dom": "^8.0.0",

@@ -2,7 +2,11 @@ import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   output: 'standalone',
-  serverExternalPackages: ['@grpc/grpc-js', '@grpc/proto-loader'],
+  serverExternalPackages: [
+    '@bufbuild/protobuf',
+    '@connectrpc/connect',
+    '@connectrpc/connect-node',
+  ],
   images: {
     unoptimized: true,
   },
