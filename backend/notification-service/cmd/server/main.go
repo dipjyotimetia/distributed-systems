@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/dipjyotimetia/distributed-systems/backend/notification-service/internal/api"
 	"github.com/dipjyotimetia/distributed-systems/backend/notification-service/internal/consumer"
@@ -33,17 +34,34 @@ func main() {
 		log.Fatalf("MongoDB startup failed: %v", err)
 	}
 
-	c, err := consumer.NewWithAuth(brokers, topic, "notification-service", mongoStore, kafkaAuth, os.Getenv("PAYMENT_KAFKA_TOPIC"))
+	paymentTopic := os.Getenv("PAYMENT_KAFKA_TOPIC")
+	newConsumer := func() (*consumer.Consumer, error) {
+		return consumer.NewWithAuth(brokers, topic, "notification-service", mongoStore, kafkaAuth, paymentTopic)
+	}
+	c, err := newConsumer()
 	if err != nil {
 		log.Fatalf("Kafka configuration error: %v", err)
 	}
-	defer c.Close()
-
-	go func() {
-		if err := c.Run(ctx); err != nil {
-			log.Fatalf("Kafka consumer stopped: %v", err)
+	go func(c *consumer.Consumer) {
+		for {
+			runErr := c.Run(ctx)
+			c.Close()
+			if runErr == nil || ctx.Err() != nil {
+				return
+			}
+			log.Printf("Kafka consumer stopped, reconnecting: %v", runErr)
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(time.Second):
+			}
+			next, err := newConsumer()
+			if err != nil {
+				log.Fatalf("Kafka configuration error: %v", err)
+			}
+			c = next
 		}
-	}()
+	}(c)
 
 	srv := &http.Server{
 		Addr:    ":" + port,
