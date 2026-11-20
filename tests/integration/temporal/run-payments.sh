@@ -33,8 +33,12 @@ cleanup() {
 }
 trap cleanup EXIT
 
-"${compose[@]}" build frontend api-gateway user-service accounts-service transactions-service fraud-service provider-fixtures \
-  payments-service payments-worker clearing-simulator payments-reconciliation notification-service
+build_services=(frontend api-gateway user-service accounts-service transactions-service fraud-service provider-fixtures
+  payments-service payments-worker clearing-simulator payments-reconciliation notification-service)
+if ! "${compose[@]}" build "${build_services[@]}"; then
+  sleep 5
+  "${compose[@]}" build "${build_services[@]}"
+fi
 "${compose[@]}" up -d --wait payments-postgres clearing-postgres clearing-mq disputes-temporal redpanda
 # Choose a future cutoff only after the infrastructure and images are available.
 read -r BANKING_SETTLEMENT_CUTOFF BANKING_SETTLEMENT_BUSINESS_DATE < <(python3 - <<'PY'

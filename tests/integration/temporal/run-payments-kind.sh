@@ -23,15 +23,21 @@ cleanup() {
 trap cleanup EXIT
 
 kind create cluster --name "$cluster" --wait 120s
+build_image() {
+  if ! docker build "$@"; then
+    sleep 5
+    docker build "$@"
+  fi
+}
 images=()
 for service in accounts-service ai-service api-gateway disputes-service fraud-service notification-service transactions-service user-service; do
   image="microsvc-journeys/$service:checkout"
-  docker build -t "$image" "backend/$service"
+  build_image -t "$image" "backend/$service"
   images+=("$image")
 done
-docker build -t microsvc-journeys/frontend:checkout frontend
-docker build -t microsvc-journeys/payments-service:checkout -f backend/payments-service/Dockerfile .
-docker build -t microsvc-journeys/provider-fixtures:checkout -f tests/integration/temporal/stack/Dockerfile .
+build_image -t microsvc-journeys/frontend:checkout frontend
+build_image -t microsvc-journeys/payments-service:checkout -f backend/payments-service/Dockerfile .
+build_image -t microsvc-journeys/provider-fixtures:checkout -f tests/integration/temporal/stack/Dockerfile .
 kind load docker-image --name "$cluster" "${images[@]}" \
   microsvc-journeys/frontend:checkout microsvc-journeys/payments-service:checkout microsvc-journeys/provider-fixtures:checkout
 
