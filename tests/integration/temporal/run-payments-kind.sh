@@ -80,7 +80,7 @@ for role in reader writer; do
     --from-literal=AWS_ACCESS_KEY_ID="synthetic-$role" --from-literal=AWS_SECRET_ACCESS_KEY="synthetic-$role"
 done
 
-kubectl -n banking-app wait --for=condition=complete job/banking-workflow-bootstrap-v2 --timeout=5m
+kubectl -n banking-app wait --for=condition=complete job/banking-workflow-bootstrap-v3 --timeout=5m
 for resource in statefulset/banking-clearing-mq statefulset/banking-payments-postgres-19 statefulset/banking-clearing-postgres-19 \
   deployment/banking-kafka deployment/mongodb deployment/banking-temporal deployment/provider-fixtures \
   deployment/banking-gateway deployment/banking-frontend deployment/banking-accounts deployment/banking-user \

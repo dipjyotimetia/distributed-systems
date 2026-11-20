@@ -56,6 +56,7 @@ dist/
 
 # Docker
 .dockerignore
+!frontend/.dockerignore
 
 # Python
 __pycache__/

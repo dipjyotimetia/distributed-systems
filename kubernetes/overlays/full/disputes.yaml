@@ -1,7 +1,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: banking-workflow-bootstrap-v2
+  name: banking-workflow-bootstrap-v3
 spec:
   backoffLimit: 6
   activeDeadlineSeconds: 300
