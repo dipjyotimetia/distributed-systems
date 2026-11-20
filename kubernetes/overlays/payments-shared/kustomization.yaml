@@ -69,3 +69,19 @@ patches:
               - name: kafka-data
                 persistentVolumeClaim:
                   claimName: banking-payment-kafka-data
+  - target:
+      kind: Deployment
+      name: banking-payments-worker
+    patch: |
+      - op: add
+        path: /spec/template/spec/initContainers
+        value:
+          - name: wait-for-temporal
+            image: busybox:1.38.0
+            command: [sh, -ec, 'until nc -z -w 2 banking-temporal 7233; do sleep 2; done']
+            resources:
+              requests:
+                cpu: 10m
+                memory: 8Mi
+              limits:
+                memory: 32Mi
