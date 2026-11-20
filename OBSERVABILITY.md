@@ -542,3 +542,24 @@ Configure data retention policies:
 - Secure Prometheus and Jaeger endpoints
 - Use TLS for OTLP communication
 - Sanitize sensitive data in traces/logs
+## Hybrid payment operations
+
+The Compose payments overlay and the Kubernetes observability stack expose
+payment signals under the `hybrid-payments` scrape job. Artemis queue counts can be inspected through the broker management interface.
+
+| Signal | Prometheus series |
+| --- | --- |
+| Age of the oldest nonterminal payment | `payments_oldest_pending_seconds` |
+| Age of the oldest unpublished outbox record | `payments_outbox_oldest_seconds{destination="workflow|mq|kafka"}`, with one series per destination |
+| Reconciliation discrepancies retained for review | `payments_reconciliation_discrepancies` |
+
+Use the backout queue depth to see messages awaiting operator inspection.
+A nonzero outbox age during an outage identifies the destination still
+awaiting acknowledgement.
+
+The payments API saves the W3C trace context alongside the payment.
+Temporal activities, MQ publications, clearing replies, and Kafka
+publications carry forward that context. Search Jaeger for the
+`payment.id` span attribute. The payment spans carry the payment UUID
+and operation name. The fixed-width clearing records carry correlation
+and clearing references.

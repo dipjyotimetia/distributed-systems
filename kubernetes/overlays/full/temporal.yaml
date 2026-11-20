@@ -1,0 +1,86 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: banking-temporal
+spec:
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: banking-temporal
+  template:
+    metadata:
+      labels:
+        app: banking-temporal
+    spec:
+      automountServiceAccountToken: false
+      initContainers:
+        - name: wait-for-temporal-role
+          image: postgres:18.7-alpine
+          command:
+            - sh
+            - -ec
+            - |
+              for db in temporal temporal_visibility; do
+                until psql -h banking-postgres -U temporal -d "$db" -c 'SELECT 1' >/dev/null 2>&1; do sleep 2; done
+              done
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: banking-workflow-credentials
+                  key: temporal-password
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+      containers:
+        - name: temporal
+          image: temporalio/auto-setup:1.29.1
+          env:
+            - name: DB
+              value: postgres12
+            - name: SKIP_DB_CREATE
+              value: "true"
+            - name: POSTGRES_SEEDS
+              value: banking-postgres
+            - name: DB_PORT
+              value: "5432"
+            - name: POSTGRES_USER
+              value: temporal
+            - name: POSTGRES_PWD
+              valueFrom:
+                secretKeyRef:
+                  name: banking-workflow-credentials
+                  key: temporal-password
+          ports:
+            - containerPort: 7233
+              name: grpc
+          startupProbe:
+            tcpSocket:
+              port: grpc
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            tcpSocket:
+              port: grpc
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 768Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: banking-temporal
+spec:
+  selector:
+    app: banking-temporal
+  ports:
+    - name: grpc
+      port: 7233
+      targetPort: grpc

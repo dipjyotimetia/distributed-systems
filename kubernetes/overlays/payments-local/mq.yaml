@@ -1,0 +1,106 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: banking-clearing-mq
+spec:
+  selector:
+    app: banking-clearing-mq
+  ports:
+    - name: mq
+      port: 61616
+      targetPort: mq
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: banking-clearing-mq
+spec:
+  serviceName: banking-clearing-mq
+  replicas: 1
+  selector:
+    matchLabels:
+      app: banking-clearing-mq
+  template:
+    metadata:
+      labels:
+        app: banking-clearing-mq
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+      containers:
+        - name: artemis
+          image: apache/activemq-artemis:2.44.0-alpine
+          ports:
+            - name: mq
+              containerPort: 61616
+          env:
+            - name: ARTEMIS_USER
+              value: app
+            - name: ARTEMIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: banking-clearing-mq
+                  key: MQ_PASSWORD
+            - name: ANONYMOUS_LOGIN
+              value: "false"
+            - name: EXTRA_ARGS
+              value: --no-web
+          volumeMounts:
+            - name: artemis-data
+              mountPath: /var/lib/artemis-instance
+            - name: broker-config
+              mountPath: /var/lib/artemis-instance/etc-override/broker.xml
+              subPath: broker.xml
+              readOnly: true
+          startupProbe:
+            tcpSocket:
+              port: mq
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            tcpSocket:
+              port: mq
+          livenessProbe:
+            tcpSocket:
+              port: mq
+          resources:
+            requests:
+              cpu: 100m
+              memory: 384Mi
+            limits:
+              memory: 768Mi
+      volumes:
+        - name: broker-config
+          configMap:
+            name: banking-artemis-config
+  volumeClaimTemplates:
+    - metadata:
+        name: artemis-data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 2Gi
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: banking-mq-clearing-clients
+spec:
+  podSelector:
+    matchLabels:
+      app: banking-clearing-mq
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: banking-payments-worker
+        - podSelector:
+            matchLabels:
+              app: banking-clearing-simulator
+      ports:
+        - protocol: TCP
+          port: 61616

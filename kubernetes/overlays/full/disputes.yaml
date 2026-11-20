@@ -1,0 +1,178 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: banking-workflow-bootstrap-v2
+spec:
+  backoffLimit: 6
+  activeDeadlineSeconds: 300
+  template:
+    spec:
+      automountServiceAccountToken: false
+      restartPolicy: OnFailure
+      containers:
+        - name: bootstrap
+          image: postgres:18.7-alpine
+          command: [sh, -ec]
+          args:
+            - |
+              until pg_isready -q -h banking-postgres -U postgres -d banking_app; do sleep 2; done
+              psql -h banking-postgres -U postgres -d banking_app -v ON_ERROR_STOP=1 <<'SQL'
+              \getenv temporal_password TEMPORAL_PASSWORD
+              SELECT format('CREATE ROLE temporal LOGIN PASSWORD %L', :'temporal_password')
+              WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'temporal') \gexec
+              SELECT 'CREATE DATABASE temporal OWNER temporal'
+              WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'temporal') \gexec
+              SELECT 'CREATE DATABASE temporal_visibility OWNER temporal'
+              WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'temporal_visibility') \gexec
+              \getenv disputes_password DISPUTES_PASSWORD
+              \ir /migrations/bootstrap.sql
+              SQL
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: banking-postgres-secret
+                  key: password
+            - name: TEMPORAL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: banking-workflow-credentials
+                  key: temporal-password
+            - name: DISPUTES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: banking-workflow-credentials
+                  key: disputes-password
+          volumeMounts:
+            - name: schema
+              mountPath: /migrations
+              readOnly: true
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+      volumes:
+        - name: schema
+          configMap:
+            name: disputes-schema
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: banking-disputes
+spec:
+  selector:
+    matchLabels:
+      app: banking-disputes
+  template:
+    metadata:
+      labels:
+        app: banking-disputes
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: disputes
+          image: ghcr.io/dipjyotimetia/distributed-systems/disputes-service:v1.4.139
+          imagePullPolicy: Always
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: banking-workflow-credentials
+                  key: disputes-database-url
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: http://otel-collector.observability:4317
+            - name: OTEL_SERVICE_NAME
+              value: disputes
+            - name: TRANSACTIONS_SERVICE_URL
+              value: http://banking-transactions
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: banking-jwt-secret
+                  key: secret
+            - name: DISPUTES_OPERATOR_IDS
+              valueFrom:
+                configMapKeyRef:
+                  name: banking-workflow-config
+                  key: disputes-operator-ids
+                  optional: true
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            periodSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+          resources:
+            requests:
+              cpu: 25m
+              memory: 48Mi
+            limits:
+              memory: 192Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: banking-disputes-worker
+spec:
+  selector:
+    matchLabels:
+      app: banking-disputes-worker
+  template:
+    metadata:
+      labels:
+        app: banking-disputes-worker
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: disputes-worker
+          image: ghcr.io/dipjyotimetia/distributed-systems/disputes-service:v1.4.139
+          imagePullPolicy: Always
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: banking-workflow-credentials
+                  key: disputes-database-url
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: http://otel-collector.observability:4317
+            - name: OTEL_SERVICE_NAME
+              value: disputes-worker
+            - name: DISPUTES_MODE
+              value: worker
+            - name: TEMPORAL_ADDRESS
+              value: banking-temporal:7233
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            periodSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+          resources:
+            requests:
+              cpu: 25m
+              memory: 48Mi
+            limits:
+              memory: 192Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: banking-disputes
+spec:
+  selector:
+    app: banking-disputes
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080

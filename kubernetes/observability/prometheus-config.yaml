@@ -62,6 +62,20 @@ data:
         metrics_path: '/actuator/prometheus'
         scrape_interval: 30s
 
+      - job_name: hybrid-payments
+        kubernetes_sd_configs:
+          - role: endpoints
+            namespaces:
+              names: ['banking-app']
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+            regex: 'banking-payments;http'
+            action: keep
+          - source_labels: [__meta_kubernetes_service_annotation_banking_metrics_path]
+            target_label: __metrics_path__
+          - source_labels: [__meta_kubernetes_service_name]
+            target_label: component
+
       # Node-level host metrics (memory, CPU, disk, network, load) from
       # node-exporter — one pod per node, host-network so we can hit each
       # one at its node IP:9100 via the headless Service endpoints.

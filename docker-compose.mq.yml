@@ -1,0 +1,68 @@
+services:
+  clearing-mq:
+    image: apache/activemq-artemis:2.44.0-alpine
+    environment:
+      ARTEMIS_USER: app
+      ARTEMIS_PASSWORD: ${BANKING_MQ_APP_PASSWORD:?Set the clearing broker password}
+      ANONYMOUS_LOGIN: "false"
+      EXTRA_ARGS: --no-web
+    volumes:
+      - clearing_artemis_data:/var/lib/artemis-instance
+      - ./config/artemis/broker.xml:/var/lib/artemis-instance/etc-override/broker.xml:ro
+    networks: [banking-network]
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 61616"]
+      interval: 5s
+      timeout: 3s
+      retries: 24
+
+  clearing-postgres:
+    image: postgres:18.7-alpine
+    environment:
+      POSTGRES_DB: clearing
+      POSTGRES_USER: clearing
+      POSTGRES_PASSWORD: ${BANKING_CLEARING_DB_PASSWORD:?Set the clearing database password}
+    volumes:
+      - clearing_postgres_data:/var/lib/postgresql
+    networks: [banking-network]
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "clearing", "-d", "clearing"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  clearing-simulator:
+    build:
+      context: .
+      dockerfile: backend/payments-service/Dockerfile
+    restart: on-failure
+    environment:
+      SPRING_PROFILES_ACTIVE: clearing
+      OTEL_SERVICE_NAME: clearing-simulator
+      PAYMENTS_TRACES_EXPORTER: otlp
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      SETTLEMENT_BUCKET: ${BANKING_SETTLEMENT_BUCKET:?Set the settlement bucket}
+      SETTLEMENT_S3_ENDPOINT: ${BANKING_SETTLEMENT_S3_ENDPOINT:-}
+      AWS_REGION: ${BANKING_SETTLEMENT_REGION:-ap-southeast-2}
+      AWS_ACCESS_KEY_ID: ${BANKING_SETTLEMENT_WRITER_KEY:-}
+      AWS_SECRET_ACCESS_KEY: ${BANKING_SETTLEMENT_WRITER_SECRET:-}
+      SETTLEMENT_CUTOFF: ${BANKING_SETTLEMENT_CUTOFF:-17:00}
+      SPRING_FLYWAY_CREATE_SCHEMAS: "true"
+      CLEARING_DB_URL: jdbc:postgresql://clearing-postgres:5432/clearing
+      CLEARING_DB_USER: clearing
+      CLEARING_DB_PASSWORD: ${BANKING_CLEARING_DB_PASSWORD:?Set the clearing database password}
+      MQ_ADDRESS: tcp://clearing-mq:61616
+      CLEARING_SETTLEMENT_DELAY: ${BANKING_CLEARING_SETTLEMENT_DELAY:-PT10S}
+      MQ_USERNAME: app
+      MQ_PASSWORD: ${BANKING_MQ_APP_PASSWORD:?Set the local queue manager application password}
+    depends_on:
+      clearing-postgres:
+        condition: service_healthy
+      clearing-mq:
+        condition: service_healthy
+    networks: [banking-network]
+
+volumes:
+  clearing_artemis_data:
+  clearing_postgres_data:

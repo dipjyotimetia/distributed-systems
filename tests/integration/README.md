@@ -81,3 +81,45 @@ escalation, and resolution without ledger changes. The statement journey
 checks queued export recovery, authenticated download, and the synchronous
 export. It also verifies that the replacement worker completes expiry and
 that the download returns HTTP 410 afterward.
+
+## Outbound payment acceptance
+
+Run `make test-integration-payments` on a Docker host with space for the test images and volumes.
+The runner uses an isolated Compose project and synthetic providers. It
+checks browser submission, a hold through clearing acceptance, final debit,
+one notification, clearing rejection, missing replies, access controls, and
+one matching reconciliation result after replaying the independent
+settlement file. The settlement object fixture is part of the automated
+test stack.
+
+The same browser suite can target a local Kubernetes deployment with the
+payments overlays and provider fixtures. Set `MICROSVC_FRONTEND`,
+`MICROSVC_GATEWAY`, and `MICROSVC_NOTIFICATIONS` to the local test
+port-forwards. Configure a 20-second settlement delay and a 50-second
+reply timeout for the acceptance observation window.
+
+```sh
+cd frontend
+MICROSVC_PAYMENTS=1 npm run test:e2e:real-backend -- payments.real-backend.spec.ts --workers=1
+```
+
+The Compose runner also pauses MQ while replacing the payments worker,
+pauses Redpanda during a separate payment, and uses disposable PostgreSQL
+triggers to reject acknowledgement writes after MQ or Kafka has accepted
+a message. Each case verifies one booked debit, one settled transition,
+and one customer notification after recovery.
+
+For an isolated Kind run, use `make test-integration-payments-kind`. This runner uses checkout-built images and the same
+browser, settlement-file, MQ backout, and broker recovery assertions. The
+manual **Hybrid payments acceptance** workflow runs both environments after
+manual dispatch.
+
+The payments Maven tests also support focused checks on disposable services.
+Set `PAYMENTS_TEST_TEMPORAL_ADDRESS` for workflow replacement,
+`PAYMENTS_TEST_KAFKA_BROKERS` and a dedicated `PAYMENTS_KAFKA_TEST_DB_URL`
+for Kafka acknowledgement replay, and `PAYMENTS_TEST_CLEARING_DB_URL`
+for the clearing cutoff and export retry. These database checks use the
+test credentials from `PAYMENTS_DB_USER` and `PAYMENTS_DB_PASSWORD`.
+Use a fresh clearing database and a Kafka test database with no pending
+outbox entries. The full acceptance suites exercise the broker boundaries
+together.

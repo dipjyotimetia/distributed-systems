@@ -1,24 +1,30 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
 
+	"github.com/dipjyotimetia/distributed-systems/backend/notification-service/internal/consumer"
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/dipjyotimetia/distributed-systems/backend/notification-service/internal/consumer"
 )
 
 const defaultLimit = 20
 
-// Handler wires HTTP routes to the shared ring buffer.
-type Handler struct {
-	buf *consumer.RingBuffer
+type EventReader interface {
+	Latest(context.Context, int) ([]*consumer.TransactionEvent, error)
+	ForUser(context.Context, string, int) ([]*consumer.TransactionEvent, error)
 }
 
-func NewHandler(buf *consumer.RingBuffer) http.Handler {
-	h := &Handler{buf: buf}
+// Handler wires HTTP routes to durable notification storage.
+type Handler struct {
+	events EventReader
+}
+
+func NewHandler(events EventReader) http.Handler {
+	h := &Handler{events: events}
 	r := mux.NewRouter()
 	r.HandleFunc("/health", h.health).Methods(http.MethodGet)
 	r.Handle("/metrics", promhttp.Handler()).Methods(http.MethodGet)
@@ -33,19 +39,32 @@ func (h *Handler) health(w http.ResponseWriter, _ *http.Request) {
 
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 	limit := parseLimit(r, defaultLimit)
-	writeJSON(w, http.StatusOK, h.buf.Latest(limit))
+	events, err := h.events.Latest(r.Context(), limit)
+	writeEvents(w, events, err)
 }
 
 func (h *Handler) byUser(w http.ResponseWriter, r *http.Request) {
 	userID := mux.Vars(r)["user_id"]
 	limit := parseLimit(r, defaultLimit)
-	writeJSON(w, http.StatusOK, h.buf.ForUser(userID, limit))
+	events, err := h.events.ForUser(r.Context(), userID, limit)
+	writeEvents(w, events, err)
+}
+
+func writeEvents(w http.ResponseWriter, events []*consumer.TransactionEvent, err error) {
+	if err != nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "notification storage unavailable"})
+		return
+	}
+	if events == nil {
+		events = []*consumer.TransactionEvent{}
+	}
+	writeJSON(w, http.StatusOK, events)
 }
 
 func parseLimit(r *http.Request, def int) int {
 	if s := r.URL.Query().Get("limit"); s != "" {
 		if n, err := strconv.Atoi(s); err == nil && n > 0 {
-			return n
+			return min(n, 1000)
 		}
 	}
 	return def

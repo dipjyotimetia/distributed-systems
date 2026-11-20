@@ -42,3 +42,11 @@ scrape_configs:
     static_configs:
       - targets: ['postgres:5432']
     scrape_interval: 30s
+  - job_name: hybrid-payments
+    file_sd_configs:
+      - files: ['/etc/prometheus/hybrid-payments/*.yml']
+    relabel_configs:
+      - source_labels: [metrics_path]
+        target_label: __metrics_path__
+      - action: labeldrop
+        regex: metrics_path

@@ -1,0 +1,9 @@
+spring:
+  datasource:
+    url: ${CLEARING_DB_URL}
+    username: ${CLEARING_DB_USER}
+    password: ${CLEARING_DB_PASSWORD}
+  flyway:
+    default-schema: clearing
+    schemas: clearing
+    locations: classpath:db/clearing

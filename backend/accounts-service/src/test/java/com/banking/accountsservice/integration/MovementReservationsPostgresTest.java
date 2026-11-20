@@ -147,9 +147,54 @@ class MovementReservationsPostgresTest {
         assertBalances(from, to, "100", "0");
     }
 
+    @Test
+    void outboundRailChecksCurrencyAndBooksTheSameOperationOnlyOnce() throws Exception {
+        long usd = account("100", "USD"), aud = account("100", "AUD");
+        UUID operation = UUID.randomUUID();
+        try (var client = HttpClient.newHttpClient()) {
+            assertEquals(422, outbound(client, UUID.randomUUID(), Action.RESERVE, usd, "outbound-aud-movement:v1:"));
+            assertEquals(403, outbound(client, operation, Action.RESERVE, aud, "account-movement:v1:"));
+            assertEquals(204, outbound(client, operation, Action.RESERVE, aud, "outbound-aud-movement:v1:"));
+            assertBalances(aud, usd, "100", "100");
+            assertEquals(409, assertThrows(ResponseStatusException.class,
+                    () -> reservations.apply(UUID.randomUUID(), Action.RESERVE, movement(aud, usd)))
+                    .getStatusCode().value());
+            assertEquals(204, outbound(client, operation, Action.COMMIT, aud, "outbound-aud-movement:v1:"));
+            assertEquals(204, outbound(client, operation, Action.COMMIT, aud, "outbound-aud-movement:v1:"));
+            assertEquals(409, outbound(client, operation, Action.COMPENSATE, aud, "outbound-aud-movement:v1:"));
+            assertBalances(aud, usd, "75", "100");
+
+            UUID rejected = UUID.randomUUID();
+            assertEquals(204, outbound(client, rejected, Action.RESERVE, aud, "outbound-aud-movement:v1:"));
+            assertEquals(204, outbound(client, rejected, Action.COMPENSATE, aud, "outbound-aud-movement:v1:"));
+            assertEquals(204, outbound(client, rejected, Action.COMPENSATE, aud, "outbound-aud-movement:v1:"));
+            assertEquals(409, outbound(client, rejected, Action.COMMIT, aud, "outbound-aud-movement:v1:"));
+            assertBalances(aud, usd, "75", "100");
+        }
+    }
+
+    private int outbound(HttpClient client, UUID operation, Action action, long account, String scope) throws Exception {
+        String payload = """
+                {"userId":%d,"fromAccountId":%d,"toAccountId":null,"amount":25.00}
+                """.formatted(OWNER, account);
+        String canonical = scope + operation + ":" + action + ":" + OWNER + ":" + account + ":null:25.00";
+        var mac = Mac.getInstance("HmacSHA256");
+        mac.init(new SecretKeySpec("synthetic-movement-signing-test-value".getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+        String signature = HexFormat.of().formatHex(mac.doFinal(canonical.getBytes(StandardCharsets.UTF_8)));
+        URI endpoint = URI.create("http://127.0.0.1:" + port + "/internal/account-movements/outbound-aud/" + operation + "/" + action);
+        var request = HttpRequest.newBuilder(endpoint).header("Content-Type", "application/json")
+                .header("X-Movement-Signature", signature).POST(HttpRequest.BodyPublishers.ofString(payload)).build();
+        return client.send(request, HttpResponse.BodyHandlers.discarding()).statusCode();
+    }
+
     private long account(String balance) {
+        return account(balance, "USD");
+    }
+
+    private long account(String balance, String currency) {
         var request = new AccountCreateRequest();
         request.setAccountType("CHECKING");
+        request.setCurrency(currency);
         request.setInitialBalance(new BigDecimal(balance));
         return accounts.createAccount(request, OWNER).getId();
     }

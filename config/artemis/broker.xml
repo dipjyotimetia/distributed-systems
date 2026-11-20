@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration xmlns="urn:activemq">
+  <core xmlns="urn:activemq:core">
+    <name>banking-clearing</name>
+    <persistence-enabled>true</persistence-enabled>
+    <journal-type>NIO</journal-type>
+    <acceptors>
+      <acceptor name="clearing">tcp://0.0.0.0:61616?protocols=CORE</acceptor>
+    </acceptors>
+    <security-settings>
+      <security-setting match="DEV.QUEUE.PAYMENTS.#">
+        <permission type="send" roles="amq"/>
+        <permission type="consume" roles="amq"/>
+        <permission type="browse" roles="amq"/>
+      </security-setting>
+    </security-settings>
+    <address-settings>
+      <address-setting match="DEV.QUEUE.PAYMENTS.#">
+        <auto-create-addresses>false</auto-create-addresses>
+        <auto-create-queues>false</auto-create-queues>
+        <max-delivery-attempts>-1</max-delivery-attempts>
+        <redelivery-delay>250</redelivery-delay>
+      </address-setting>
+    </address-settings>
+    <addresses>
+      <address name="DEV.QUEUE.PAYMENTS.REQUEST"><anycast><queue name="DEV.QUEUE.PAYMENTS.REQUEST"/></anycast></address>
+      <address name="DEV.QUEUE.PAYMENTS.REPLY"><anycast><queue name="DEV.QUEUE.PAYMENTS.REPLY"/></anycast></address>
+      <address name="DEV.QUEUE.PAYMENTS.BACKOUT"><anycast><queue name="DEV.QUEUE.PAYMENTS.BACKOUT"/></anycast></address>
+    </addresses>
+  </core>
+</configuration>

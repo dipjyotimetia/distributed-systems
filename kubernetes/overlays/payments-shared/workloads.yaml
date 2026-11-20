@@ -1,0 +1,271 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: banking-payments
+spec:
+  selector:
+    matchLabels:
+      app: banking-payments
+  template:
+    metadata:
+      labels:
+        app: banking-payments
+        banking/settlement: "true"
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: payments
+          image: ghcr.io/dipjyotimetia/distributed-systems/payments-service:v1.4.139
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+          envFrom:
+            - secretRef:
+                name: banking-payments-db
+            - configMapRef:
+                name: banking-payments-config
+          env:
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: banking-jwt-secret
+                  key: secret
+          ports:
+            - name: http
+              containerPort: 8080
+          startupProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: http
+            failureThreshold: 30
+            periodSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: http
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: http
+          resources:
+            requests:
+              cpu: 50m
+              memory: 192Mi
+            limits:
+              memory: 768Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: banking-payments-worker
+spec:
+  selector:
+    matchLabels:
+      app: banking-payments-worker
+  template:
+    metadata:
+      labels:
+        app: banking-payments-worker
+        banking/settlement: "true"
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: payments-worker
+          image: ghcr.io/dipjyotimetia/distributed-systems/payments-service:v1.4.139
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+          envFrom:
+            - secretRef:
+                name: banking-payments-db
+            - secretRef:
+                name: banking-payment-movement
+            - secretRef:
+                name: banking-payments-worker
+            - secretRef:
+                name: banking-payments-mq
+            - configMapRef:
+                name: banking-payments-config
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: payment-worker
+            - name: OTEL_SERVICE_NAME
+              value: payments-worker
+          ports:
+            - name: http
+              containerPort: 8080
+          startupProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: http
+            failureThreshold: 30
+            periodSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: http
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: http
+          resources:
+            requests:
+              cpu: 50m
+              memory: 192Mi
+            limits:
+              memory: 768Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: banking-clearing-simulator
+spec:
+  selector:
+    matchLabels:
+      app: banking-clearing-simulator
+  template:
+    metadata:
+      labels:
+        app: banking-clearing-simulator
+        banking/settlement: "true"
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: clearing-simulator
+          image: ghcr.io/dipjyotimetia/distributed-systems/payments-service:v1.4.139
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+          envFrom:
+            - secretRef:
+                name: banking-clearing-db
+            - secretRef:
+                name: banking-clearing-mq
+            - secretRef:
+                name: banking-settlement-writer
+            - configMapRef:
+                name: banking-payments-config
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: clearing
+            - name: OTEL_SERVICE_NAME
+              value: clearing-simulator
+          ports:
+            - name: http
+              containerPort: 8080
+          startupProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: http
+            failureThreshold: 30
+            periodSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: http
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: http
+          resources:
+            requests:
+              cpu: 50m
+              memory: 192Mi
+            limits:
+              memory: 768Mi
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: banking-payments-reconciliation
+spec:
+  schedule: "*/15 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 600
+      template:
+        metadata:
+          labels:
+            app: banking-payments-reconciliation
+            banking/settlement: "true"
+        spec:
+          automountServiceAccountToken: false
+          restartPolicy: Never
+          containers:
+            - name: payments-reconciliation
+              image: ghcr.io/dipjyotimetia/distributed-systems/payments-service:v1.4.139
+              imagePullPolicy: IfNotPresent
+              securityContext:
+                allowPrivilegeEscalation: false
+                runAsNonRoot: true
+                capabilities:
+                  drop: ["ALL"]
+                seccompProfile:
+                  type: RuntimeDefault
+              envFrom:
+                - secretRef:
+                    name: banking-payments-db
+                - secretRef:
+                    name: banking-settlement-reader
+                - configMapRef:
+                    name: banking-payments-config
+              env:
+                - name: SPRING_PROFILES_ACTIVE
+                  value: reconciliation
+                - name: OTEL_SERVICE_NAME
+                  value: payments-reconciliation
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 192Mi
+                limits:
+                  memory: 768Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: banking-payments
+  annotations:
+    banking/metrics-path: /actuator/prometheus
+spec:
+  selector:
+    app: banking-payments
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: banking-payments-config
+data:
+  TEMPORAL_ADDRESS: banking-temporal:7233
+  FRAUD_SERVICE_ADDRESS: banking-fraud:8080
+  PAYMENTS_ACCOUNTS_URL: http://banking-accounts
+  PAYMENTS_KAFKA_BROKERS: banking-kafka:9092
+  SETTLEMENT_CUTOFF: "17:00"
+  SETTLEMENT_ZONE: Australia/Sydney
+  AWS_REGION: ap-southeast-2
+  PAYMENTS_TRACES_EXPORTER: otlp
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector.observability:4317
+  OTEL_EXPORTER_OTLP_PROTOCOL: grpc

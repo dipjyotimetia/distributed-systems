@@ -38,10 +38,23 @@ public class MovementController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void apply(@PathVariable UUID operation, @PathVariable Action action,
                       @RequestBody Movement movement, @RequestHeader("X-Movement-Signature") String signature) {
+        authorize("account-movement:v1:", operation, action, movement, signature);
+        reservations.apply(operation, action, movement);
+    }
+
+    @PostMapping("/outbound-aud/{operation}/{action}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void applyOutbound(@PathVariable UUID operation, @PathVariable Action action,
+                               @RequestBody Movement movement, @RequestHeader("X-Movement-Signature") String signature) {
+        authorize("outbound-aud-movement:v1:", operation, action, movement, signature);
+        reservations.applyOutbound(operation, action, movement);
+    }
+
+    private void authorize(String scope, UUID operation, Action action, Movement movement, String signature) {
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
             mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
-            String data = "account-movement:v1:" + operation + ":" + action + ":" + movement.userId()
+            String data = scope + operation + ":" + action + ":" + movement.userId()
                     + ":" + movement.fromAccountId() + ":" + movement.toAccountId() + ":" + movement.amount().toPlainString();
             byte[] expected = mac.doFinal(data.getBytes(StandardCharsets.UTF_8));
             if (!MessageDigest.isEqual(expected, HexFormat.of().parseHex(signature))) {
@@ -52,6 +65,5 @@ public class MovementController {
         } catch (GeneralSecurityException e) {
             throw new IllegalStateException("Unable to verify movement signature", e);
         }
-        reservations.apply(operation, action, movement);
     }
 }

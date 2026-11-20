@@ -1,0 +1,87 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: banking-app
+
+resources:
+  - ../full
+  - workloads.yaml
+  - network-policies.yaml
+  - kafka-storage.yaml
+
+patches:
+  - target:
+      kind: Deployment
+      name: banking-gateway
+    patch: |
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: PAYMENTS_SERVICE_URL
+          value: http://banking-payments
+  - target:
+      kind: Deployment
+      name: banking-frontend
+    patch: |
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: OUTBOUND_PAYMENTS_ENABLED
+          value: "true"
+  - target:
+      kind: Deployment
+      name: banking-notification
+    patch: |
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: PAYMENT_KAFKA_TOPIC
+          value: payment-events.v1
+  - target:
+      kind: Deployment
+      name: banking-(accounts|transactions)
+    patch: |
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: MOVEMENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: banking-payment-movement
+              key: MOVEMENT_SECRET
+  - patch: |
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: banking-kafka
+        namespace: banking-app
+      spec:
+        strategy:
+          type: Recreate
+        template:
+          spec:
+            containers:
+              - name: redpanda
+                volumeMounts:
+                  - name: kafka-data
+                    mountPath: /var/lib/redpanda/data
+            volumes:
+              - name: kafka-data
+                persistentVolumeClaim:
+                  claimName: banking-payment-kafka-data
+  - target:
+      kind: Deployment
+      name: banking-payments-worker
+    patch: |
+      - op: add
+        path: /spec/template/spec/initContainers
+        value:
+          - name: wait-for-temporal
+            image: busybox:1.38.0
+            command: [sh, -ec, 'until nc -z -w 2 banking-temporal 7233; do sleep 2; done']
+            resources:
+              requests:
+                cpu: 10m
+                memory: 8Mi
+              limits:
+                memory: 32Mi

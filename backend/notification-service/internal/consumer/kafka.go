@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -23,7 +25,11 @@ const ringSize = 1000
 // The Java producer sends transaction_id and user_id as JSON numbers and
 // account_id as a number or null, so we use json.Number (nullable via pointer).
 type TransactionEvent struct {
-	TransactionID   json.Number  `json:"transaction_id" bson:"transactionid"`
+	TransactionID   json.Number  `json:"transaction_id,omitempty" bson:"transactionid,omitempty"`
+	PaymentID       string       `json:"payment_id,omitempty" bson:"paymentid,omitempty"`
+	EventID         string       `json:"event_id,omitempty" bson:"eventid,omitempty"`
+	Currency        string       `json:"currency,omitempty" bson:"currency,omitempty"`
+	AmountMinor     int64        `json:"amount_minor,omitempty" bson:"amountminor,omitempty"`
 	AccountID       *json.Number `json:"account_id" bson:"accountid"`
 	UserID          json.Number  `json:"user_id" bson:"userid"`
 	Amount          float64      `json:"amount" bson:"amount"`
@@ -91,11 +97,12 @@ type Store interface {
 
 // Consumer reads from Kafka and populates both the ring buffer and a durable store.
 type Consumer struct {
-	client   *kgo.Client
-	topic    string
-	Buffer   *RingBuffer
-	store    Store
-	notifier *notify.Notifier
+	client       *kgo.Client
+	topic        string
+	paymentTopic string
+	Buffer       *RingBuffer
+	store        Store
+	notifier     *notify.Notifier
 }
 
 type AuthConfig struct {
@@ -112,10 +119,21 @@ func New(brokers []string, topic, groupID string, store Store) *Consumer {
 	return c
 }
 
-func NewWithAuth(brokers []string, topic, groupID string, store Store, auth AuthConfig) (*Consumer, error) {
+func NewWithAuth(brokers []string, topic, groupID string, store Store, auth AuthConfig, paymentTopics ...string) (*Consumer, error) {
+	topics := []string{topic}
+	paymentTopic := ""
+	if len(paymentTopics) > 0 {
+		paymentTopic = paymentTopics[0]
+		if paymentTopic != "" {
+			if paymentTopic == topic {
+				return nil, fmt.Errorf("payment events require a separate Kafka topic")
+			}
+			topics = append(topics, paymentTopic)
+		}
+	}
 	opts := []kgo.Opt{
 		kgo.SeedBrokers(brokers...),
-		kgo.ConsumeTopics(topic),
+		kgo.ConsumeTopics(topics...),
 		kgo.ConsumerGroup(groupID),
 		kgo.ConsumeResetOffset(kgo.NewOffset().AtStart()),
 		kgo.FetchMinBytes(1),
@@ -136,11 +154,12 @@ func NewWithAuth(brokers []string, topic, groupID string, store Store, auth Auth
 		return nil, fmt.Errorf("configure Kafka consumer: %w", err)
 	}
 	return &Consumer{
-		client:   client,
-		topic:    topic,
-		Buffer:   &RingBuffer{},
-		store:    store,
-		notifier: notify.NewNotifier(),
+		client:       client,
+		topic:        topic,
+		paymentTopic: paymentTopic,
+		Buffer:       &RingBuffer{},
+		store:        store,
+		notifier:     notify.NewNotifier(),
 	}, nil
 }
 
@@ -182,12 +201,12 @@ func (c *Consumer) Run(ctx context.Context) error {
 }
 
 func (c *Consumer) process(ctx context.Context, message *kgo.Record) error {
-	var event TransactionEvent
-	if err := json.Unmarshal(message.Value, &event); err != nil || event.TransactionID == "" || event.Status == "" {
+	event, err := c.decode(message)
+	if err != nil {
 		metrics.ConsumeErrors.Inc()
-		log.Printf("invalid transaction event (partition=%d offset=%d)", message.Partition, message.Offset)
-	} else {
-		if err := c.deliver(ctx, &event); err != nil {
+		log.Printf("invalid notification event (partition=%d offset=%d)", message.Partition, message.Offset)
+	} else if event != nil {
+		if err := c.deliver(ctx, event); err != nil {
 			return err
 		}
 	}
@@ -195,6 +214,51 @@ func (c *Consumer) process(ctx context.Context, message *kgo.Record) error {
 		return fmt.Errorf("commit transaction event offset: %w", err)
 	}
 	return nil
+}
+
+var paymentIDPattern = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
+
+func (c *Consumer) decode(message *kgo.Record) (*TransactionEvent, error) {
+	if c.paymentTopic != "" && message.Topic == c.paymentTopic {
+		var payment struct {
+			Version     int
+			EventID     string
+			PaymentID   string
+			CustomerID  int64
+			AmountMinor int64
+			Currency    string
+			Status      string
+			OccurredAt  time.Time
+		}
+		if err := json.Unmarshal(message.Value, &payment); err != nil {
+			return nil, err
+		}
+		if payment.Version != 1 || !paymentIDPattern.MatchString(payment.EventID) ||
+			!paymentIDPattern.MatchString(payment.PaymentID) || string(message.Key) != payment.PaymentID ||
+			payment.CustomerID < 1 || payment.AmountMinor < 1 || payment.AmountMinor > 999999999999 ||
+			payment.Currency != "AUD" || payment.OccurredAt.IsZero() {
+			return nil, fmt.Errorf("invalid payment event")
+		}
+		switch payment.Status {
+		case "PENDING", "SUBMITTED", "ACCEPTED", "REJECTED", "REVIEW_REQUIRED":
+			return nil, nil
+		case "SETTLED":
+			return &TransactionEvent{
+				PaymentID: payment.PaymentID, EventID: payment.EventID, Currency: payment.Currency,
+				UserID: json.Number(strconv.FormatInt(payment.CustomerID, 10)), AmountMinor: payment.AmountMinor,
+				Amount: float64(payment.AmountMinor) / 100, TransactionType: "OUTBOUND_PAYMENT",
+				Status: payment.Status, Timestamp: payment.OccurredAt,
+			}, nil
+		default:
+			return nil, fmt.Errorf("unknown payment status")
+		}
+	}
+
+	var event TransactionEvent
+	if err := json.Unmarshal(message.Value, &event); err != nil || event.TransactionID == "" || event.Status == "" {
+		return nil, fmt.Errorf("invalid transaction event")
+	}
+	return &event, nil
 }
 
 func (c *Consumer) deliver(ctx context.Context, event *TransactionEvent) error {
@@ -209,8 +273,13 @@ func (c *Consumer) deliver(ctx context.Context, event *TransactionEvent) error {
 	}
 	metrics.EventsConsumed.WithLabelValues(event.TransactionType, event.Status).Inc()
 	c.Buffer.Push(event)
+	reference := event.TransactionID.String()
+	if event.PaymentID != "" {
+		reference = event.PaymentID
+	}
 	c.notifier.FanOut(ctx, notify.TransactionInfo{
-		TransactionID: event.TransactionID.String(),
+		TransactionID: reference,
+		Currency:      event.Currency,
 		UserID:        event.UserID.String(),
 		Amount:        event.Amount,
 		Type:          event.TransactionType,

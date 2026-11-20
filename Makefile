@@ -78,6 +78,7 @@ test-backend:
 		echo "Testing $$service..."; \
 		cd backend/$$service && ./mvnw test && cd ../..; \
 	done
+	backend/accounts-service/mvnw -f backend/payments-service/pom.xml test
 
 test-frontend:
 	@echo "Running frontend tests..."
@@ -323,3 +324,11 @@ test-integration-temporal:
 
 test-integration-temporal-ui:
 	TEMPORAL_TEST_UI_PORT="$${TEMPORAL_TEST_UI_PORT:-8233}" bash tests/integration/temporal/run.sh
+
+.PHONY: test-integration-payments
+test-integration-payments:
+	bash tests/integration/temporal/run-payments.sh
+
+.PHONY: test-integration-payments-kind
+test-integration-payments-kind:
+	bash tests/integration/temporal/run-payments-kind.sh

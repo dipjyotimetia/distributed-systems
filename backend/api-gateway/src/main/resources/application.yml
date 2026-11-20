@@ -60,6 +60,8 @@ services:
     url: ${USER_SERVICE_URL:http://localhost:8081}
   accounts-service:
     url: ${ACCOUNTS_SERVICE_URL:http://localhost:8082}
+  payments-service:
+    url: ${PAYMENTS_SERVICE_URL:}
   disputes-service:
     url: ${DISPUTES_SERVICE_URL:http://localhost:8087}
   transactions-service:

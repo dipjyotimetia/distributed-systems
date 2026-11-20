@@ -430,7 +430,7 @@ func TestWorkerDispatchesAndEscalates(t *testing.T) {
 
 func migrateTestDatabase(t *testing.T, db *sql.DB) {
 	t.Helper()
-	schema, err := os.ReadFile("../../../../database/migrations/disputes-service/schema.sql")
+	schema, err := os.ReadFile("../../../../kubernetes/overlays/full/schema.sql")
 	if err != nil {
 		t.Fatal(err)
 	}
