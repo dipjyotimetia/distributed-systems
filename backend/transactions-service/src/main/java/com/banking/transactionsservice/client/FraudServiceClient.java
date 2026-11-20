@@ -1,8 +1,8 @@
 package com.banking.transactionsservice.client;
 
-import com.banking.transactions.grpc.FraudCheckResponse;
-import com.banking.transactions.grpc.FraudCheckerGrpc;
-import com.banking.transactions.grpc.TransactionRequest;
+import fraud.v1.Fraud.FraudCheckResponse;
+import fraud.v1.Fraud.TransactionRequest;
+import fraud.v1.FraudCheckerGrpc;
 import io.opentelemetry.api.trace.Span;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

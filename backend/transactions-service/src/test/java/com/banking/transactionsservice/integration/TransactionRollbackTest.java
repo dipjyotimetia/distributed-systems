@@ -26,7 +26,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
-import com.banking.transactions.grpc.FraudCheckResponse;
+import fraud.v1.Fraud.FraudCheckResponse;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;

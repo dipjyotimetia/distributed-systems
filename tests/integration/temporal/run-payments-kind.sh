@@ -32,7 +32,11 @@ build_image() {
 images=()
 for service in accounts-service ai-service api-gateway disputes-service fraud-service notification-service transactions-service user-service; do
   image="microsvc-journeys/$service:checkout"
-  build_image -t "$image" "backend/$service"
+  if [ "$service" = "transactions-service" ]; then
+    build_image -f backend/transactions-service/Dockerfile -t "$image" .
+  else
+    build_image -t "$image" "backend/$service"
+  fi
   images+=("$image")
 done
 build_image -t microsvc-journeys/frontend:checkout frontend

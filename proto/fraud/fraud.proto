@@ -3,9 +3,6 @@ syntax = "proto3";
 package fraud.v1;
 
 option go_package = "github.com/dipjyotimetia/distributed-systems/backend/fraud-service/gen/fraud/v1;fraudv1";
-option java_package = "com.banking.transactions.grpc";
-option java_outer_classname = "FraudProto";
-option java_multiple_files = true;
 
 service FraudChecker {
   rpc CheckTransaction(TransactionRequest) returns (FraudCheckResponse);

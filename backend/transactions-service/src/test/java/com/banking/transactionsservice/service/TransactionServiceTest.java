@@ -1,6 +1,6 @@
 package com.banking.transactionsservice.service;
 
-import com.banking.transactions.grpc.FraudCheckResponse;
+import fraud.v1.Fraud.FraudCheckResponse;
 import com.banking.transactionsservice.client.FraudServiceClient;
 import com.banking.transactionsservice.dto.*;
 import com.banking.transactionsservice.entity.Transaction;

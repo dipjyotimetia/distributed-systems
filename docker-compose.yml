@@ -226,8 +226,8 @@ services:
 
   transactions-service:
     build:
-      context: ./backend/transactions-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/transactions-service/Dockerfile
     container_name: banking-transactions-service
     depends_on:
       postgres:

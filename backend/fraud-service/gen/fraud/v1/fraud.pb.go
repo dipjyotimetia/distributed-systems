@@ -181,9 +181,7 @@ const file_fraud_proto_rawDesc = "" +
 	"risk_score\x18\x02 \x01(\x01R\triskScore\x12\x16\n" +
 	"\x06reason\x18\x03 \x01(\tR\x06reason2^\n" +
 	"\fFraudChecker\x12N\n" +
-	"\x10CheckTransaction\x12\x1c.fraud.v1.TransactionRequest\x1a\x1c.fraud.v1.FraudCheckResponseB\x86\x01\n" +
-	"\x1dcom.banking.transactions.grpcB\n" +
-	"FraudProtoP\x01ZWgithub.com/dipjyotimetia/distributed-systems/backend/fraud-service/gen/fraud/v1;fraudv1b\x06proto3"
+	"\x10CheckTransaction\x12\x1c.fraud.v1.TransactionRequest\x1a\x1c.fraud.v1.FraudCheckResponseBYZWgithub.com/dipjyotimetia/distributed-systems/backend/fraud-service/gen/fraud/v1;fraudv1b\x06proto3"
 
 var (
 	file_fraud_proto_rawDescOnce sync.Once

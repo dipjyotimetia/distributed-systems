@@ -9,7 +9,7 @@ Put the service in `backend/<name>-service`. Java services get their own `pom.xm
 Publish the API before the handlers:
 
 - HTTP: an OpenAPI file next to the service, following `backend/accounts-service/openapi.yml` and `backend/transactions-service/openapi.yml`.
-- gRPC: one protobuf file. Fraud is `proto/fraud/fraud.proto`. `transactions-service` compiles that file. The checked-in Go stubs under `backend/fraud-service/gen` come from the same file; regenerate them when the messages change.
+- gRPC: one protobuf file. Fraud is `proto/fraud/fraud.proto`. `transactions-service` and `payments-service` compile that file, so their image builds use the repository root as the Docker context. The checked-in Go stubs under `backend/fraud-service/gen` come from the same file; regenerate them when the messages change.
 - Kafka: document the JSON fields next to the producer. `transaction-events` is written by `TransactionEventOutbox` and read by `notification-service`.
 
 ## 2. Identity
