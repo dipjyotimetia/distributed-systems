@@ -21,6 +21,30 @@ services:
     networks:
       - banking-network
 
+  mongodb:
+    image: mongo:9.0.8
+    volumes:
+      - mongodb_data:/data/db
+    networks: [banking-network]
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "quit(db.adminCommand({ping: 1}).ok ? 0 : 1)"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+
+  notification-service:
+    build: ./backend/notification-service
+    restart: on-failure
+    networks: [banking-network]
+    depends_on:
+      redpanda:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKERS: redpanda:9092
+      MONGO_URI: mongodb://mongodb:27017
+
   # Backend Services
   disputes-schema:
     image: postgres:18.7-alpine
@@ -31,7 +55,7 @@ services:
       PGPASSWORD: password
     command: ["psql", "-h", "postgres", "-U", "postgres", "-d", "banking_app", "-v", "disputes_password=disputes_service_pass", "-f", "/migrations/bootstrap.sql"]
     volumes:
-      - ./database/migrations/disputes-service:/migrations:ro
+      - ./kubernetes/overlays/full:/migrations:ro
     networks:
       - banking-network
 
@@ -380,6 +404,7 @@ volumes:
   postgres_data:
   disputes_temporal_data:
   grafana_data:
+  mongodb_data:
 
 networks:
   banking-network:

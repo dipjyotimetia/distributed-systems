@@ -1,4 +1,4 @@
-"""Verify the frontend proxy and one end-to-end W3C trace on a test cluster."""
+"""Verify shared banking journeys and, when configured, a Kubernetes W3C trace."""
 
 import json
 import secrets
@@ -42,7 +42,15 @@ def main(frontend, jaeger, notifications):
         "traceparent": f"00-{trace_id}-{parent_id}-01",
     })
     assert accounts == [], "new user must have an empty account list"
-    print("Kubernetes smoke passed for frontend health, registration, login and account listing")
+    print("Frontend health, registration, login and account listing passed")
+
+    if jaeger != "-":
+        verify_trace(jaeger, trace_id)
+    verify_notification(frontend, notifications, login)
+    verify_workflows(frontend, login)
+
+
+def verify_trace(jaeger, trace_id):
 
     expected_services = {"frontend", "api-gateway", "accounts-service"}
     observed = set()
@@ -61,7 +69,6 @@ def main(frontend, jaeger, notifications):
             observed = services
             if expected_services <= services:
                 print(f"Trace {trace_id} contained spans from all three services")
-                verify_notification(frontend, notifications, login)
                 return
         time.sleep(2)
     raise SystemExit(f"Trace {trace_id} missing spans from {', '.join(sorted(expected_services - observed))}")
@@ -84,6 +91,42 @@ def verify_notification(frontend, notifications, login):
             return
         time.sleep(2)
     raise SystemExit("The deposit notification did not reach the consumer")
+
+
+def verify_workflows(frontend, login):
+    auth = {"Authorization": "Bearer " + login["token"]}
+    source = get_json(frontend, "/api/accounts", 201, {
+        "accountType": "CHECKING", "initialBalance": 40,
+    }, auth)
+    destination = get_json(frontend, "/api/accounts", 201, {
+        "accountType": "SAVINGS", "initialBalance": 0,
+    }, auth)
+    transfer = get_json(frontend, "/api/transactions/transfer", 201, {
+        "fromAccountId": source["id"], "toAccountId": destination["id"],
+        "amount": 10, "description": "Banking journey fixture",
+    }, auth)
+    assert transfer["status"] == "COMPLETED"
+    dispute = get_json(frontend, "/api/disputes", 201, {
+        "transferId": transfer["id"], "reason": "Please review this transfer.",
+    }, auth)
+    detail = get_json(frontend, f"/api/disputes/{dispute['id']}", headers=auth)
+    assert detail["status"] == "OPEN" and detail["transferId"] == transfer["id"]
+
+    base = f"/api/accounts/{source['id']}/statement-jobs"
+    job = get_json(frontend, base, 202, {}, {**auth, "Idempotency-Key": secrets.token_hex(16)})
+    deadline = time.monotonic() + 60
+    while time.monotonic() < deadline:
+        items = get_json(frontend, base, headers=auth)["items"]
+        status = next(item["status"] for item in items if item["id"] == job["id"])
+        if status == "READY":
+            statement = get_json(frontend, f"{base}/{job['id']}/download", headers=auth)
+            assert statement["accountId"] == source["id"] and statement["balance"] == 30
+            print("Transfer, dispute filing and asynchronous statement download passed")
+            return
+        if status == "FAILED":
+            raise RuntimeError("Statement worker reported a failed export")
+        time.sleep(2)
+    raise RuntimeError("Statement export did not become ready")
 
 
 if __name__ == "__main__":

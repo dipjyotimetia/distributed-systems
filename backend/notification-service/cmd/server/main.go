@@ -33,7 +33,7 @@ func main() {
 		log.Fatalf("MongoDB startup failed: %v", err)
 	}
 
-	c, err := consumer.NewWithAuth(brokers, topic, "notification-service", mongoStore, kafkaAuth)
+	c, err := consumer.NewWithAuth(brokers, topic, "notification-service", mongoStore, kafkaAuth, os.Getenv("PAYMENT_KAFKA_TOPIC"))
 	if err != nil {
 		log.Fatalf("Kafka configuration error: %v", err)
 	}

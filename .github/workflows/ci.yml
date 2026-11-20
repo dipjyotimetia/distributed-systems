@@ -44,9 +44,14 @@ jobs:
           CREATE SCHEMA IF NOT EXISTS user_service;
           CREATE SCHEMA IF NOT EXISTS accounts_service;
           CREATE SCHEMA IF NOT EXISTS transactions_service;
+          CREATE SCHEMA IF NOT EXISTS payments;
         "
     
     - name: Test Backend Services
+      env:
+        PAYMENTS_DB_URL: jdbc:postgresql://localhost:5432/banking_test
+        PAYMENTS_DB_USER: postgres
+        PAYMENTS_DB_PASSWORD: password
       run: make test-backend
 
     - name: Test movement reservations, statement jobs, and reconciliation against PostgreSQL
@@ -218,6 +223,7 @@ jobs:
           - fraud-service
           - notification-service
           - disputes-service
+          - payments-service
     
     steps:
     - uses: actions/checkout@v7.0.1
@@ -282,7 +288,9 @@ jobs:
       uses: docker/build-push-action@v7.4.0
       continue-on-error: ${{ github.event_name == 'push' && github.ref != 'refs/heads/main' }}
       with:
+        file: ${{ matrix.service == 'payments-service' && 'backend/payments-service/Dockerfile' || '' }}
         context: ${{
+          matrix.service == 'payments-service' && '.' ||
           matrix.service == 'frontend' && './frontend' ||
           matrix.service == 'simulation-client' && './simulation-client' ||
           format('./backend/{0}', matrix.service) }}
@@ -299,7 +307,9 @@ jobs:
       if: github.event_name == 'push' && github.ref != 'refs/heads/main' && steps.build.outcome == 'failure'
       uses: docker/build-push-action@v7.4.0
       with:
+        file: ${{ matrix.service == 'payments-service' && 'backend/payments-service/Dockerfile' || '' }}
         context: ${{
+          matrix.service == 'payments-service' && '.' ||
           matrix.service == 'frontend' && './frontend' ||
           matrix.service == 'simulation-client' && './simulation-client' ||
           format('./backend/{0}', matrix.service) }}
@@ -342,7 +352,7 @@ jobs:
         # Always commit — the bump itself guarantees a diff
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
-        git add VERSION kubernetes/base/deployments/ frontend/package.json simulation-client/package.json backend/*/pom.xml
+        git add VERSION kubernetes/base/deployments/ kubernetes/overlays/full/ kubernetes/overlays/payments-shared/workloads.yaml frontend/package.json simulation-client/package.json backend/*/pom.xml
 
         if git diff --cached --quiet; then
           echo "No changes to commit (manifests already at $NEW_TAG)"

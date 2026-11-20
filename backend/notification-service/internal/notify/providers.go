@@ -16,10 +16,18 @@ import (
 
 type TransactionInfo struct {
 	TransactionID string
+	Currency      string
 	UserID        string
 	Amount        float64
 	Type          string
 	Status        string
+}
+
+func (txn TransactionInfo) formattedAmount() string {
+	if txn.Currency == "" {
+		return fmt.Sprintf("$%.2f", txn.Amount)
+	}
+	return fmt.Sprintf("%s %.2f", txn.Currency, txn.Amount)
 }
 
 type Notifier struct {
@@ -91,7 +99,7 @@ func (n *Notifier) sendEmail(ctx context.Context, txn TransactionInfo) error {
 		"content": []map[string]string{
 			{
 				"type":  "text/plain",
-				"value": fmt.Sprintf("Transaction %s of $%.2f (%s) is %s.", txn.TransactionID, txn.Amount, txn.Type, txn.Status),
+				"value": fmt.Sprintf("Transaction %s of %s (%s) is %s.", txn.TransactionID, txn.formattedAmount(), txn.Type, txn.Status),
 			},
 		},
 	}
@@ -113,7 +121,7 @@ func (n *Notifier) sendSMS(ctx context.Context, txn TransactionInfo) error {
 	form := url.Values{}
 	form.Set("To", "+15551234567")
 	form.Set("From", "+15559876543")
-	form.Set("Body", fmt.Sprintf("Apex Banking: your %s of $%.2f is %s (ref: %s)", txn.Type, txn.Amount, txn.Status, txn.TransactionID))
+	form.Set("Body", fmt.Sprintf("Apex Banking: your %s of %s is %s (ref: %s)", txn.Type, txn.formattedAmount(), txn.Status, txn.TransactionID))
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(form.Encode()))
 	if err != nil {
@@ -127,7 +135,7 @@ func (n *Notifier) sendSMS(ctx context.Context, txn TransactionInfo) error {
 
 func (n *Notifier) sendSlack(ctx context.Context, txn TransactionInfo) error {
 	body := map[string]string{
-		"text":     fmt.Sprintf("[%s] Transaction %s: $%.2f %s", txn.Status, txn.TransactionID, txn.Amount, txn.Type),
+		"text":     fmt.Sprintf("[%s] Transaction %s: %s %s", txn.Status, txn.TransactionID, txn.formattedAmount(), txn.Type),
 		"channel":  "#transaction-alerts",
 		"username": "apex-banking-bot",
 	}

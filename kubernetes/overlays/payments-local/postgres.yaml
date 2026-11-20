@@ -1,0 +1,187 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: banking-payments-postgres
+spec:
+  selector:
+    app: banking-payments-postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: banking-payments-postgres
+spec:
+  serviceName: banking-payments-postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: banking-payments-postgres
+  template:
+    metadata:
+      labels:
+        app: banking-payments-postgres
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: postgres
+          image: postgres:18.7-alpine
+          ports:
+            - name: postgres
+              containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: payments
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: banking-payments-db
+                  key: PAYMENTS_DB_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: banking-payments-db
+                  key: PAYMENTS_DB_PASSWORD
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql
+          startupProbe:
+            exec:
+              command: [pg_isready, -q, -h, 127.0.0.1]
+            periodSeconds: 5
+            failureThreshold: 24
+          readinessProbe:
+            exec:
+              command: [pg_isready, -q, -h, 127.0.0.1]
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres-data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 1Gi
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: banking-payments-postgres-clients
+spec:
+  podSelector:
+    matchLabels:
+      app: banking-payments-postgres
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: banking-payments
+        - podSelector:
+            matchLabels:
+              app: banking-payments-worker
+        - podSelector:
+            matchLabels:
+              app: banking-payments-reconciliation
+      ports:
+        - protocol: TCP
+          port: 5432
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: banking-clearing-postgres
+spec:
+  selector:
+    app: banking-clearing-postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: banking-clearing-postgres
+spec:
+  serviceName: banking-clearing-postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: banking-clearing-postgres
+  template:
+    metadata:
+      labels:
+        app: banking-clearing-postgres
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: postgres
+          image: postgres:18.7-alpine
+          ports:
+            - name: postgres
+              containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: clearing
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: banking-clearing-db
+                  key: CLEARING_DB_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: banking-clearing-db
+                  key: CLEARING_DB_PASSWORD
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql
+          startupProbe:
+            exec:
+              command: [pg_isready, -q, -h, 127.0.0.1]
+            periodSeconds: 5
+            failureThreshold: 24
+          readinessProbe:
+            exec:
+              command: [pg_isready, -q, -h, 127.0.0.1]
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres-data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 1Gi
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: banking-clearing-postgres-clients
+spec:
+  podSelector:
+    matchLabels:
+      app: banking-clearing-postgres
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: banking-clearing-simulator
+      ports:
+        - protocol: TCP
+          port: 5432

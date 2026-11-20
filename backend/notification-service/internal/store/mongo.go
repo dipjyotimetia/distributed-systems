@@ -13,7 +13,8 @@ import (
 )
 
 type MongoStore struct {
-	coll *mongo.Collection
+	coll     *mongo.Collection
+	payments *mongo.Collection
 }
 
 func NewMongoStore(ctx context.Context, uri, db, collection string) (*MongoStore, error) {
@@ -42,11 +43,22 @@ func NewMongoStore(ctx context.Context, uri, db, collection string) (*MongoStore
 		_ = client.Disconnect(context.Background())
 		return nil, fmt.Errorf("create notification indexes: %w", err)
 	}
-	return &MongoStore{coll: coll}, nil
+	payments := client.Database(db).Collection(collection + "_payments")
+	if _, err := payments.Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys: bson.D{{Key: "eventid", Value: 1}}, Options: options.Index().SetUnique(true),
+	}); err != nil {
+		_ = client.Disconnect(context.Background())
+		return nil, fmt.Errorf("create payment notification index: %w", err)
+	}
+	return &MongoStore{coll: coll, payments: payments}, nil
 }
 
 func (s *MongoStore) Insert(ctx context.Context, evt *consumer.TransactionEvent) (bool, error) {
-	_, err := s.coll.InsertOne(ctx, evt)
+	collection := s.coll
+	if evt.PaymentID != "" {
+		collection = s.payments
+	}
+	_, err := collection.InsertOne(ctx, evt)
 	if mongo.IsDuplicateKeyError(err) {
 		return false, nil
 	}

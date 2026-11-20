@@ -41,6 +41,23 @@ Bracketed catch-all route handlers expose multiple operations.
 | GET and POST `/api/operations/disputes/[[...casePath]]` | List disputes, request evidence, and resolve cases for allowlisted operators | Playwright and integration | `disputes.real-backend.spec.ts` and the disputes scenario |
 | GET and POST `/api/accounts/[id]/statement-jobs/[[...jobPath]]` | Queue an export, inspect job state, and download it before expiry | Integration | Statement jobs and worker recovery in the [integration guide](../tests/integration/README.md#disputes-and-statement-worker-recovery) |
 
+## Shared deployment checks
+
+The same smoke script runs through the frontend in the Compose disputes
+scenario and the Kubernetes journey overlay. Both use the integration
+suite’s synthetic providers.
+
+| Journey | Assertion in both environments |
+| --- | --- |
+| Identity | Register, sign in and verify the new customer has no accounts |
+| Transfer | Move 10 between owned accounts and verify the source balance in the exported statement |
+| Notification | Deposit funds and poll until the notification consumer returns the matching completed event |
+| Dispute | File against the completed transfer and read the open case |
+| Statement | Queue an export and download the owned statement after the worker marks it ready |
+
+The Compose browser tests also replace workers during dispute and statement
+processing. The Kubernetes smoke additionally checks the W3C trace in Jaeger.
+
 ## Cross-service boundaries
 
 | Boundary | Expected outcome | Test layer | Evidence |
@@ -52,3 +69,66 @@ Bracketed catch-all route handlers expose multiple operations.
 | Broker and notification providers | One matching event and one request to each notification provider | Temporal | `Journey.VerifyKafka` reads Kafka independently and `VerifyDeliveries` checks each provider’s request and status |
 | MongoDB and consumer recovery | Persist the event and handle restart, duplicates, and provider failures | Temporal recovery | `VerifyMongo` queries the database. `RecoveryJourney` checks offsets, restarts, duplicate delivery and an HTTP 503 |
 | Kubernetes, trace propagation, and traffic replay | Smoke and trace checks pass, and replay reports success or an infrastructure skip | Scheduled and manual CI | `kubernetes-smoke.py` checks the deployed frontend and Jaeger trace. The replay job runs `make proxymock-replay` or records why it skipped |
+
+## ActiveMQ Artemis development components
+
+The optional Compose overlay provisions the Artemis broker and the
+clearing simulator with its own PostgreSQL database. Configure
+`BANKING_MQ_APP_PASSWORD` and
+`BANKING_CLEARING_DB_PASSWORD` through the deployment environment.
+
+```sh
+docker compose -f docker-compose.yml -f docker-compose.mq.yml up -d clearing-simulator
+```
+
+The default broker image is `apache/activemq-artemis:2.44.0-alpine` for amd64 and ARM64. MQ and both databases stay on the Compose
+network.
+
+| Queue | Purpose |
+| --- | --- |
+| `DEV.QUEUE.PAYMENTS.REQUEST` | Persistent outbound instructions |
+| `DEV.QUEUE.PAYMENTS.REPLY` | Persistent clearing acceptance, rejection and settlement records |
+| `DEV.QUEUE.PAYMENTS.BACKOUT` | Invalid messages rolled back three times |
+
+The simulator uses a durable clearing reference per payment ID. It sends
+a single logical acceptance and delayed settlement for a normal destination.
+The synthetic destinations `REJECT000001` and `SILENT000001` exercise
+definitive rejection and a missing reply. The payments worker calls the existing fraud and account services, checks
+the configured compliance endpoint, and keeps ambiguous outcomes in review.
+The full Compose payment journey also needs the payments overlay and
+`BANKING_PAYMENTS_DB_PASSWORD`, `BANKING_PAYMENTS_JWT_SECRET`,
+`BANKING_PAYMENTS_MOVEMENT_SECRET`, `BANKING_PAYMENTS_COMPLIANCE_URL`,
+and `BANKING_PAYMENTS_COMPLIANCE_TOKEN`.
+
+```sh
+docker compose -f docker-compose.yml -f docker-compose.mq.yml -f docker-compose.payments.yml up -d
+```
+
+Use an AUD source account and open `/payments`. The worker publishes
+lifecycle events to `payment-events.v1`. The focused component checks cover PostgreSQL holds, Temporal worker
+replacement, Kafka acknowledgement replay, S3-compatible upload retries,
+and reconciliation. The full browser-to-clearing run and recovery checks
+against the pinned Artemis image are pending in both Compose and Kind.
+An external Artemis deployment also requires runtime verification.
+
+### Settlement files and operator queue
+
+Provide a private bucket through `BANKING_SETTLEMENT_BUCKET`. Set
+`BANKING_SETTLEMENT_S3_ENDPOINT` for an S3-compatible service. The clearing
+simulator needs object write and read access to check whether an upload retry matches the existing object. The reconciliation job needs object
+read access under `settlement/aud/`. Configure separate credentials with the
+`BANKING_SETTLEMENT_WRITER_*` and `BANKING_SETTLEMENT_READER_*` variables, or
+provide credentials through the runtime. The cutoff defaults to 17:00
+Sydney time. Set `BANKING_SETTLEMENT_CUTOFF` to change it for both components.
+
+```sh
+docker compose -f docker-compose.yml -f docker-compose.mq.yml -f docker-compose.payments.yml \
+  run --rm payments-reconciliation
+```
+
+The MQ settlement reply carries the clearing business date as message metadata. Reconciliation uses that date even when network delays move the booking past the cutoff. The job processes closed dates. Set `BANKING_SETTLEMENT_BUSINESS_DATE` to
+replay a specific date. Set `BANKING_SETTLEMENT_FIRST_DATE` to start a new deployment from a known earlier business date. An identical file is idempotent. A changed file
+for an already processed date fails and preserves the original evidence.
+The read-only queue is available at
+`GET /api/operations/payments/reconciliation` to customers whose IDs are
+listed in `BANKING_PAYMENTS_OPERATOR_IDS`. Operators can open the same queue at `/operations/payments`.

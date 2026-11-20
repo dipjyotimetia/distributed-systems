@@ -38,6 +38,10 @@ func main() {
 		evidence.Compliance[body.SearchTerm]++
 		evidence.mu.Unlock()
 		w.Header().Set("Content-Type", "application/json")
+		if body.SearchTerm == "SCREEN000001" {
+			fmt.Fprint(w, `{"content":{"data":{"total_matches":1,"risk_level":"high"}}}`)
+			return
+		}
 		fmt.Fprint(w, `{"content":{"data":{"total_matches":0,"risk_level":"low"}}}`)
 	})
 	registerDeliveryEndpoints(mux)
@@ -45,6 +49,7 @@ func main() {
 	registerPaymentEndpoints(mux)
 	registerFraudEndpoints(mux, evidence)
 	registerFinancialEndpoints(mux)
+	registerSettlementEndpoints(mux)
 	compliance := &http.Server{Addr: ":8081", Handler: mux, ReadHeaderTimeout: 5 * time.Second}
 	log.Fatal(compliance.ListenAndServe())
 }

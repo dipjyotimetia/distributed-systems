@@ -102,7 +102,7 @@ jobs:
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
       - name: Build and load the services used by the smoke test
         run: |
-          for service in api-gateway accounts-service user-service transactions-service fraud-service notification-service ai-service; do
+          for service in api-gateway accounts-service user-service transactions-service fraud-service notification-service ai-service disputes-service; do
             image="microsvc-journeys/$service:checkout"
             if ! docker build -t "$image" "backend/$service"; then
               sleep 5
@@ -112,10 +112,20 @@ jobs:
           done
           docker build -t microsvc-journeys/frontend:checkout frontend
           kind load docker-image microsvc-journeys/frontend:checkout --name banking-journeys
+          docker build -f tests/integration/temporal/stack/Dockerfile -t microsvc-journeys/provider-fixtures:checkout .
+          kind load docker-image microsvc-journeys/provider-fixtures:checkout --name banking-journeys
       - name: Deploy and check smoke and trace propagation
         run: |
           kubectl apply -k kubernetes/observability
+          kubectl create namespace banking-app
+          temporal_password="$(openssl rand -hex 24)"
+          disputes_password="$(openssl rand -hex 24)"
+          kubectl -n banking-app create secret generic banking-workflow-credentials \
+            --from-literal=temporal-password="$temporal_password" \
+            --from-literal=disputes-password="$disputes_password" \
+            --from-literal=disputes-database-url="postgres://disputes_service_user:$disputes_password@banking-postgres:5432/banking_app?sslmode=disable"
           kubectl apply -k kubernetes/testing/journeys
+          kubectl -n banking-app wait --for=condition=complete job/banking-workflow-bootstrap-v2 --timeout=5m
           kubectl -n banking-app rollout status deployment/banking-kafka --timeout=5m
           broker() { kubectl -n banking-app exec "$@" ; }
           broker deployment/banking-kafka -- rpk topic describe transaction-events -X brokers=banking-kafka:9092 ||
@@ -123,7 +133,7 @@ jobs:
           broker deployment/banking-kafka -- rpk topic create ci-round-trip --partitions 1 --replicas 1 -X brokers=banking-kafka:9092
           printf 'ci-fixture\n' | broker -i deployment/banking-kafka -- rpk topic produce ci-round-trip -X brokers=banking-kafka:9092
           timeout 30s kubectl -n banking-app exec deployment/banking-kafka -- rpk topic consume ci-round-trip -n 1 -X brokers=banking-kafka:9092 | grep -q ci-fixture
-          for name in banking-postgres banking-kafka redis mongodb banking-frontend banking-user banking-gateway banking-accounts banking-transactions banking-fraud banking-notification banking-ai; do
+          for name in banking-postgres banking-kafka redis mongodb banking-frontend banking-user banking-gateway banking-accounts banking-transactions banking-fraud banking-notification banking-ai banking-temporal banking-disputes banking-disputes-worker banking-statement-worker provider-fixtures; do
             kubectl -n banking-app rollout status "deployment/$name" --timeout=5m
           done
           kubectl -n observability rollout status deployment/jaeger --timeout=3m

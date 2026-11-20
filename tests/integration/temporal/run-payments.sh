@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/../../.."
+project="payment-test-$(openssl rand -hex 6)"
+evidence="$(mktemp /tmp/banking-payment-evidence.XXXXXX)"
+export MICROSVC_PAYMENT_EVIDENCE="$evidence"
+export MICROSVC_PAYMENTS=1
+export BANKING_MQ_APP_PASSWORD="$(openssl rand -hex 24)"
+export BANKING_CLEARING_DB_PASSWORD="$(openssl rand -hex 24)"
+export BANKING_PAYMENTS_DB_PASSWORD="$(openssl rand -hex 24)"
+export BANKING_PAYMENTS_JWT_SECRET="$(openssl rand -hex 32)"
+export BANKING_PAYMENTS_MOVEMENT_SECRET="$(openssl rand -hex 32)"
+export BANKING_PAYMENTS_COMPLIANCE_URL=http://provider-fixtures:8081/searches
+export BANKING_PAYMENTS_COMPLIANCE_TOKEN=synthetic-token
+export BANKING_SETTLEMENT_BUCKET=settlements-test
+export BANKING_SETTLEMENT_S3_ENDPOINT=http://provider-fixtures:8081
+export BANKING_SETTLEMENT_READER_KEY=synthetic-reader BANKING_SETTLEMENT_READER_SECRET=synthetic-reader
+export BANKING_SETTLEMENT_WRITER_KEY=synthetic-writer BANKING_SETTLEMENT_WRITER_SECRET=synthetic-writer
+export BANKING_PAYMENTS_REPLY_TIMEOUT=PT50S
+export BANKING_CLEARING_SETTLEMENT_DELAY=PT20S
+
+compose=(docker compose -p "$project" -f docker-compose.yml -f docker-compose.mq.yml -f docker-compose.payments.yml
+  -f tests/integration/temporal/stack/compose.yml -f tests/integration/temporal/stack/payments.compose.yml)
+cleanup() {
+  local status=$?
+  if [[ "$status" != 0 ]]; then
+    "${compose[@]}" ps -a || true
+    "${compose[@]}" logs --tail 40 frontend api-gateway user-service accounts-service transactions-service payments-service payments-worker clearing-simulator clearing-mq || true
+  fi
+  "${compose[@]}" down --volumes --remove-orphans || true
+  rm -f "$evidence"
+}
+trap cleanup EXIT
+
+"${compose[@]}" build frontend api-gateway user-service accounts-service transactions-service fraud-service provider-fixtures \
+  payments-service payments-worker clearing-simulator payments-reconciliation notification-service
+"${compose[@]}" up -d --wait payments-postgres clearing-postgres clearing-mq disputes-temporal redpanda
+# Choose a future cutoff only after the infrastructure and images are available.
+read -r BANKING_SETTLEMENT_CUTOFF BANKING_SETTLEMENT_BUSINESS_DATE < <(python3 - <<'PY'
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
+end = datetime.now(ZoneInfo("Australia/Sydney")) + timedelta(minutes=4)
+print(end.strftime("%H:%M"), end.date().isoformat())
+PY
+)
+export BANKING_SETTLEMENT_CUTOFF BANKING_SETTLEMENT_BUSINESS_DATE
+"${compose[@]}" up -d frontend payments-worker clearing-simulator notification-service jaeger
+export MICROSVC_FRONTEND="http://$("${compose[@]}" port frontend 3000)"
+export MICROSVC_GATEWAY="http://$("${compose[@]}" port api-gateway 8080)"
+export MICROSVC_NOTIFICATIONS="http://$("${compose[@]}" port notification-service 8080)"
+fixtures="http://$("${compose[@]}" port provider-fixtures 8081)"
+
+(cd frontend && npm run test:e2e:real-backend -- payments.real-backend.spec.ts --workers=1)
+timeout 30 "${compose[@]}" exec -T redpanda rpk topic consume payment-events.v1 \
+  -X brokers=redpanda:9092 -o :end --format '%k\t%v\n' |
+  python3 tests/integration/verify-payment-event.py "$MICROSVC_PAYMENT_EVIDENCE"
+
+jaeger="http://$("${compose[@]}" port jaeger 16686)"
+python3 tests/integration/verify-payment-trace.py "$jaeger" "$MICROSVC_PAYMENT_EVIDENCE"
+
+file_url="$fixtures/settlements-test/settlement/aud/$BANKING_SETTLEMENT_BUSINESS_DATE.dat"
+for ((attempt = 0; attempt < 100; attempt++)); do
+  if curl -fsS -o /dev/null "$file_url" 2>/dev/null; then break; fi
+  sleep 3
+done
+curl -fsS "$file_url" | python3 tests/integration/verify-payment-settlement.py "$evidence"
+"${compose[@]}" run --rm payments-reconciliation
+"${compose[@]}" run --rm payments-reconciliation
+payment_id="$(python3 -c 'import json,sys,uuid; print(uuid.UUID(json.load(open(sys.argv[1]))["paymentId"]))' "$evidence")"
+movement="$("${compose[@]}" exec -T postgres psql -At -U postgres -d banking_app \
+  -v ON_ERROR_STOP=1 -c "SELECT state || '|' || amount FROM accounts_service.movement_reservations WHERE operation_id = '$payment_id'")"
+[[ "$movement" == 'COMMITTED|25.00' ]]
+matched="$("${compose[@]}" exec -T payments-postgres psql -At -U payments -d payments \
+  -v ON_ERROR_STOP=1 -c "SELECT count(*) FROM payments.reconciliation_result WHERE payment_id = '$payment_id' AND outcome = 'MATCHED'")"
+[[ "$matched" == 1 ]]
+echo "Settlement file and idempotent reconciliation verified"
+
+MICROSVC_PAYMENT_FIXTURES="$fixtures" python3 tests/integration/temporal/payment-recovery.py "${compose[@]}"
+
+export PAYMENTS_TEST_MQ_ADDRESS
+mq_port="$("${compose[@]}" port clearing-mq 61616)"
+PAYMENTS_TEST_MQ_ADDRESS="tcp://127.0.0.1:${mq_port##*:}"
+backend/accounts-service/mvnw -B -f backend/payments-service/pom.xml -Dtest=MqClearingRecoveryTest test
+
+inbox="$("${compose[@]}" exec -T payments-postgres psql -At -U payments -d payments \
+  -v ON_ERROR_STOP=1 -c "SELECT count(*) FROM payments.clearing_inbox WHERE payment_id = '$payment_id' AND kind = 'SETTLED'")"
+[[ "$inbox" == 1 ]]

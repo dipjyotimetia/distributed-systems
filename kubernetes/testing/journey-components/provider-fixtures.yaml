@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: provider-fixtures
+  namespace: banking-app
+spec:
+  selector:
+    matchLabels:
+      app: provider-fixtures
+  template:
+    metadata:
+      labels:
+        app: provider-fixtures
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: provider-fixtures
+          image: microsvc-journeys/provider-fixtures:checkout
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8081
+              name: http
+          readinessProbe:
+            tcpSocket:
+              port: http
+          resources:
+            requests:
+              cpu: 25m
+              memory: 24Mi
+            limits:
+              memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: provider-fixtures
+  namespace: banking-app
+spec:
+  selector:
+    app: provider-fixtures
+  ports:
+    - name: http
+      port: 8081
+      targetPort: http

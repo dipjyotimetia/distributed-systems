@@ -1,0 +1,4 @@
+- targets: [payments-service:8080]
+  labels:
+    component: payments
+    metrics_path: /actuator/prometheus

@@ -53,29 +53,15 @@ services:
   redpanda:
     tmpfs: ["/var/lib/redpanda/data:size=512m,uid=101,gid=101,mode=0700"]
   mongodb:
-    image: mongo:9.0.8
+    volumes: !reset []
     tmpfs: ["/data/db:size=384m"]
-    networks: [banking-network]
-    healthcheck:
-      test: ["CMD", "mongosh", "--quiet", "--eval", "quit(db.adminCommand({ping: 1}).ok ? 0 : 1)"]
-      interval: 3s
-      timeout: 5s
-      retries: 20
   notification-service:
-    build: ./backend/notification-service
-    networks:
+    networks: !override
       banking-network: {}
       test-edge:
         gw_priority: 1
     ports: ["127.0.0.1::8080"]
-    depends_on:
-      redpanda:
-        condition: service_healthy
-      mongodb:
-        condition: service_healthy
     environment:
-      KAFKA_BROKERS: redpanda:9092
-      MONGO_URI: mongodb://mongodb:27017
       SLACK_WEBHOOK_URL: http://provider-fixtures:8081/slack
       SENDGRID_API_URL: http://provider-fixtures:8081/v3/mail/send
       TWILIO_API_BASE_URL: http://provider-fixtures:8081

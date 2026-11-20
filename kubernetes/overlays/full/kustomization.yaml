@@ -1,0 +1,46 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: banking-app
+
+resources:
+  - ../../base
+  - temporal.yaml
+  - disputes.yaml
+  - statement-worker.yaml
+
+configMapGenerator:
+  - name: disputes-schema
+    files:
+      - bootstrap.sql
+      - schema.sql
+
+patches:
+  - target:
+      kind: Deployment
+      name: banking-gateway
+    patch: |
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: DISPUTES_SERVICE_URL
+          value: http://banking-disputes
+  - target:
+      kind: Deployment
+      name: banking-(disputes-worker|statement-worker)
+    patch: |
+      - op: add
+        path: /spec/template/spec/initContainers
+        value:
+          - name: wait-for-workflow-infrastructure
+            image: busybox:1.38.0
+            command:
+              - sh
+              - -ec
+              - until nc -z -w 2 banking-temporal 7233; do sleep 2; done
+            resources:
+              requests:
+                cpu: 10m
+                memory: 8Mi
+              limits:
+                memory: 32Mi

@@ -1,0 +1,124 @@
+services:
+  payments-postgres:
+    image: postgres:18.7-alpine
+    environment:
+      POSTGRES_DB: payments
+      POSTGRES_USER: payments
+      POSTGRES_PASSWORD: ${BANKING_PAYMENTS_DB_PASSWORD:?Set the payments database password}
+    volumes:
+      - payments_postgres_data:/var/lib/postgresql
+    networks: [banking-network]
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "payments", "-d", "payments"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  payments-service:
+    build: &payments-build
+      context: .
+      dockerfile: backend/payments-service/Dockerfile
+    environment:
+      <<: &payments-db
+        PAYMENTS_DB_URL: jdbc:postgresql://payments-postgres:5432/payments
+        PAYMENTS_DB_USER: payments
+        PAYMENTS_DB_PASSWORD: ${BANKING_PAYMENTS_DB_PASSWORD:?Set the payments database password}
+        SPRING_FLYWAY_CREATE_SCHEMAS: "true"
+        PAYMENTS_TRACES_EXPORTER: otlp
+        OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
+        OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      JWT_SECRET: ${BANKING_PAYMENTS_JWT_SECRET:?Set the same JWT secret as the banking services}
+      PAYMENTS_OPERATOR_IDS: ${BANKING_PAYMENTS_OPERATOR_IDS:-}
+    depends_on:
+      payments-postgres:
+        condition: service_healthy
+    networks: [banking-network]
+
+  payments-worker:
+    build: *payments-build
+    restart: on-failure
+    environment:
+      <<: *payments-db
+      SPRING_PROFILES_ACTIVE: payment-worker
+      OTEL_SERVICE_NAME: payments-worker
+      TEMPORAL_ADDRESS: disputes-temporal:7233
+      PAYMENTS_REPLY_TIMEOUT: ${BANKING_PAYMENTS_REPLY_TIMEOUT:-PT2M}
+      MQ_ADDRESS: tcp://clearing-mq:61616
+      MQ_USERNAME: app
+      MQ_PASSWORD: ${BANKING_MQ_APP_PASSWORD:?Set the local queue manager application password}
+      PAYMENTS_KAFKA_BROKERS: redpanda:9092
+      PAYMENTS_ACCOUNTS_URL: http://accounts-service:8080
+      FRAUD_SERVICE_ADDRESS: fraud-service:8080
+      MOVEMENT_SECRET: ${BANKING_PAYMENTS_MOVEMENT_SECRET:?Set the account movement secret}
+      PAYMENTS_COMPLIANCE_URL: ${BANKING_PAYMENTS_COMPLIANCE_URL:?Set the compliance searches endpoint}
+      PAYMENTS_COMPLIANCE_TOKEN: ${BANKING_PAYMENTS_COMPLIANCE_TOKEN:?Set the compliance token}
+    depends_on:
+      payments-postgres:
+        condition: service_healthy
+      disputes-temporal:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+    networks: [banking-network]
+
+  payments-reconciliation:
+    build: *payments-build
+    profiles: [reconciliation]
+    environment:
+      <<: *payments-db
+      SPRING_PROFILES_ACTIVE: reconciliation
+      SETTLEMENT_BUCKET: ${BANKING_SETTLEMENT_BUCKET:?Set the settlement bucket}
+      SETTLEMENT_S3_ENDPOINT: ${BANKING_SETTLEMENT_S3_ENDPOINT:-}
+      AWS_REGION: ${BANKING_SETTLEMENT_REGION:-ap-southeast-2}
+      AWS_ACCESS_KEY_ID: ${BANKING_SETTLEMENT_READER_KEY:-}
+      AWS_SECRET_ACCESS_KEY: ${BANKING_SETTLEMENT_READER_SECRET:-}
+      SETTLEMENT_CUTOFF: ${BANKING_SETTLEMENT_CUTOFF:-17:00}
+      SETTLEMENT_BUSINESS_DATE: ${BANKING_SETTLEMENT_BUSINESS_DATE:-}
+      SETTLEMENT_FIRST_DATE: ${BANKING_SETTLEMENT_FIRST_DATE:-}
+    depends_on:
+      payments-postgres:
+        condition: service_healthy
+    networks: [banking-network]
+
+  accounts-service:
+    environment:
+      MOVEMENT_SECRET: ${BANKING_PAYMENTS_MOVEMENT_SECRET:?Set the account movement secret}
+
+  transactions-service:
+    environment:
+      MOVEMENT_SECRET: ${BANKING_PAYMENTS_MOVEMENT_SECRET:?Set the account movement secret}
+
+  prometheus:
+    volumes:
+      - ./config/prometheus-payments-targets.yml:/etc/prometheus/hybrid-payments/targets.yml:ro
+
+  redpanda:
+    volumes:
+      - payments_redpanda_data:/var/lib/redpanda/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          (rpk topic describe transaction-events -X brokers=redpanda:9092 >/dev/null 2>&1 ||
+           rpk topic create transaction-events --partitions 1 --replicas 1 -X brokers=redpanda:9092) &&
+          (rpk topic describe payment-events.v1 -X brokers=redpanda:9092 >/dev/null 2>&1 ||
+           rpk topic create payment-events.v1 --partitions 1 --replicas 1 -X brokers=redpanda:9092)
+
+  notification-service:
+    environment:
+      PAYMENT_KAFKA_TOPIC: payment-events.v1
+
+  api-gateway:
+    environment:
+      PAYMENTS_SERVICE_URL: http://payments-service:8080
+    depends_on:
+      payments-service:
+        condition: service_started
+
+  frontend:
+    environment:
+      OUTBOUND_PAYMENTS_ENABLED: "true"
+
+volumes:
+  payments_postgres_data:
+  payments_redpanda_data:

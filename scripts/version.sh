@@ -228,6 +228,11 @@ update_k8s_manifests() {
             echo "Updated $deployment_file"
         fi
     done
+
+    for deployment_file in kubernetes/overlays/full/{disputes,statement-worker}.yaml kubernetes/overlays/payments-shared/workloads.yaml; do
+        sed -E -i.bak "s#(image: ${REGISTRY}/(disputes-service|accounts-service|payments-service)):v[0-9]+\.[0-9]+\.[0-9]+#\1:${tag}#" "$deployment_file"
+        rm -f "${deployment_file}.bak"
+    done
 }
 
 # Show version information

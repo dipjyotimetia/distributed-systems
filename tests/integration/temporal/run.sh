@@ -83,7 +83,7 @@ stage=startup
 if [[ "$MICROSVC_SCENARIO" == ai ]]; then
   "${compose[@]}" up -d --no-deps --build frontend ai-service provider-fixtures
 elif [[ "$MICROSVC_SCENARIO" == disputes ]]; then
-  "${compose[@]}" up -d --build frontend disputes-worker statement-worker
+  "${compose[@]}" up -d --build frontend disputes-worker statement-worker notification-service
 else
   "${compose[@]}" up -d --build frontend notification-service
   export MICROSVC_GATEWAY="http://$("${compose[@]}" port api-gateway 8080)"
@@ -101,6 +101,9 @@ if [[ "$MICROSVC_SCENARIO" == disputes ]]; then
   browser_verdict=failed
   (cd frontend && npm run test:e2e:real-backend -- --grep '(transfer dispute|statement export) survives' --workers=1)
   browser_verdict=passed
+  stage=shared-journeys
+  notifications="http://$("${compose[@]}" port notification-service 8080)"
+  python3 tests/integration/kubernetes-smoke.py "$MICROSVC_FRONTEND" - "$notifications"
   printf '{"scenario":"disputes","workflow_passed":true}\n' >"$report"
   stage=complete
   exit 0

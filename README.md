@@ -23,8 +23,9 @@ exits with an OpenTelemetry `ContainerAttributes` error, apply the
 
 | Environment | Features and dependencies |
 |---|---|
-| Default Compose | Identity, accounts, transactions, fraud, disputes and statement workers, PostgreSQL, Redis, Redpanda, Jaeger, Prometheus, Grafana |
+| Default Compose | Identity, accounts, transactions, fraud, disputes and statement workers, PostgreSQL, Redis, Redpanda, MongoDB, notifications, Jaeger, Prometheus, Grafana |
 | Kubernetes base and local overlay | Identity, accounts, transactions, fraud, AI, notifications, simulation, PostgreSQL, Redis, Redpanda and MongoDB |
+| Kubernetes full overlay | Base services plus disputes, the statement worker, and PostgreSQL-backed Temporal |
 | Temporal integration stack | Isolated banking journeys with scenario-specific workers and provider fixtures |
 
 Use the [Kubernetes deployment guide](kubernetes/README.md) for cluster setup and
@@ -185,6 +186,19 @@ cd frontend
 npm test               # Unit tests
 npm run test:e2e       # End-to-end tests
 ```
+
+### Hybrid outbound payments
+
+The optional hybrid stack adds an AUD outbound payment journey with
+Temporal, ActiveMQ Artemis clearing, Redpanda notifications, and daily settlement
+reconciliation. After enabling the hybrid stack, use `/payments` to submit
+from an active AUD account and `/operations/payments` to view reconciliation
+discrepancies as an allowlisted operator.
+
+See the [Compose setup and settlement configuration](docs/banking-journey-coverage.md#activemq-artemis-development-components),
+the [Kubernetes deployment and credential setup](kubernetes/README.md#hybrid-outbound-payments),
+and the [acceptance commands](tests/integration/README.md#outbound-payment-acceptance).
+The pinned Artemis image supports amd64 and ARM64.
 
 ### Temporal Banking Integration
 

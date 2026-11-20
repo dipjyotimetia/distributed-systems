@@ -3,6 +3,7 @@ package consumer
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/twmb/franz-go/pkg/kgo"
@@ -92,5 +93,31 @@ func TestDeliverSkipsFanOutWhenPersistenceFailsOrEventAlreadyExists(t *testing.T
 				t.Fatal("unexpected event in the API buffer")
 			}
 		})
+	}
+}
+
+func TestPaymentNotificationDecoding(t *testing.T) {
+	const paymentID = "597a4c24-019f-4ed6-884f-bf7cf8486f65"
+	const eventID = "6ebeca05-61f1-4cae-bdd1-bade0e5beccd"
+	const body = `{"version":1,"eventId":"` + eventID + `","paymentId":"` + paymentID + `",
+		"customerId":9,"amountMinor":125,"currency":"AUD","status":"SETTLED","occurredAt":"2026-11-20T04:32:00+00:00"}`
+	c := Consumer{paymentTopic: "payment-events.v1"}
+	record := &kgo.Record{Topic: c.paymentTopic, Key: []byte(paymentID), Value: []byte(body)}
+	event, err := c.decode(record)
+	if err != nil || event == nil || event.EventID != eventID || event.PaymentID != paymentID ||
+		event.TransactionID != "" || event.UserID != "9" || event.AmountMinor != 125 ||
+		event.Amount != 1.25 || event.Currency != "AUD" {
+		t.Fatalf("settled payment was not decoded correctly: %+v, %v", event, err)
+	}
+
+	record.Value = []byte(strings.Replace(body, "SETTLED", "ACCEPTED", 1))
+	if event, err := c.decode(record); event != nil || err != nil {
+		t.Fatalf("acceptance may not trigger a customer notification: %+v, %v", event, err)
+	}
+
+	record.Value = []byte(body)
+	record.Key = []byte(eventID)
+	if _, err := c.decode(record); err == nil {
+		t.Fatal("mismatched payment correlation was accepted")
 	}
 }

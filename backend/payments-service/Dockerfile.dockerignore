@@ -1,0 +1,5 @@
+*
+!proto/fraud/fraud.proto
+!backend/payments-service/pom.xml
+!backend/payments-service/src
+!backend/payments-service/src/**

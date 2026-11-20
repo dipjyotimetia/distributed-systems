@@ -42,6 +42,18 @@ public class MovementReservations {
 
     @Transactional
     public void apply(UUID operation, Action action, Movement movement) {
+        apply(operation, action, movement, null);
+    }
+
+    @Transactional
+    public void applyOutbound(UUID operation, Action action, Movement movement) {
+        if (movement.fromAccountId() == null || movement.toAccountId() != null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Outbound payments require one source account");
+        }
+        apply(operation, action, movement, "AUD");
+    }
+
+    private void apply(UUID operation, Action action, Movement movement, String currency) {
         var locked = Stream.of(movement.fromAccountId(), movement.toAccountId())
                 .filter(Objects::nonNull).sorted()
                 .map(id -> accounts.findOwnedForUpdate(id, movement.userId()))
@@ -53,6 +65,9 @@ public class MovementReservations {
         }
         Account from = locked.stream().filter(account -> account.getId().equals(movement.fromAccountId())).findFirst().orElse(null);
         Account to = locked.stream().filter(account -> account.getId().equals(movement.toAccountId())).findFirst().orElse(null);
+        if (currency != null && from != null && !currency.equals(from.getCurrency())) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Outbound payments require an AUD account");
+        }
         var rows = jdbc.query("""
                 SELECT * FROM accounts_service.movement_reservations WHERE operation_id = ?
                 """, (rs, row) -> new Reservation(new Movement(rs.getLong("user_id"),

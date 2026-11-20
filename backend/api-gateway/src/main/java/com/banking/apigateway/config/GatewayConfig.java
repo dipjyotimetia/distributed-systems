@@ -34,6 +34,9 @@ public class GatewayConfig {
     @Value("${services.disputes-service.url}")
     private String disputesServiceUrl;
 
+    @Value("${services.payments-service.url:}")
+    private String paymentsServiceUrl;
+
     @Bean
     @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
             name = "gateway.rate-limiter.enabled", havingValue = "true", matchIfMissing = true)
@@ -51,7 +54,7 @@ public class GatewayConfig {
 
     @Bean
     public RouteLocator routes(RouteLocatorBuilder builder) {
-        return builder.routes()
+        var routes = builder.routes()
                 // API Gateway health check route
                 .route("api-gateway-health", r -> r.path("/api/healthz")
                         .filters(f -> f.rewritePath("/api/healthz", "/health"))
@@ -96,7 +99,18 @@ public class GatewayConfig {
                             }
                             return f;
                         })
-                        .uri(disputesServiceUrl))
-                .build();
+                        .uri(disputesServiceUrl));
+        if (paymentsServiceUrl != null && !paymentsServiceUrl.isBlank()) {
+            routes.route("payments-service", r -> r.path("/api/payments", "/api/payments/**", "/api/operations/payments/reconciliation")
+                    .filters(f -> {
+                        f.filter(authFilter);
+                        if (rateLimiterEnabled) {
+                            f.requestRateLimiter(c -> c.setRateLimiter(redisRateLimiter()).setKeyResolver(userKeyResolver()));
+                        }
+                        return f;
+                    })
+                    .uri(paymentsServiceUrl));
+        }
+        return routes.build();
     }
 }

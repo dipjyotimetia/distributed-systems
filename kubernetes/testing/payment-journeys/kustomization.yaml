@@ -1,0 +1,61 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: banking-app
+
+resources:
+  - ../../overlays/payments-local
+
+components:
+  - ../journey-components
+
+images:
+  - name: ghcr.io/dipjyotimetia/distributed-systems/payments-service
+    newName: microsvc-journeys/payments-service
+    newTag: checkout
+
+patches:
+  - target:
+      kind: Deployment
+      name: banking-(payments|payments-worker|clearing-simulator)
+    patch: |
+      - op: replace
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: Never
+  - target:
+      kind: CronJob
+      name: banking-payments-reconciliation
+    patch: |
+      - op: replace
+        path: /spec/jobTemplate/spec/template/spec/containers/0/imagePullPolicy
+        value: Never
+      - op: add
+        path: /spec/suspend
+        value: true
+  - patch: |
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: banking-payments-config
+      data:
+        CLEARING_SETTLEMENT_DELAY: PT20S
+        PAYMENTS_REPLY_TIMEOUT: PT50S
+        CLEARING_EXPORT_INTERVAL: "3000"
+        AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+        AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+  - target:
+      kind: Deployment
+      name: banking-gateway
+    patch: |
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: FAULT_INJECTION_RATE
+          value: "0"
+  - patch: |
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: banking-clearing-simulator
+      spec:
+        replicas: 0
