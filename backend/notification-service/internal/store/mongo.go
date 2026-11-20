@@ -3,6 +3,8 @@ package store
 import (
 	"context"
 	"fmt"
+	"slices"
+	"strconv"
 	"time"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -44,8 +46,10 @@ func NewMongoStore(ctx context.Context, uri, db, collection string) (*MongoStore
 		return nil, fmt.Errorf("create notification indexes: %w", err)
 	}
 	payments := client.Database(db).Collection(collection + "_payments")
-	if _, err := payments.Indexes().CreateOne(ctx, mongo.IndexModel{
-		Keys: bson.D{{Key: "eventid", Value: 1}}, Options: options.Index().SetUnique(true),
+	if _, err := payments.Indexes().CreateMany(ctx, []mongo.IndexModel{
+		{Keys: bson.D{{Key: "eventid", Value: 1}}, Options: options.Index().SetUnique(true)},
+		{Keys: bson.D{{Key: "userid", Value: 1}, {Key: "timestamp", Value: -1}}},
+		{Keys: bson.D{{Key: "timestamp", Value: -1}}},
 	}); err != nil {
 		_ = client.Disconnect(context.Background())
 		return nil, fmt.Errorf("create payment notification index: %w", err)
@@ -66,37 +70,35 @@ func (s *MongoStore) Insert(ctx context.Context, evt *consumer.TransactionEvent)
 }
 
 func (s *MongoStore) Latest(ctx context.Context, n int) ([]*consumer.TransactionEvent, error) {
-	opts := options.Find().
-		SetSort(bson.D{{Key: "timestamp", Value: -1}}).
-		SetLimit(int64(n))
-
-	cursor, err := s.coll.Find(ctx, bson.D{}, opts)
-	if err != nil {
-		return nil, err
-	}
-	defer cursor.Close(ctx)
-
-	var events []*consumer.TransactionEvent
-	if err := cursor.All(ctx, &events); err != nil {
-		return nil, err
-	}
-	return events, nil
+	return s.read(ctx, bson.D{}, n)
 }
 
 func (s *MongoStore) ForUser(ctx context.Context, userID string, n int) ([]*consumer.TransactionEvent, error) {
-	opts := options.Find().
-		SetSort(bson.D{{Key: "timestamp", Value: -1}}).
-		SetLimit(int64(n))
-
-	cursor, err := s.coll.Find(ctx, bson.D{{Key: "userid", Value: userID}}, opts)
-	if err != nil {
-		return nil, err
+	id, err := strconv.ParseInt(userID, 10, 64)
+	if err != nil || id <= 0 {
+		return nil, nil
 	}
-	defer cursor.Close(ctx)
+	return s.read(ctx, bson.D{{Key: "userid", Value: bson.D{{Key: "$in", Value: bson.A{id, userID}}}}}, n)
+}
 
-	var events []*consumer.TransactionEvent
-	if err := cursor.All(ctx, &events); err != nil {
-		return nil, err
+func (s *MongoStore) read(ctx context.Context, filter bson.D, n int) ([]*consumer.TransactionEvent, error) {
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	opts := options.Find().SetSort(bson.D{{Key: "timestamp", Value: -1}}).SetLimit(int64(n))
+	var combined []*consumer.TransactionEvent
+	for _, collection := range []*mongo.Collection{s.coll, s.payments} {
+		cursor, err := collection.Find(ctx, filter, opts)
+		if err != nil {
+			return nil, err
+		}
+		var events []*consumer.TransactionEvent
+		if err := cursor.All(ctx, &events); err != nil {
+			return nil, err
+		}
+		combined = append(combined, events...)
 	}
-	return events, nil
+	slices.SortStableFunc(combined, func(a, b *consumer.TransactionEvent) int {
+		return b.Timestamp.Compare(a.Timestamp)
+	})
+	return combined[:min(n, len(combined))], nil
 }

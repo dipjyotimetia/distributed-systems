@@ -47,7 +47,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:    ":" + port,
-		Handler: api.NewHandler(c.Buffer),
+		Handler: api.NewHandler(mongoStore),
 	}
 
 	go func() {

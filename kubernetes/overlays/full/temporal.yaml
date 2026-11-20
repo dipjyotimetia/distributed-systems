@@ -42,6 +42,8 @@ spec:
           env:
             - name: DB
               value: postgres12
+            - name: SKIP_DB_CREATE
+              value: "true"
             - name: POSTGRES_SEEDS
               value: banking-postgres
             - name: DB_PORT

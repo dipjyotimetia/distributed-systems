@@ -26,7 +26,7 @@ cleanup() {
   local status=$?
   if [[ "$status" != 0 ]]; then
     "${compose[@]}" ps -a || true
-    "${compose[@]}" logs --tail 40 frontend api-gateway user-service accounts-service transactions-service payments-service payments-worker clearing-simulator clearing-mq || true
+    "${compose[@]}" logs --tail 40 frontend api-gateway user-service accounts-service transactions-service payments-service payments-worker clearing-simulator clearing-mq notification-service redpanda || true
   fi
   "${compose[@]}" down --volumes --remove-orphans || true
   rm -f "$evidence"
