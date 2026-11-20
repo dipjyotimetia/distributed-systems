@@ -35,6 +35,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization');
+    const idempotencyKey = request.headers.get('idempotency-key');
     const body = await request.json();
     
     // transactions-service exposes POST /api/transactions/create (a type
@@ -44,6 +45,7 @@ export async function POST(request: NextRequest) {
       headers: {
         'Content-Type': 'application/json',
         ...(authHeader && { 'Authorization': authHeader }),
+        ...(idempotencyKey && { 'Idempotency-Key': idempotencyKey }),
       },
       body: JSON.stringify(body),
     });

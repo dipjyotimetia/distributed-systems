@@ -9,6 +9,7 @@ A Node.js application that continuously simulates realistic user interactions wi
 - **Realistic Workflows**: Mimics real user behavior with appropriate delays and actions
 - **Configurable Load**: Adjustable concurrent users, session duration, and transaction patterns
 - **OpenTelemetry Integration**: Full observability with distributed tracing
+- **Workflow mix**: A small share of sessions file a dispute, queue a statement job, and, when `PAYMENTS_ENABLED=true`, submit an outbound payment
 - **Kubernetes Ready**: Production-ready container with resource constraints
 - **Graceful Shutdown**: Proper signal handling and session cleanup
 

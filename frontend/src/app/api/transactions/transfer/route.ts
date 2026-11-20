@@ -8,6 +8,7 @@ const API_GATEWAY_URL = process.env.API_GATEWAY_URL || 'http://localhost:8080';
 export async function POST(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization');
+    const idempotencyKey = request.headers.get('idempotency-key');
     const body = await request.json();
 
     const response = await fetch(`${API_GATEWAY_URL}/api/transactions/transfer`, {
@@ -15,6 +16,7 @@ export async function POST(request: NextRequest) {
       headers: {
         'Content-Type': 'application/json',
         ...(authHeader && { 'Authorization': authHeader }),
+        ...(idempotencyKey && { 'Idempotency-Key': idempotencyKey }),
       },
       body: JSON.stringify(body),
     });

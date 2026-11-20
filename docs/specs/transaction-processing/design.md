@@ -1,6 +1,7 @@
 # Design — Transaction Processing
 
 > Historical specification. See the [current architecture](../../../architecture.md) and [project README](../../../README.md).
+> Ledger movements, idempotency keys, and the transaction event outbox are implemented. Fraud unavailability follows `fraud.fail-open`.
 
 `TransactionService` orchestrates fraud-service (gRPC), accounts-service (REST), its own
 Postgres schema, Kafka and the payment providers.
@@ -42,7 +43,7 @@ flowchart LR
 - `PaymentComplianceService` — JDK `HttpClient`, 5s timeouts: Stripe
   `POST /v1/payment_intents`, PayPal `POST /v2/checkout/orders`, ComplyAdvantage
   `POST ${payment.comply.base-url}/searches` (parses `total_matches`, `risk_level`).
-- `TransactionEventProducer` — Kafka (`${KAFKA_BROKERS}`), topic
+- `TransactionEventOutbox` — writes `transaction-events` in the ledger transaction, then publishes to Kafka (`${KAFKA_BROKERS}`)
   `${kafka.topic.transactions:transaction-events}`, JSON payload keyed by transaction id.
 
 ## Data

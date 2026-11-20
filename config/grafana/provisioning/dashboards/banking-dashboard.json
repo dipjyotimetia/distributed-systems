@@ -368,6 +368,38 @@
           "sort": "none"
         }
       }
+    },
+    {
+      "id": 6,
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 24 },
+      "type": "timeseries",
+      "title": "Unpublished outbox age",
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "expr": "transactions_outbox_oldest_seconds",
+          "legendFormat": "transaction events",
+          "refId": "A"
+        },
+        {
+          "expr": "max by (destination) (payments_outbox_oldest_seconds)",
+          "legendFormat": "payments {{destination}}",
+          "refId": "B"
+        },
+        {
+          "expr": "payments_reconciliation_discrepancies",
+          "legendFormat": "payment discrepancies",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      }
     }
   ],
   "schemaVersion": 37,

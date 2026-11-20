@@ -25,6 +25,8 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long>,
     
     Optional<Transaction> findByIdAndUserId(Long id, Long userId);
 
+    Optional<Transaction> findByUserIdAndIdempotencyKey(Long userId, String idempotencyKey);
+
     interface SummaryCount {
         Transaction.TransactionType getType();
         Transaction.TransactionStatus getStatus();

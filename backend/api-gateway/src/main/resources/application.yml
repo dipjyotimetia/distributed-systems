@@ -67,6 +67,11 @@ services:
   transactions-service:
     url: ${TRANSACTIONS_SERVICE_URL:http://localhost:8083}
 
+# Random gateway faults are off unless a demo sets FAULT_INJECTION_RATE above 0.
+fault:
+  injection:
+    rate: ${FAULT_INJECTION_RATE:0}
+
 # JWT Configuration
 jwt:
   secret: ${JWT_SECRET:banking-app-super-secret-key-change-this-in-production-256-bit}

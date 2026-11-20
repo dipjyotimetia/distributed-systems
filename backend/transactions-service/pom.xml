@@ -14,7 +14,7 @@
 
     <groupId>com.banking</groupId>
     <artifactId>transactions-service</artifactId>
-    <version>1.4.142</version>
+    <version>1.4.143</version>
     <packaging>jar</packaging>
 
     <name>transactions-service</name>
@@ -251,7 +251,7 @@
                         <version>${protobuf.version}</version>
                     </protoc>
                     <sourceDirectories>
-                        <sourceDirectory>src/main/proto</sourceDirectory>
+                        <sourceDirectory>${project.basedir}/../../proto/fraud</sourceDirectory>
                     </sourceDirectories>
                     <plugins>
                         <plugin kind="binary-maven">
