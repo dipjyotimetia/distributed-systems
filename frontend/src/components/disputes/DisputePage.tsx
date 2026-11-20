@@ -97,11 +97,12 @@ function Cases({ operations, transferId }: { operations: boolean; transferId?: n
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-5 px-4 py-8">
-      <h1 className="text-2xl font-semibold text-gray-900">{operations ? 'Dispute operations' : 'Transfer disputes'}</h1>
+    <div className="mx-auto max-w-3xl space-y-5">
+      <p className="text-xs font-medium uppercase tracking-[0.18em] text-brass">{operations ? 'Operations' : 'Disputes'}</p>
+      <h1 className="text-3xl font-semibold tracking-tight text-ink">{operations ? 'Dispute operations' : 'Transfer disputes'}</h1>
       {notice && <p role="status" className="text-green-800">{notice}</p>}
       {transferId && !filed && (
-        <section className="rounded-lg bg-white p-5 shadow">
+        <section className="rounded-3xl border border-line bg-surface p-5">
           <h2 className="font-semibold">Dispute transfer #{transferId}</h2>
           <DisputeForm label="Reason" limit={500} submitLabel="File dispute" onSubmit={async reason => {
             const dispute = await requestDisputes<Dispute>(prefix, { transferId, reason });
@@ -115,7 +116,7 @@ function Cases({ operations, transferId }: { operations: boolean; transferId?: n
       {error && <p role="alert" className="text-red-700">{error}</p>}
       {!loading && !error && items.length === 0 && <p>No disputes to display.</p>}
       {!loading && !error && items.map(item => (
-        <article key={item.id} className="space-y-2 rounded-lg bg-white p-5 shadow">
+        <article key={item.id} className="space-y-2 rounded-3xl border border-line bg-surface p-5">
           <h2 className="font-semibold">Dispute #{item.id} · Transfer #{item.transferId}</h2>
           <p>{item.status === 'OPEN' ? 'Open' : item.status === 'ESCALATED' ? 'Escalated' : 'Resolved'}</p>
           <p className="text-sm text-gray-700">Filed {new Date(item.createdAt).toLocaleString()}</p>

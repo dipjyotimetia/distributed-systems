@@ -61,17 +61,18 @@ const RegisterForm: React.FC = () => {
     <>
       <ToastContainer toasts={toasts} onRemoveToast={removeToast} />
       
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-md w-full space-y-8">
+      <div className="flex min-h-screen items-center justify-center bg-canvas px-4 py-12 sm:px-6">
+        <div className="w-full max-w-md space-y-8 rounded-3xl border border-line bg-surface p-6 shadow-sm sm:p-8">
           <div>
-            <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+            <p className="text-center text-xs font-medium uppercase tracking-[0.18em] text-brass">Apex Banking</p>
+            <h2 className="mt-3 text-center text-3xl font-semibold tracking-tight text-ink">
               Create your account
             </h2>
-            <p className="mt-2 text-center text-sm text-gray-600">
+            <p className="mt-2 text-center text-sm text-ink/70">
               Or{' '}
               <Link
                 href="/login"
-                className="font-medium text-blue-600 hover:text-blue-500"
+                className="font-medium text-brass hover:text-ink"
               >
                 sign in to your existing account
               </Link>
@@ -123,9 +124,9 @@ const RegisterForm: React.FC = () => {
                   id="seed-account-data"
                   type="checkbox"
                   {...register('seedAccountData')}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  className="h-4 w-4 rounded border-line text-ink focus:ring-brass"
                 />
-                <label htmlFor="seed-account-data" className="ml-2 block text-sm text-gray-900">
+                <label htmlFor="seed-account-data" className="ml-2 block text-sm text-ink">
                   Create sample accounts and transactions
                 </label>
               </div>
@@ -136,16 +137,16 @@ const RegisterForm: React.FC = () => {
                 id="agree-terms"
                 name="agree-terms"
                 type="checkbox"
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                className="h-4 w-4 rounded border-line text-ink focus:ring-brass"
                 required
               />
-              <label htmlFor="agree-terms" className="ml-2 block text-sm text-gray-900">
+              <label htmlFor="agree-terms" className="ml-2 block text-sm text-ink">
                 I agree to the{' '}
-                <a href="#" className="text-blue-600 hover:text-blue-500">
+                <a href="#" className="text-brass hover:text-ink">
                   Terms of Service
                 </a>{' '}
                 and{' '}
-                <a href="#" className="text-blue-600 hover:text-blue-500">
+                <a href="#" className="text-brass hover:text-ink">
                   Privacy Policy
                 </a>
               </label>

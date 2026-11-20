@@ -56,13 +56,13 @@ function Queue() {
   }
 
   return (
-    <section className="mx-auto max-w-6xl space-y-4 p-4 sm:p-8">
-      <h1 className="text-2xl font-semibold">Payment reconciliation</h1>
+    <section className="mx-auto max-w-6xl space-y-4">
+      <h1 className="text-3xl font-semibold tracking-tight text-ink">Payment reconciliation</h1>
       {error && <p role="alert" className="text-red-700">{error}</p>}
       {!error && !rows && <p role="status">Loading discrepancies…</p>}
       {rows?.length === 0 && <p role="status">No discrepancies on this page.</p>}
       {rows && rows.length > 0 && (
-        <ul className="divide-y divide-gray-200 rounded-lg border border-gray-200 bg-white">
+        <ul className="divide-y divide-line rounded-3xl border border-line bg-surface">
           {rows.map(row => (
             <li className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4" key={row.businessDate + '/' + row.recordNumber}>
               <div>

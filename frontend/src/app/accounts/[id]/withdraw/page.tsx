@@ -103,10 +103,10 @@ const WithdrawPage: React.FC = () => {
     return (
       <ProtectedRoute requireAuth={true}>
         <AuthenticatedLayout>
-          <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="min-h-screen flex items-center justify-center">
             <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-              <p className="mt-4 text-gray-600">Loading account details...</p>
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-ink mx-auto"></div>
+              <p className="mt-4 text-ink/70">Loading account details...</p>
             </div>
           </div>
         </AuthenticatedLayout>
@@ -118,15 +118,15 @@ const WithdrawPage: React.FC = () => {
     return (
       <ProtectedRoute requireAuth={true}>
         <AuthenticatedLayout>
-          <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="min-h-screen flex items-center justify-center">
             <div className="text-center">
               <div className="w-24 h-24 mx-auto mb-4 text-gray-400">
                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Account not found</h3>
-              <p className="text-gray-600 mb-4">
+              <h3 className="text-lg font-medium text-ink mb-2">Account not found</h3>
+              <p className="text-ink/70 mb-4">
                 The account you&apos;re looking for doesn&apos;t exist or you don&apos;t have permission to view it.
               </p>
               <Link href="/accounts">
@@ -144,14 +144,14 @@ const WithdrawPage: React.FC = () => {
   return (
     <ProtectedRoute requireAuth={true}>
       <AuthenticatedLayout>
-        <div className="max-w-2xl mx-auto py-6 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-2xl">
           <div className="px-4 py-6 sm:px-0">
             {/* Header */}
             <div className="mb-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <h1 className="text-3xl font-bold text-gray-900">Withdraw Funds</h1>
-                  <p className="mt-1 text-sm text-gray-600">
+                  <h1 className="text-3xl font-bold text-ink">Withdraw Funds</h1>
+                  <p className="mt-1 text-sm text-ink/70">
                     Withdraw funds from your {account?.accountType?.toLowerCase()} account
                   </p>
                 </div>
@@ -165,15 +165,15 @@ const WithdrawPage: React.FC = () => {
 
             {/* Account Summary */}
             {account && (
-              <div className="bg-white shadow rounded-lg p-6 mb-6">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Account Information</h3>
+              <div className="rounded-3xl border border-line bg-surface p-6 mb-6">
+                <h3 className="text-lg font-medium text-ink mb-4">Account Information</h3>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className="text-sm font-medium text-gray-600">Account Number</p>
-                    <p className="text-lg font-semibold text-gray-900">{account.accountNumber}</p>
+                    <p className="text-sm font-medium text-ink/70">Account Number</p>
+                    <p className="text-lg font-semibold text-ink">{account.accountNumber}</p>
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-gray-600">Available Balance</p>
+                    <p className="text-sm font-medium text-ink/70">Available Balance</p>
                     <p className="text-xl font-bold text-green-600">
                       {formatCurrency(account.balance, account.currency)}
                     </p>
@@ -204,9 +204,9 @@ const WithdrawPage: React.FC = () => {
             )}
 
             {/* Withdrawal Form */}
-            <div className="bg-white shadow rounded-lg">
+            <div className="rounded-3xl border border-line bg-surface">
               <div className="px-6 py-4 border-b border-gray-200">
-                <h3 className="text-lg font-medium text-gray-900">Withdrawal Details</h3>
+                <h3 className="text-lg font-medium text-ink">Withdrawal Details</h3>
               </div>
               <form onSubmit={handleSubmit} className="p-6 space-y-6">
                 {error && (

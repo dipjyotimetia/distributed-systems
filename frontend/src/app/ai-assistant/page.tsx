@@ -90,13 +90,14 @@ const AIAssistantPage: React.FC = () => {
   return (
     <ProtectedRoute requireAuth={true}>
       <AuthenticatedLayout>
-        <div className="max-w-5xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex flex-col" style={{ height: 'calc(100vh - 64px)' }}>
+        <div className="mx-auto flex max-w-5xl flex-col" style={{ height: 'calc(100vh - 7rem)' }}>
           <div className="mb-4">
-            <h1 className="text-2xl font-bold text-gray-900">AI Banking Assistant</h1>
-            <p className="text-sm text-gray-600">Ask a question — all configured LLM providers respond simultaneously</p>
+            <p className="text-xs font-medium uppercase tracking-[0.18em] text-brass">Assistant</p>
+            <h1 className="mt-1 text-3xl font-semibold tracking-tight text-ink">AI Banking Assistant</h1>
+            <p className="text-sm text-ink/70">Ask a question — all configured LLM providers respond simultaneously</p>
           </div>
 
-          <div className="flex-1 overflow-y-auto bg-white shadow rounded-lg p-4 mb-4 space-y-4">
+          <div className="mb-4 flex-1 space-y-4 overflow-y-auto rounded-3xl border border-line bg-surface p-4">
             {messages.length === 0 && (
               <div className="text-center text-gray-400 py-12">
                 <p className="text-lg font-medium mb-2">No messages yet</p>
@@ -108,7 +109,7 @@ const AIAssistantPage: React.FC = () => {
               <div key={i}>
                 {msg.role === 'user' ? (
                   <div className="flex justify-end">
-                    <div className="max-w-[75%] rounded-lg px-4 py-2 text-sm whitespace-pre-wrap bg-blue-600 text-white">
+                    <div className="max-w-[75%] whitespace-pre-wrap rounded-2xl bg-ink px-4 py-2 text-sm text-canvas">
                       {msg.content}
                     </div>
                   </div>
@@ -165,12 +166,12 @@ const AIAssistantPage: React.FC = () => {
               onKeyDown={handleKeyDown}
               placeholder="Ask a question..."
               disabled={isLoading}
-              className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50"
+              className="flex-1 rounded-full border border-line bg-surface px-4 py-2 text-sm text-ink focus:border-brass focus:outline-none focus:ring-2 focus:ring-brass disabled:bg-[#f6f1e6]"
             />
             <button
               onClick={sendMessage}
               disabled={isLoading || !input.trim()}
-              className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white px-6 py-2 rounded-lg text-sm font-medium transition-colors"
+              className="rounded-full bg-ink px-6 py-2 text-sm font-medium text-canvas transition-colors hover:bg-[#24362f] disabled:opacity-50"
             >
               Send
             </button>

@@ -136,10 +136,10 @@ const AccountDetailsPage: React.FC = () => {
     return (
       <ProtectedRoute requireAuth={true}>
         <AuthenticatedLayout>
-          <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="min-h-screen flex items-center justify-center">
             <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-              <p className="mt-4 text-gray-600">Loading account details...</p>
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-ink mx-auto"></div>
+              <p className="mt-4 text-ink/70">Loading account details...</p>
             </div>
           </div>
         </AuthenticatedLayout>
@@ -151,17 +151,17 @@ const AccountDetailsPage: React.FC = () => {
     return (
       <ProtectedRoute requireAuth={true}>
         <AuthenticatedLayout>
-          <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="min-h-screen flex items-center justify-center">
             <div className="text-center">
               <div className="w-24 h-24 mx-auto mb-4 text-gray-400">
                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
+              <h3 className="text-lg font-medium text-ink mb-2">
                 {error || 'Account not found'}
               </h3>
-              <p className="text-gray-600 mb-4">
+              <p className="text-ink/70 mb-4">
                 The account you&apos;re looking for doesn&apos;t exist or you don&apos;t have permission to view it.
               </p>
               <Link href="/accounts">
@@ -179,13 +179,13 @@ const AccountDetailsPage: React.FC = () => {
   return (
     <ProtectedRoute requireAuth={true}>
       <AuthenticatedLayout>
-        <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-6xl">
           <div className="px-4 py-6 sm:px-0">
             <div className="mb-6">
               <div className="flex justify-between items-center">
                 <div>
-                  <h1 className="text-3xl font-bold text-gray-900">Account Details</h1>
-                  <p className="mt-1 text-sm text-gray-600">
+                  <h1 className="text-3xl font-bold text-ink">Account Details</h1>
+                  <p className="mt-1 text-sm text-ink/70">
                     {account.accountType.charAt(0).toUpperCase() + account.accountType.slice(1).toLowerCase()} Account
                   </p>
                 </div>
@@ -206,26 +206,26 @@ const AccountDetailsPage: React.FC = () => {
             </div>
 
             {/* Account Summary Card */}
-            <div className="bg-white shadow rounded-lg p-6 mb-6">
+            <div className="rounded-3xl border border-line bg-surface p-6 mb-6">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Account Number</p>
-                  <p className="text-lg font-semibold text-gray-900">{account.accountNumber}</p>
+                  <p className="text-sm font-medium text-ink/70">Account Number</p>
+                  <p className="text-lg font-semibold text-ink">{account.accountNumber}</p>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Current Balance</p>
-                  <p className="text-2xl font-bold text-green-600">
+                  <p className="text-sm font-medium text-ink/70">Current Balance</p>
+                  <p className="money text-4xl font-semibold text-ink">
                     {formatCurrency(account.balance, account.currency)}
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Account Type</p>
-                  <p className="text-lg font-semibold text-gray-900">
+                  <p className="text-sm font-medium text-ink/70">Account Type</p>
+                  <p className="text-lg font-semibold text-ink">
                     {account.accountType.charAt(0).toUpperCase() + account.accountType.slice(1).toLowerCase()}
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Status</p>
+                  <p className="text-sm font-medium text-ink/70">Status</p>
                   <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
                     account.status === 'ACTIVE' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                   }`}>
@@ -233,8 +233,8 @@ const AccountDetailsPage: React.FC = () => {
                   </span>
                 </div>
               </div>
-              <div className="mt-4 pt-4 border-t border-gray-200">
-                <div className="flex justify-between text-sm text-gray-600">
+              <div className="mt-4 pt-4 border-t border-line">
+                <div className="flex justify-between text-sm text-ink/70">
                   <span>Account opened: {formatDate(account.createdAt)}</span>
                   <span>Last updated: {formatDate(account.updatedAt)}</span>
                 </div>
@@ -244,8 +244,8 @@ const AccountDetailsPage: React.FC = () => {
             <StatementJobs key={account.id} accountId={account.id} />
 
             {/* Quick Actions */}
-            <div className="bg-white shadow rounded-lg p-6 mb-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Quick Actions</h3>
+            <div className="rounded-3xl border border-line bg-surface p-6 mb-6">
+              <h3 className="text-lg font-medium text-ink mb-4">Quick Actions</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Button
                   variant="outline"
@@ -281,10 +281,10 @@ const AccountDetailsPage: React.FC = () => {
             </div>
 
             {/* Recent Transactions */}
-            <div className="bg-white shadow rounded-lg">
-              <div className="px-6 py-4 border-b border-gray-200">
+            <div className="rounded-3xl border border-line bg-surface">
+              <div className="px-6 py-4 border-b border-line">
                 <div className="flex justify-between items-center">
-                  <h3 className="text-lg font-medium text-gray-900">Recent Transactions</h3>
+                  <h3 className="text-lg font-medium text-ink">Recent Transactions</h3>
                   <Link href={`/transactions?accountId=${account.id}`}>
                     <Button variant="outline" size="sm">
                       View All
@@ -295,8 +295,8 @@ const AccountDetailsPage: React.FC = () => {
 
               {transactionsLoading ? (
                 <div className="px-6 py-12 text-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                  <p className="mt-4 text-gray-600">Loading transactions...</p>
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-ink mx-auto"></div>
+                  <p className="mt-4 text-ink/70">Loading transactions...</p>
                 </div>
               ) : transactions.length === 0 ? (
                 <div className="px-6 py-12 text-center">
@@ -305,8 +305,8 @@ const AccountDetailsPage: React.FC = () => {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
                   </div>
-                  <h4 className="text-lg font-medium text-gray-900 mb-2">No transactions yet</h4>
-                  <p className="text-gray-600 mb-4">This account has no transaction history.</p>
+                  <h4 className="text-lg font-medium text-ink mb-2">No transactions yet</h4>
+                  <p className="text-ink/70 mb-4">This account has no transaction history.</p>
                   <Button
                     variant="primary"
                     onClick={() => router.push(`/accounts/${account.id}/transactions/new`)}
@@ -323,7 +323,7 @@ const AccountDetailsPage: React.FC = () => {
                           {getTransactionIcon(transaction.type)}
                           <div className="ml-4">
                             <div className="flex items-center">
-                              <p className="text-sm font-medium text-gray-900">
+                              <p className="text-sm font-medium text-ink">
                                 {transaction.description}
                               </p>
                               <div className="ml-2">
@@ -338,10 +338,10 @@ const AccountDetailsPage: React.FC = () => {
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className={`text-lg font-semibold ${
-                            transaction.type === 'DEPOSIT' ? 'text-green-600' : 
-                            transaction.type === 'WITHDRAWAL' ? 'text-red-600' : 
-                            'text-blue-600'
+                          <p className={`money text-lg font-semibold ${
+                            transaction.type === 'DEPOSIT' ? 'text-emerald-700' : 
+                            transaction.type === 'WITHDRAWAL' ? 'text-red-700' : 
+                            'text-ink'
                           }`}>
                             {transaction.type === 'DEPOSIT' ? '+' : '-'}
                             {formatCurrency(transaction.amount)}
@@ -351,7 +351,7 @@ const AccountDetailsPage: React.FC = () => {
                     </div>
                   ))}
                   {transactions.length > 5 && (
-                    <div className="px-6 py-4 bg-gray-50 text-center">
+                    <div className="bg-[#f6f1e6] px-6 py-4 text-center">
                       <Link href={`/transactions?accountId=${account.id}`}>
                         <Button variant="outline" size="sm">
                           View {transactions.length - 5} more transactions

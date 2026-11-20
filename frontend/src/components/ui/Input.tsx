@@ -16,8 +16,8 @@ const Input = forwardRef<HTMLInputElement, InputProps>(({
   id,
   ...props
 }, ref) => {
-  const baseStyles = 'block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-gray-900 bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors';
-  const errorStyles = error ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : '';
+  const baseStyles = 'block w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-ink shadow-sm placeholder:text-ink/40 focus:border-brass focus:outline-none focus:ring-2 focus:ring-brass transition-colors';
+  const errorStyles = error ? 'border-red-400 focus:ring-red-500 focus:border-red-500' : '';
   const combinedClassName = `${baseStyles} ${errorStyles} ${className}`;
   const generatedId = useId();
   const inputId = id || generatedId;
@@ -25,7 +25,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(({
   return (
     <div className="space-y-1">
       {label && (
-        <label htmlFor={inputId} className="block text-sm font-medium text-gray-700">
+        <label htmlFor={inputId} className="block text-sm font-medium text-ink">
           {label}
         </label>
       )}

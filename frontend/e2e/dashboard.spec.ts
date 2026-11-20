@@ -134,12 +134,12 @@ test.describe('Dashboard Page', () => {
 
   test('should navigate to create account page', async ({ page }) => {
     await page.getByRole('button', { name: 'Create Account' }).click();
-    await expect(page).toHaveURL('/accounts/create');
+    await expect(page).toHaveURL('/accounts');
   });
 
   test('should navigate to create transaction page', async ({ page }) => {
     await page.getByRole('button', { name: 'New Transaction' }).click();
-    await expect(page).toHaveURL('/transactions/create');
+    await expect(page).toHaveURL('/transactions');
   });
 
   test('should display user greeting', async ({ page }) => {

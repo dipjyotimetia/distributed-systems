@@ -9,13 +9,15 @@ interface AuthenticatedLayoutProps {
 
 const AuthenticatedLayout: React.FC<AuthenticatedLayoutProps> = ({ children }) => {
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-canvas text-ink">
       <Header />
-      <main className="pt-0">
-        {children}
-      </main>
+      <div className="lg:pl-72">
+        <main className="min-h-screen px-4 pb-10 pt-20 sm:px-6 lg:px-8 lg:pt-8">
+          {children}
+        </main>
+      </div>
     </div>
   );
 };
 
-export default AuthenticatedLayout; 
+export default AuthenticatedLayout;

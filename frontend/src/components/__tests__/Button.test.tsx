@@ -11,25 +11,25 @@ describe('Button Component', () => {
   it('renders with primary variant by default', () => {
     render(<Button>Primary</Button>)
     const button = screen.getByRole('button')
-    expect(button).toHaveClass('bg-blue-600', 'text-white')
+    expect(button).toHaveClass('bg-ink', 'text-canvas')
   })
 
   it('renders with secondary variant', () => {
     render(<Button variant="secondary">Secondary</Button>)
     const button = screen.getByRole('button')
-    expect(button).toHaveClass('bg-gray-600', 'text-white')
+    expect(button).toHaveClass('bg-[#d7b56a]', 'text-ink')
   })
 
   it('renders with outline variant', () => {
     render(<Button variant="outline">Outline</Button>)
     const button = screen.getByRole('button')
-    expect(button).toHaveClass('border', 'border-gray-300', 'bg-white', 'text-gray-700')
+    expect(button).toHaveClass('border', 'border-line', 'bg-surface', 'text-ink')
   })
 
   it('renders with ghost variant', () => {
     render(<Button variant="ghost">Ghost</Button>)
     const button = screen.getByRole('button')
-    expect(button).toHaveClass('text-gray-700')
+    expect(button).toHaveClass('text-ink')
   })
 
   it('renders with small size', () => {

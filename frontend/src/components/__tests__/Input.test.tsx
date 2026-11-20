@@ -37,13 +37,13 @@ describe('Input Component', () => {
   it('applies error styling when error is present', () => {
     render(<Input error="Error message" />)
     const input = screen.getByRole('textbox')
-    expect(input).toHaveClass('border-red-300', 'focus:ring-red-500', 'focus:border-red-500')
+    expect(input).toHaveClass('border-red-400', 'focus:ring-red-500', 'focus:border-red-500')
   })
 
   it('applies default styling when no error', () => {
     render(<Input />)
     const input = screen.getByRole('textbox')
-    expect(input).toHaveClass('border-gray-300', 'focus:ring-blue-500', 'focus:border-blue-500')
+    expect(input).toHaveClass('border-line', 'focus:ring-brass', 'focus:border-brass')
   })
 
   it('handles value changes', () => {

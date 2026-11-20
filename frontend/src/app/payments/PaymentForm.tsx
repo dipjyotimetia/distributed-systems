@@ -7,7 +7,7 @@ import Button from '@/components/ui/Button';
 import { AccountsAPI, type Account } from '@/lib/api/accounts';
 
 type Payment = { id: string; status: string; clearingReference?: string; settlementBusinessDate?: string };
-const inputClass = 'mt-1 block w-full rounded-md border border-gray-400 p-2 text-gray-900';
+const inputClass = 'mt-1 block w-full rounded-xl border border-line bg-surface p-2.5 text-ink focus:border-brass focus:outline-none focus:ring-2 focus:ring-brass';
 
 function Form() {
   const retry = useRef<{ body: string; key: string } | null>(null);
@@ -73,8 +73,9 @@ function Form() {
   }
 
   return (
-    <section className="mx-auto max-w-xl space-y-5 p-4 sm:p-8">
-      <h1 className="text-2xl font-semibold">Outbound payment</h1>
+    <section className="mx-auto max-w-xl space-y-5 rounded-3xl border border-line bg-surface p-5 sm:p-8">
+      <p className="text-xs font-medium uppercase tracking-[0.18em] text-brass">Payments</p>
+      <h1 className="text-3xl font-semibold tracking-tight text-ink">Outbound payment</h1>
       <form className="space-y-4" onSubmit={submit}>
         <label className="block">Source account
           <select className={inputClass} name="account" required defaultValue="" disabled={!accounts?.length}>

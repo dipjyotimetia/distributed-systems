@@ -7,6 +7,7 @@ import Header from '@/components/layout/Header';
 // Mock Next.js router
 jest.mock('next/navigation', () => ({
   useRouter: jest.fn(),
+  usePathname: jest.fn(() => '/dashboard'),
 }));
 
 // Mock auth context
@@ -56,10 +57,10 @@ describe('Header', () => {
     render(<Header />);
 
     expect(screen.getByText('Apex Banking')).toBeInTheDocument();
-    expect(screen.getAllByText('Dashboard')).toHaveLength(2);
-    expect(screen.getAllByText('Accounts')).toHaveLength(2);
-    expect(screen.getAllByText('Transactions')).toHaveLength(2);
-    expect(screen.getAllByText('Profile')).toHaveLength(2);
+    expect(screen.getByRole('link', { name: 'Dashboard' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Accounts' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Transactions' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Profile' })).toBeInTheDocument();
     expect(screen.getByText('Logout')).toBeInTheDocument();
   });
 
@@ -110,15 +111,15 @@ describe('Header', () => {
 
     render(<Header />);
 
-    const dashboardLinks = screen.getAllByRole('link', { name: /dashboard/i });
-    const accountsLinks = screen.getAllByRole('link', { name: /accounts/i });
-    const transactionsLinks = screen.getAllByRole('link', { name: /transactions/i });
-    const profileLinks = screen.getAllByRole('link', { name: /profile/i });
+    const dashboardLink = screen.getByRole('link', { name: 'Dashboard' });
+    const accountsLink = screen.getByRole('link', { name: 'Accounts' });
+    const transactionsLink = screen.getByRole('link', { name: 'Transactions' });
+    const profileLink = screen.getByRole('link', { name: 'Profile' });
 
-    expect(dashboardLinks[0]).toHaveAttribute('href', '/dashboard');
-    expect(accountsLinks[0]).toHaveAttribute('href', '/accounts');
-    expect(transactionsLinks[0]).toHaveAttribute('href', '/transactions');
-    expect(profileLinks[0]).toHaveAttribute('href', '/profile');
+    expect(dashboardLink).toHaveAttribute('href', '/dashboard');
+    expect(accountsLink).toHaveAttribute('href', '/accounts');
+    expect(transactionsLink).toHaveAttribute('href', '/transactions');
+    expect(profileLink).toHaveAttribute('href', '/profile');
   });
 
   it('renders mobile navigation menu', () => {
@@ -129,9 +130,8 @@ describe('Header', () => {
 
     render(<Header />);
 
-    // Mobile navigation should be present but hidden on desktop
-    const mobileNav = screen.getAllByText('Dashboard')[1].closest('.md\\:hidden');
-    expect(mobileNav).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Menu' })).toHaveAttribute('aria-controls', 'app-nav');
+    expect(screen.getByRole('link', { name: 'Dashboard' })).toBeInTheDocument();
   });
 
   it('renders logo icon', () => {
