@@ -1,6 +1,6 @@
 # Add a service
 
-Use this when the playground needs another backend. Keep cards, KYC, and service-to-service mTLS out of the demo until a specific story needs them.
+Use this when the playground needs another backend. Cards and KYC are Go gRPC services. Their mutual TLS overlay is `docker-compose.mtls.yml`.
 
 ## 1. Code and contract
 
@@ -9,14 +9,14 @@ Put the service in `backend/<name>-service`. Java services get their own `pom.xm
 Publish the API before the handlers:
 
 - HTTP: an OpenAPI file next to the service, following `backend/accounts-service/openapi.yml` and `backend/transactions-service/openapi.yml`.
-- gRPC: one protobuf file. Fraud is `proto/fraud/fraud.proto`. `transactions-service` and `payments-service` compile that file, so their image builds use the repository root as the Docker context. The checked-in Go stubs under `backend/fraud-service/gen` come from the same file; regenerate them when the messages change.
+- gRPC: one protobuf file under `proto/`. That directory is the only contract. Fraud is `proto/fraud/fraud.proto`, KYC is `proto/kyc/kyc.proto`, and cards is `proto/cards/cards.proto`. `transactions-service` and `payments-service` compile the fraud file, so their image builds use the repository root as the Docker context. The checked-in Go stubs under `backend/fraud-service/gen` come from the same file. The frontend checks in Buf TypeScript under `frontend/src/gen`, produced by `scripts/frontend-proto.sh` (Buf 1.75.0 and `protoc-gen-es` 2.16.0). Regenerate the stubs in the same change as the proto.
 - Kafka: document the JSON fields next to the producer. `transaction-events` is written by `TransactionEventOutbox` and read by `notification-service`.
 
 ## 2. Identity
 
 Every service except `user-service` checks the caller JWT. Copy the filter style in `backend/accounts-service` or `backend/transactions-service`: read `Authorization: Bearer`, verify the shared HMAC secret, and take the user id from the token. Do not trust a user id in the body.
 
-The Next.js frontend is the browser's API. Add a route under `frontend/src/app/api` that calls `API_GATEWAY_URL` and forwards `Authorization`, `Idempotency-Key`, and `traceparent`. Then add the gateway route in `GatewayConfig`.
+The Next.js frontend is the browser's API. For an HTTP service, add a route under `frontend/src/app/api` that calls `API_GATEWAY_URL` and forwards `Authorization`, `Idempotency-Key`, and `traceparent`. Then add the gateway route in `GatewayConfig`. KYC and cards routes call the generated gRPC clients in `frontend/src/lib/grpc/banking.ts` and forward `Authorization` as gRPC metadata.
 
 ## 3. Data
 

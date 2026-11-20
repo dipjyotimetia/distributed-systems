@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: banking-cards
+  namespace: banking-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: banking-cards
+  template:
+    metadata:
+      labels:
+        app: banking-cards
+        app.kubernetes.io/service: cards-service
+    spec:
+      serviceAccountName: banking-app-sa
+      containers:
+      - name: cards-service
+        image: ghcr.io/dipjyotimetia/distributed-systems/cards-service:v1.4.139
+        ports:
+        - containerPort: 8092
+          name: grpc
+        - containerPort: 9093
+          name: metrics
+        env:
+        - name: GRPC_PORT
+          value: "8092"
+        - name: METRICS_PORT
+          value: "9093"
+        - name: DATABASE_URL
+          value: postgres://postgres:password@banking-postgres:5432/banking_app?sslmode=disable
+        - name: ACCOUNTS_SERVICE_URL
+          value: http://banking-accounts:8080
+        - name: KYC_GRPC_ADDR
+          value: banking-kyc:8091
+        - name: FRAUD_GRPC_ADDR
+          value: banking-fraud:8080
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: banking-jwt-secret
+              key: secret
+        - name: MOVEMENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: banking-jwt-secret
+              key: secret

@@ -18,8 +18,23 @@ jobs:
           go install github.com/bufbuild/buf/cmd/buf@v1.75.0
           go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.12
           go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.2
-          curl -fsSL https://repo.maven.apache.org/maven2/com/google/protobuf/protoc/4.36.2/protoc-4.36.2-linux-x86_64.exe -o "$(go env GOPATH)/bin/protoc"
-          chmod +x "$(go env GOPATH)/bin/protoc"
+          protoc_dest="$(go env GOPATH)/bin/protoc"
+          urls=(
+            https://repo1.maven.org/maven2/com/google/protobuf/protoc/4.36.2/protoc-4.36.2-linux-x86_64.exe
+            https://repo.maven.apache.org/maven2/com/google/protobuf/protoc/4.36.2/protoc-4.36.2-linux-x86_64.exe
+          )
+          downloaded=0
+          for attempt in 1 2 3 4 5; do
+            for url in "${urls[@]}"; do
+              if curl -fsSL --retry 3 --retry-all-errors "$url" -o "$protoc_dest"; then
+                downloaded=1
+                break 2
+              fi
+            done
+            sleep "$attempt"
+          done
+          test "$downloaded" -eq 1
+          chmod +x "$protoc_dest"
           go env GOPATH | sed 's|$|/bin|' >> "$GITHUB_PATH"
       - name: Verify generated bindings
         run: |
@@ -38,6 +53,19 @@ jobs:
             --go-grpc_out="$generated" --go-grpc_opt=module="$module" \
             proto/fraud/fraud.proto
           diff -ru backend/fraud-service/gen "$generated/gen"
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: '26.13.1'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install frontend protobuf plugin
+        working-directory: frontend
+        run: npm ci
+      - name: Verify frontend gRPC clients
+        run: |
+          generated="$(mktemp -d)"
+          bash scripts/frontend-proto.sh "$generated"
+          diff -ru frontend/src/gen "$generated/frontend/src/gen"
       - name: Check compatibility with PR base
         if: github.event_name == 'pull_request'
         env:
