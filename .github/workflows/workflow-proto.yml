@@ -18,22 +18,33 @@ jobs:
           go install github.com/bufbuild/buf/cmd/buf@v1.75.0
           go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.12
           go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.2
+          case "$(uname -m)" in
+            aarch64|arm64) arch=aarch_64 ;;
+            *) arch=x86_64 ;;
+          esac
           protoc_dest="$(go env GOPATH)/bin/protoc"
           urls=(
-            https://repo1.maven.org/maven2/com/google/protobuf/protoc/4.36.2/protoc-4.36.2-linux-x86_64.exe
-            https://repo.maven.apache.org/maven2/com/google/protobuf/protoc/4.36.2/protoc-4.36.2-linux-x86_64.exe
+            "https://repo1.maven.org/maven2/com/google/protobuf/protoc/4.36.2/protoc-4.36.2-linux-${arch}.exe"
+            "https://repo.maven.apache.org/maven2/com/google/protobuf/protoc/4.36.2/protoc-4.36.2-linux-${arch}.exe"
           )
           downloaded=0
-          for attempt in 1 2 3 4 5; do
+          for attempt in 1 2 3; do
             for url in "${urls[@]}"; do
-              if curl -fsSL --retry 3 --retry-all-errors "$url" -o "$protoc_dest"; then
+              if curl -fsSL --retry 2 --retry-all-errors "$url" -o "$protoc_dest"; then
                 downloaded=1
                 break 2
               fi
+              echo "protoc download failed: $url" >&2
             done
             sleep "$attempt"
           done
-          test "$downloaded" -eq 1
+          if [ "$downloaded" -ne 1 ]; then
+            zip="$(mktemp)"
+            gh_url="https://github.com/protocolbuffers/protobuf/releases/download/v36.2/protoc-36.2-linux-${arch}.zip"
+            curl -fsSL --retry 3 --retry-all-errors "$gh_url" -o "$zip"
+            unzip -p "$zip" bin/protoc > "$protoc_dest"
+            rm -f "$zip"
+          fi
           chmod +x "$protoc_dest"
           go env GOPATH | sed 's|$|/bin|' >> "$GITHUB_PATH"
       - name: Verify generated bindings
