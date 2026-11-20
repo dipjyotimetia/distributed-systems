@@ -1,5 +1,7 @@
 buildscript {
-    repositories { mavenCentral() }
+    repositories {
+        mavenCentral()
+    }
     dependencies {
         classpath("org.flywaydb:flyway-database-postgresql:12.4.0")
         classpath("org.postgresql:postgresql:42.7.14")
@@ -14,10 +16,6 @@ plugins {
 }
 
 subprojects {
-    repositories {
-        mavenCentral()
-    }
-
     plugins.withType<JavaPlugin> {
         extensions.configure<JavaPluginExtension> {
             toolchain.languageVersion.set(JavaLanguageVersion.of(25))

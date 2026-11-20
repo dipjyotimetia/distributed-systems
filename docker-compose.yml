@@ -180,7 +180,9 @@ services:
       - banking-network
 
   statement-worker:
-    build: ./backend/accounts-service
+    build:
+      context: .
+      dockerfile: backend/accounts-service/Dockerfile
     depends_on:
       accounts-service:
         condition: service_started

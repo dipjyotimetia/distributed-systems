@@ -95,12 +95,7 @@ jobs:
         with:
           go-version-file: tests/integration/temporal/go.mod
           cache: false
-      - name: Create Kind cluster
-        run: |
-          go install sigs.k8s.io/kind@v0.33.0
-          "$(go env GOPATH)/bin/kind" create cluster --name banking-journeys --wait 120s
-          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
-      - name: Build and load the services used by the smoke test
+      - name: Build the services used by the smoke test
         run: |
           for service in api-gateway accounts-service user-service transactions-service fraud-service notification-service ai-service disputes-service; do
             image="microsvc-journeys/$service:checkout"
@@ -110,11 +105,19 @@ jobs:
               sleep 5
               docker build -t "$image" "${args[@]}"
             fi
-            kind load docker-image "$image" --name banking-journeys
           done
           docker build -t microsvc-journeys/frontend:checkout frontend
-          kind load docker-image microsvc-journeys/frontend:checkout --name banking-journeys
           docker build -f tests/integration/temporal/stack/Dockerfile -t microsvc-journeys/provider-fixtures:checkout .
+      - name: Create Kind cluster
+        run: |
+          go install sigs.k8s.io/kind@v0.33.0
+          "$(go env GOPATH)/bin/kind" create cluster --name banking-journeys --wait 120s
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+      - name: Load the services used by the smoke test
+        run: |
+          for service in api-gateway accounts-service user-service transactions-service fraud-service notification-service ai-service disputes-service frontend; do
+            kind load docker-image "microsvc-journeys/$service:checkout" --name banking-journeys
+          done
           kind load docker-image microsvc-journeys/provider-fixtures:checkout --name banking-journeys
       - name: Deploy and check smoke and trace propagation
         run: |

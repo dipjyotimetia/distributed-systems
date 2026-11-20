@@ -2,14 +2,14 @@
 FROM --platform=$BUILDPLATFORM amazoncorretto:25 AS builder
 RUN yum install -y findutils && yum clean all
 WORKDIR /app
-COPY gradlew settings.gradle.kts build.gradle.kts ./
+COPY gradlew settings.gradle.kts build.gradle.kts gradle.properties ./
 COPY gradle/ gradle/
 COPY backend/accounts-service/build.gradle.kts backend/accounts-service/gradle.properties backend/accounts-service/
 COPY backend/api-gateway/build.gradle.kts backend/api-gateway/gradle.properties backend/api-gateway/
 COPY backend/payments-service/build.gradle.kts backend/payments-service/gradle.properties backend/payments-service/
 COPY backend/transactions-service/build.gradle.kts backend/transactions-service/gradle.properties backend/transactions-service/
 COPY backend/accounts-service/src backend/accounts-service/src
-RUN --mount=type=cache,target=/root/.gradle,sharing=locked ./gradlew --no-daemon :accounts-service:bootJar
+RUN --mount=type=cache,id=gradle-accounts-service,target=/root/.gradle,sharing=locked ./gradlew --no-daemon :accounts-service:bootJar
 RUN java -Djarmode=tools -jar backend/accounts-service/build/libs/application.jar extract --layers --destination extracted
 
 FROM --platform=$TARGETPLATFORM amazoncorretto:25-alpine@sha256:1124f698f69d2185828dbd1a1ebeb9aee21884ac64bed7af3deeafd20b21a9dc
