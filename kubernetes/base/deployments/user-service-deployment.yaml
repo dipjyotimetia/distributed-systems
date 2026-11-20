@@ -71,5 +71,5 @@ spec:
           failureThreshold: 3
       initContainers:
       - name: wait-for-postgres
-        image: postgres:18.7-alpine
+        image: postgres:19.0-alpine
         command: ['sh', '-c', 'echo "[user-service] Waiting for PostgreSQL..."; until pg_isready -h banking-postgres -p 5432 -q; do sleep 1; done; echo "[user-service] PostgreSQL ready!"']

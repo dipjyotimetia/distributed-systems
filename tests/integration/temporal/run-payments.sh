@@ -85,7 +85,7 @@ MICROSVC_PAYMENT_FIXTURES="$fixtures" python3 tests/integration/temporal/payment
 export PAYMENTS_TEST_MQ_ADDRESS
 mq_port="$("${compose[@]}" port clearing-mq 61616)"
 PAYMENTS_TEST_MQ_ADDRESS="tcp://127.0.0.1:${mq_port##*:}"
-backend/accounts-service/mvnw -B -f backend/payments-service/pom.xml -Dtest=MqClearingRecoveryTest test
+./gradlew :payments-service:test --tests "*MqClearingRecoveryTest"
 
 inbox="$("${compose[@]}" exec -T payments-postgres psql -At -U payments -d payments \
   -v ON_ERROR_STOP=1 -c "SELECT count(*) FROM payments.clearing_inbox WHERE payment_id = '$payment_id' AND kind = 'SETTLED'")"

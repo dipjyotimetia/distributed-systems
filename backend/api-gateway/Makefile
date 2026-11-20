@@ -23,19 +23,19 @@ help:
 .PHONY: build
 build:
 	@echo "Building $(SERVICE_NAME)..."
-	./mvnw clean package -DskipTests
+	../../gradlew -p ../.. :api-gateway:clean :api-gateway:bootJar
 
 # Run target
 .PHONY: run
 run:
 	@echo "Running $(SERVICE_NAME) on port $(SERVICE_PORT)..."
-	java -jar target/api-gateway-1.0.0.jar
+	java -jar build/libs/application.jar
 
 # Test target
 .PHONY: test
 test:
 	@echo "Running tests for $(SERVICE_NAME)..."
-	./mvnw test
+	../../gradlew -p ../.. :api-gateway:test
 
 # proxymock replay: externalized integration tests driven by the checked-in golden
 # snapshot (proxymock/recorded-golden). Builds the gateway, runs it behind `proxymock mock`,
@@ -70,4 +70,4 @@ proxymock-prepare-golden:
 .PHONY: clean
 clean:
 	@echo "Cleaning $(SERVICE_NAME)..."
-	./mvnw clean
+	../../gradlew -p ../.. :api-gateway:clean

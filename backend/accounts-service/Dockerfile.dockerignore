@@ -1,0 +1,9 @@
+**
+!gradlew
+!settings.gradle.kts
+!build.gradle.kts
+!gradle.properties
+!gradle/**
+!backend/*/build.gradle.kts
+!backend/*/gradle.properties
+!backend/accounts-service/src/**

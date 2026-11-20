@@ -1,12 +1,12 @@
 services:
   payments-postgres:
-    image: postgres:18.7-alpine
+    image: postgres:19.0-alpine
     environment:
       POSTGRES_DB: payments
       POSTGRES_USER: payments
       POSTGRES_PASSWORD: ${BANKING_PAYMENTS_DB_PASSWORD:?Set the payments database password}
     volumes:
-      - payments_postgres_data:/var/lib/postgresql
+      - payments_postgres_data_19:/var/lib/postgresql
     networks: [banking-network]
     healthcheck:
       test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "payments", "-d", "payments"]
@@ -120,5 +120,5 @@ services:
       OUTBOUND_PAYMENTS_ENABLED: "true"
 
 volumes:
-  payments_postgres_data:
+  payments_postgres_data_19:
   payments_redpanda_data:

@@ -32,9 +32,9 @@ This project follows a phased implementation approach. Each phase must be comple
 ## Key Commands Reference
 
 **Start development environment**: `docker-compose up -d`  
-**Build service**: `./mvnw clean package` (from service directory)  
-**Run tests**: `./mvnw test` (backend) or `npm test` (frontend)  
-**Database migrations**: `./mvnw flyway:migrate`
+**Build service**: `../../gradlew -p ../.. clean bootJar` (from service directory)
+**Run tests**: `../../gradlew -p ../.. test` (backend) or `npm test` (frontend)
+**Database migrations**: `../../gradlew -p ../.. :accounts-service:flywayMigrate`
 
 ## Implementation Guidelines
 
@@ -51,13 +51,13 @@ The project uses a two-tier versioning model:
 
 **Global version** — stored in the root `VERSION` file (e.g. `1.4.1`). This is the canonical source of truth for Docker image tags and all non-Java package versions.
 
-**Per-service version** — each Java backend service tracks its own `<version>` in `backend/<service>/pom.xml`.
+**Per-service version** — each Java backend service tracks its own `serviceVersion` in `backend/<service>/gradle.properties`.
 
 ### Rules for agents and developers
 
 | File | Who bumps it? | When? |
 |------|--------------|-------|
-| `backend/<service>/pom.xml` | Agent / developer | Required in any PR that modifies code under `backend/<service>/` |
+| `backend/<service>/gradle.properties` | Agent / developer | Required in any PR that modifies code under `backend/<service>/` |
 | `VERSION` | Agent / developer | When a global release version change is needed (e.g. a minor or major bump) |
 | `frontend/package.json` | **CI only — do not touch** | Auto-synced from `VERSION` on every merge to `master` |
 | `simulation-client/package.json` | **CI only — do not touch** | Auto-synced from `VERSION` on every merge to `master` |
@@ -72,7 +72,7 @@ The `update-k8s-manifests` CI job runs `make update-frontend-version` followed b
 
 **Do NOT manually bump `frontend/package.json` or `simulation-client/package.json`.** Doing so creates merge conflicts across concurrent branches because multiple agents will all bump from the same base version independently. Let CI handle it.
 
-Docs-only or infra-only changes can skip a `pom.xml` version bump. CI is the final enforcement gate.
+Docs-only or infra-only changes can skip a `gradle.properties` version bump. CI is the final enforcement gate.
 
 ## Current Status
 

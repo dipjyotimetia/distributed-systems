@@ -4,7 +4,7 @@ Use this when the playground needs another backend. Cards and KYC are Go gRPC se
 
 ## 1. Code and contract
 
-Put the service in `backend/<name>-service`. Java services get their own `pom.xml` version bump in the same change. Do not edit `frontend/package.json`, `simulation-client/package.json`, or Kubernetes image tags by hand. CI syncs those from `VERSION` on merge to `master`.
+Put the service in `backend/<name>-service`. Register Java services in `settings.gradle.kts` and put each service version in its own `gradle.properties`. Bump that version when the pull request changes service code. Do not edit `frontend/package.json`, `simulation-client/package.json`, or Kubernetes image tags by hand. CI syncs those from `VERSION` on merge to `master`.
 
 Publish the API before the handlers:
 

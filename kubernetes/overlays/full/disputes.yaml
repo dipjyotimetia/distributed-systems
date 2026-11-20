@@ -1,7 +1,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: banking-workflow-bootstrap-v2
+  name: banking-workflow-bootstrap-v3
 spec:
   backoffLimit: 6
   activeDeadlineSeconds: 300
@@ -11,7 +11,7 @@ spec:
       restartPolicy: OnFailure
       containers:
         - name: bootstrap
-          image: postgres:18.7-alpine
+          image: postgres:19.0-alpine
           command: [sh, -ec]
           args:
             - |

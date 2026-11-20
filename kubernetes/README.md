@@ -63,7 +63,7 @@ as well as the Secret. An optional `banking-workflow-config` ConfigMap key
 
 ```bash
 kubectl apply -k kubernetes/overlays/full
-kubectl -n banking-app wait --for=condition=complete job/banking-workflow-bootstrap-v2 --timeout=5m
+kubectl -n banking-app wait --for=condition=complete job/banking-workflow-bootstrap-v3 --timeout=5m
 kubectl -n banking-app port-forward svc/banking-frontend 3000:80
 ```
 

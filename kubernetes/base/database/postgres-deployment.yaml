@@ -29,7 +29,7 @@ spec:
       serviceAccountName: banking-app-sa
       containers:
       - name: postgres
-        image: postgres:18.7-alpine
+        image: postgres:19.0-alpine
         ports:
         - containerPort: 5432
           name: postgres
@@ -43,11 +43,9 @@ spec:
             secretKeyRef:
               name: banking-postgres-secret
               key: password
-        - name: PGDATA
-          value: /var/lib/postgresql/data/pgdata
         volumeMounts:
         - name: postgres-storage
-          mountPath: /var/lib/postgresql/data
+          mountPath: /var/lib/postgresql
         - name: postgres-init
           mountPath: /docker-entrypoint-initdb.d
         resources:
@@ -81,7 +79,7 @@ spec:
       volumes:
       - name: postgres-storage
         persistentVolumeClaim:
-          claimName: banking-postgres-pvc
+          claimName: banking-postgres-19-pvc
       - name: postgres-init
         configMap:
           name: banking-postgres-init
