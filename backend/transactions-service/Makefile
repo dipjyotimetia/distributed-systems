@@ -19,22 +19,22 @@ help:
 .PHONY: build
 build:
 	@echo "Building $(SERVICE_NAME)..."
-	./mvnw clean package -DskipTests
+	../../gradlew -p ../.. :transactions-service:clean :transactions-service:bootJar
 
 # Run target
 .PHONY: run
 run:
 	@echo "Running $(SERVICE_NAME) on port $(SERVICE_PORT)..."
-	java -jar target/transactions-service-1.0.0.jar
+	java -jar build/libs/application.jar
 
 # Test target
 .PHONY: test
 test:
 	@echo "Running tests for $(SERVICE_NAME)..."
-	./mvnw test
+	../../gradlew -p ../.. :transactions-service:test
 
 # Clean target
 .PHONY: clean
 clean:
 	@echo "Cleaning $(SERVICE_NAME)..."
-	./mvnw clean
+	../../gradlew -p ../.. :transactions-service:clean

@@ -149,8 +149,8 @@ services:
 
   accounts-service:
     build:
-      context: ./backend/accounts-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/accounts-service/Dockerfile
     container_name: banking-accounts-service
     depends_on:
       - postgres
@@ -226,8 +226,8 @@ services:
 
   transactions-service:
     build:
-      context: ./backend/transactions-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/transactions-service/Dockerfile
     container_name: banking-transactions-service
     depends_on:
       postgres:
@@ -295,8 +295,8 @@ services:
 
   api-gateway:
     build:
-      context: ./backend/api-gateway
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/api-gateway/Dockerfile
     container_name: banking-api-gateway
     depends_on:
       - user-service

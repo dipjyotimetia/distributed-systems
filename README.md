@@ -137,12 +137,11 @@ A PostSync hook (`kubernetes/overlays/speedscale/responders/tr-postsync-reroll.y
 
 ### Individual Service Development
 
-Build and run a Java service from its module directory:
+Build and run a Java service from the repository root:
 
 ```bash
-cd backend/accounts-service
-./mvnw package
-./mvnw spring-boot:run
+./gradlew :accounts-service:bootJar
+./gradlew :accounts-service:bootRun
 ```
 
 ### Frontend Development
@@ -155,12 +154,14 @@ npm test               # Run tests
 ```
 
 ### Database Operations
+
+For manual Flyway tasks, provide `FLYWAY_PASSWORD` and optionally override `FLYWAY_URL` and `FLYWAY_USER`. Use the corresponding Gradle subproject for each schema.
 ```bash
 # Postgres
 psql -h localhost -p 5432 -U postgres -d banking_app
 
-# Run Flyway from accounts-service or transactions-service
-./mvnw flyway:migrate
+# Run the migration for the desired schema
+./gradlew :accounts-service:flywayMigrate
 ```
 
 ## Testing
@@ -170,8 +171,8 @@ route contracts and evidence across test layers.
 
 ### Backend Tests
 ```bash
-# From a Java service directory
-./mvnw test
+# From the repository root
+./gradlew test
 
 # Go services
 cd backend/fraud-service && go test ./...

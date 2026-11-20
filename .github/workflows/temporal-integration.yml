@@ -74,7 +74,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '25'
-          cache: maven
+      - uses: gradle/actions/setup-gradle@v5
       - name: Run existing gateway replay when authorized
         env:
           PROXYMOCK_API_KEY: ${{ secrets.PROXYMOCK_API_KEY }}
@@ -104,9 +104,11 @@ jobs:
         run: |
           for service in api-gateway accounts-service user-service transactions-service fraud-service notification-service ai-service disputes-service; do
             image="microsvc-journeys/$service:checkout"
-            if ! docker build -t "$image" "backend/$service"; then
+            args=("backend/$service")
+            case "$service" in accounts-service|api-gateway|payments-service|transactions-service) args=(-f "backend/$service/Dockerfile" .) ;; esac
+            if ! docker build -t "$image" "${args[@]}"; then
               sleep 5
-              docker build -t "$image" "backend/$service"
+              docker build -t "$image" "${args[@]}"
             fi
             kind load docker-image "$image" --name banking-journeys
           done

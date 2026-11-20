@@ -94,7 +94,7 @@ fi
 
 cd "$SERVICE_DIR"
 
-# Always build from the current sources. Reusing a jar already in target/ would let the
+# Always build from the current sources. Reusing a jar already in build/libs/ would let the
 # pre-commit hook validate a source change against an older, working binary. BUILD_CMD
 # cleans first, so exactly one fresh artifact matches JAR_GLOB afterwards.
 # PROXYMOCK_SKIP_BUILD=1 reuses an existing jar for fast local iteration only; the pre-commit

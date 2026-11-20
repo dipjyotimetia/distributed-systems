@@ -1,5 +1,9 @@
-*
-!proto/fraud/fraud.proto
-!backend/payments-service/pom.xml
-!backend/payments-service/src
+**
+!gradlew
+!settings.gradle.kts
+!build.gradle.kts
+!gradle/**
+!backend/*/build.gradle.kts
+!backend/*/gradle.properties
 !backend/payments-service/src/**
+!proto/fraud/**

@@ -1,0 +1,63 @@
+plugins {
+    java
+    id("org.springframework.boot")
+    id("io.spring.dependency-management")
+    id("org.flywaydb.flyway")
+}
+
+group = "com.banking"
+version = findProperty("serviceVersion") as String
+
+dependencyManagement {
+    imports {
+        mavenBom("io.opentelemetry:opentelemetry-bom:1.68.0")
+        mavenBom("software.amazon.awssdk:bom:2.59.4")
+    }
+    dependencies {
+        dependency("com.google.guava:guava:33.8.0-android")
+    }
+}
+
+dependencies {
+    implementation("io.temporal:temporal-sdk:1.41.1")
+    testImplementation("io.temporal:temporal-testing:1.41.1")
+    implementation("com.google.protobuf:protobuf-java:4.36.2")
+    implementation("org.springframework.boot:spring-boot-starter-oauth2-client")
+    implementation("org.springframework.boot:spring-boot-starter-web")
+    implementation("org.springframework.boot:spring-boot-starter-data-jpa")
+    implementation("org.springframework.boot:spring-boot-starter-security")
+    implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server")
+    implementation("org.springframework.boot:spring-boot-starter-validation")
+    implementation("org.springframework.boot:spring-boot-starter-actuator")
+    implementation("software.amazon.awssdk:s3")
+    implementation("org.springframework.boot:spring-boot-jackson2")
+    runtimeOnly("org.postgresql:postgresql")
+    implementation("org.springframework.boot:spring-boot-starter-flyway")
+    implementation("org.flywaydb:flyway-database-postgresql")
+    implementation("io.jsonwebtoken:jjwt-api:0.13.0")
+    runtimeOnly("io.jsonwebtoken:jjwt-impl:0.13.0")
+    runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.13.0")
+    implementation("io.opentelemetry:opentelemetry-api:1.68.0")
+    implementation("io.opentelemetry.instrumentation:opentelemetry-spring-boot-starter:2.34.0")
+    implementation("io.opentelemetry:opentelemetry-exporter-otlp:1.68.0")
+    implementation("io.opentelemetry.instrumentation:opentelemetry-jdbc:2.34.0-alpha")
+    implementation("io.micrometer:micrometer-registry-prometheus")
+    developmentOnly("org.springframework.boot:spring-boot-devtools")
+    testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
+    testImplementation("org.springframework.security:spring-security-test")
+    testImplementation("com.h2database:h2")
+    testImplementation("org.testcontainers:testcontainers-postgresql")
+    testImplementation("org.testcontainers:testcontainers-junit-jupiter")
+}
+
+tasks.jar { enabled = false }
+
+tasks.bootJar { archiveFileName.set("application.jar") }
+
+flyway {
+    url = providers.environmentVariable("FLYWAY_URL").getOrElse("jdbc:postgresql://localhost:5432/banking_app")
+    user = providers.environmentVariable("FLYWAY_USER").getOrElse("accounts_service_user")
+    password = providers.environmentVariable("FLYWAY_PASSWORD").orNull
+    schemas = arrayOf("accounts_service")
+    locations = arrayOf("filesystem:${projectDir}/src/main/resources/db/migration")
+}

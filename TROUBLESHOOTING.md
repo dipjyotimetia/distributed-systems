@@ -109,21 +109,20 @@ cat frontend/.env.local
 
 ### 5. Build Failures
 
-**Symptom**: Maven build fails
+**Symptom**: Gradle build fails
 **Solutions**:
 ```bash
 # Clean and rebuild
-./mvnw clean install -DskipTests
+./gradlew clean bootJar
 
 # Check Java version
-java -version  # Should be Java 17+
+java -version  # Should be Java 25
 
-# Clear Maven cache
-rm -rf ~/.m2/repository
+# Refresh dependency metadata
+./gradlew --refresh-dependencies bootJar
 
 # For specific service
-cd backend/user-service
-./mvnw clean package
+./gradlew :accounts-service:clean :accounts-service:bootJar
 ```
 
 ### 6. OpenTelemetry Issues
@@ -149,8 +148,8 @@ export OTEL_LOG_LEVEL=DEBUG
 If `docker compose logs api-gateway` shows
 `NoClassDefFoundError: io/opentelemetry/semconv/ContainerAttributes`, the
 gateway failed while loading its OpenTelemetry container resource provider.
-The gateway's Maven dependencies are in
-[`backend/api-gateway/pom.xml`](backend/api-gateway/pom.xml).
+The gateway's Gradle dependencies are in
+[`backend/api-gateway/build.gradle.kts`](backend/api-gateway/build.gradle.kts).
 
 For local development, save this as `compose.gateway-workaround.yml`:
 
@@ -222,17 +221,13 @@ docker compose exec accounts-service curl http://transactions-service:8080/actua
 2. **Run services locally**:
    ```bash
    # Terminal 1: User Service
-   cd backend/user-service
-   export DB_HOST=localhost
-   export DB_PORT=5432
-   ./mvnw spring-boot:run
+   docker compose up user-service
 
    # Terminal 2: Accounts Service  
-   cd backend/accounts-service
    export DB_HOST=localhost
    export DB_PORT=5432
    export USER_SERVICE_URL=http://localhost:8081
-   ./mvnw spring-boot:run
+   ./gradlew :accounts-service:bootRun
    ```
 
 3. **Debug with IDE**:
@@ -242,9 +237,8 @@ docker compose exec accounts-service curl http://transactions-service:8080/actua
 
 ### Hot Reload Development
 ```bash
-# For backend services (Maven)
-cd backend/user-service
-./mvnw spring-boot:run -Dspring-boot.run.jvmArguments="-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005"
+# For a Java backend service
+./gradlew :accounts-service:bootRun --debug-jvm
 
 # For frontend (Next.js)
 cd frontend
@@ -266,11 +260,10 @@ docker compose up user-service
 ### Database Migrations
 ```bash
 # Check migration status
-cd backend/user-service
-./mvnw flyway:info
+./gradlew :accounts-service:flywayInfo
 
 # Run migrations manually
-./mvnw flyway:migrate
+./gradlew :accounts-service:flywayMigrate
 
 ```
 
@@ -298,13 +291,13 @@ docker compose logs user-service accounts-service
 ### Integration Tests
 ```bash
 # Run all tests
-./mvnw test
+./gradlew test
 
 # Run specific test class
-./mvnw test -Dtest=UserServiceTest
+./gradlew :accounts-service:test --tests "*AccountsServiceApplicationTests"
 
 # Run with profile
-./mvnw test -Dspring.profiles.active=test
+./gradlew test -Dspring.profiles.active=test
 ```
 
 ### API Testing

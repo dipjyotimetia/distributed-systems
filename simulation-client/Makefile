@@ -132,7 +132,7 @@ k8s-scale: ## Scale deployment (usage: make k8s-scale REPLICAS=3)
 .PHONY: migrate-simulation-users
 migrate-simulation-users: ## Run simulation users migration
 	@echo "Running simulation users migration..."
-	cd ../backend/user-service && ./mvnw flyway:migrate
+	docker compose -f ../docker-compose.yml exec -T postgres psql -v ON_ERROR_STOP=1 -U postgres -d banking_app < ../database/migrations/user-service/V2__Seed_simulation_users.sql
 
 .PHONY: check-simulation-users
 check-simulation-users: ## Check if simulation users exist

@@ -1,24 +1,17 @@
 # Multi-stage build for Accounts Service
-FROM --platform=$BUILDPLATFORM maven:3.10.0-amazoncorretto-25 AS builder
-
+FROM --platform=$BUILDPLATFORM amazoncorretto:25 AS builder
+RUN yum install -y findutils && yum clean all
 WORKDIR /app
+COPY gradlew settings.gradle.kts build.gradle.kts ./
+COPY gradle/ gradle/
+COPY backend/accounts-service/build.gradle.kts backend/accounts-service/gradle.properties backend/accounts-service/
+COPY backend/api-gateway/build.gradle.kts backend/api-gateway/gradle.properties backend/api-gateway/
+COPY backend/payments-service/build.gradle.kts backend/payments-service/gradle.properties backend/payments-service/
+COPY backend/transactions-service/build.gradle.kts backend/transactions-service/gradle.properties backend/transactions-service/
+COPY backend/accounts-service/src backend/accounts-service/src
+RUN --mount=type=cache,target=/root/.gradle,sharing=locked ./gradlew --no-daemon :accounts-service:bootJar
+RUN java -Djarmode=tools -jar backend/accounts-service/build/libs/application.jar extract --layers --destination extracted
 
-# Copy pom.xml and download dependencies
-COPY pom.xml ./
-RUN mvn -B dependency:go-offline
-
-# Copy source code
-COPY src ./src
-
-# Build the application
-RUN mvn -B clean package -DskipTests
-
-# Extract layers from the JAR
-RUN cp target/accounts-service-*.jar application.jar && \
-    java -Djarmode=tools -jar application.jar extract --layers --destination extracted
-
-# Runtime image - use Amazon Corretto Alpine for Colima compatibility
-# Pin the Corretto 25 image index for reproducible multi-platform builds.
 FROM --platform=$TARGETPLATFORM amazoncorretto:25-alpine@sha256:1124f698f69d2185828dbd1a1ebeb9aee21884ac64bed7af3deeafd20b21a9dc
 
 WORKDIR /app

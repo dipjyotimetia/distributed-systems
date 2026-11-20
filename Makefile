@@ -14,11 +14,7 @@ SERVICES = accounts-service transactions-service api-gateway
 # Docker related targets
 .PHONY: build-backend build-frontend build-all
 build-backend:
-	@echo "Building backend services..."
-	@for service in $(SERVICES); do \
-		echo "Building $$service..."; \
-		cd backend/$$service && ./mvnw clean package -DskipTests && cd ../..; \
-	done
+	./gradlew bootJar
 
 build-frontend:
 	@echo "Building frontend..."
@@ -32,7 +28,7 @@ docker-build:
 	@echo "Building Docker images with version: $(IMAGE_TAG)..."
 	@for service in $(SERVICES); do \
 		echo "Building Docker image for $$service..."; \
-		docker build -t $(REGISTRY)/$$service:$(IMAGE_TAG) backend/$$service/; \
+		docker build -t $(REGISTRY)/$$service:$(IMAGE_TAG) $$(case "$$service" in accounts-service|api-gateway|payments-service|transactions-service) printf "%s" "-f backend/$$service/Dockerfile ." ;; *) printf "%s" "backend/$$service/" ;; esac) || exit $$?; \
 	done
 	@echo "Building Docker image for frontend..."
 	docker build -t $(REGISTRY)/frontend:$(IMAGE_TAG) frontend/
@@ -53,7 +49,7 @@ docker-build-versioned:
 	@VERSION_TAG=$$(./scripts/version.sh tag); \
 	for service in $(SERVICES); do \
 		echo "Building Docker image for $$service with tag: $$VERSION_TAG..."; \
-		docker build -t $(REGISTRY)/$$service:$$VERSION_TAG backend/$$service/; \
+		docker build -t $(REGISTRY)/$$service:$$VERSION_TAG $$(case "$$service" in accounts-service|api-gateway|payments-service|transactions-service) printf "%s" "-f backend/$$service/Dockerfile ." ;; *) printf "%s" "backend/$$service/" ;; esac) || exit $$?; \
 	done
 	@VERSION_TAG=$$(./scripts/version.sh tag); \
 	echo "Building Docker image for frontend with tag: $$VERSION_TAG..."; \
@@ -73,12 +69,7 @@ docker-clean-versioned:
 # Test targets
 .PHONY: test-backend test-frontend test-all test-e2e validate-e2e
 test-backend:
-	@echo "Running backend tests..."
-	@for service in $(SERVICES); do \
-		echo "Testing $$service..."; \
-		cd backend/$$service && ./mvnw test && cd ../..; \
-	done
-	backend/accounts-service/mvnw -f backend/payments-service/pom.xml test
+	./gradlew test
 
 test-frontend:
 	@echo "Running frontend tests..."
@@ -248,10 +239,7 @@ update-k8s-version:
 # Utility targets
 .PHONY: clean help
 clean:
-	@echo "Cleaning up..."
-	@for service in $(SERVICES); do \
-		cd backend/$$service && ./mvnw clean && cd ../..; \
-	done
+	./gradlew clean
 	cd frontend && rm -rf .next node_modules || true
 
 help:

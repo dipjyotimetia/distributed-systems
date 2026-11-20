@@ -28,11 +28,8 @@ Thumbs.db
 
 # Java/Maven
 target/
-!.mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
-.mvn/timing.properties
-.mvn/wrapper/maven-wrapper.properties
 
 # .NET
 bin/
@@ -130,3 +127,7 @@ thoughts/
 
 # Local Temporal integration reports
 /tests/integration/temporal/results/
+
+.gradle/
+**/build/
+!gradle/wrapper/gradle-wrapper.jar

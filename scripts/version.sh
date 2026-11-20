@@ -92,14 +92,13 @@ update_all_versions() {
     local version=$(get_version)
     echo "Updating all project files with version: $version"
     
-    # Update backend service pom.xml files
+    # Update backend service gradle.properties files
     for service in "${BACKEND_SERVICES[@]}"; do
-        local pom_file="backend/${service}/pom.xml"
-        if [ -f "$pom_file" ]; then
-            # Update only the project version in pom.xml (after artifactId, before properties)
-            sed -i.bak "/^[[:space:]]*<artifactId>${service}<\/artifactId>/,/^[[:space:]]*<properties>/ s|<version>[0-9]*\.[0-9]*\.[0-9]*</version>|<version>${version}</version>|" "$pom_file"
-            echo "Updated $pom_file to version $version"
-            rm -f "${pom_file}.bak"
+        local version_file="backend/${service}/gradle.properties"
+        if [ -f "$version_file" ]; then
+            sed -i.bak "s/^serviceVersion=.*/serviceVersion=${version}/" "$version_file"
+            echo "Updated $version_file to version $version"
+            rm -f "${version_file}.bak"
         fi
     done
     
@@ -131,14 +130,13 @@ validate_versions() {
     
     echo "Validating version consistency (expected: $expected_version)..."
     
-    # Check backend pom.xml files
+    # Check backend gradle.properties files
     for service in "${BACKEND_SERVICES[@]}"; do
-        local pom_file="backend/${service}/pom.xml"
-        if [ -f "$pom_file" ]; then
-            # Extract project version (first version tag after groupId/artifactId)
-            local actual_version=$(grep -A 5 "<artifactId>${service}</artifactId>" "$pom_file" | grep "<version>" | head -1 | sed 's/.*<version>\(.*\)<\/version>.*/\1/' | tr -d ' ')
+        local version_file="backend/${service}/gradle.properties"
+        if [ -f "$version_file" ]; then
+            local actual_version=$(sed -n 's/^serviceVersion=//p' "$version_file")
             if [ "$actual_version" != "$expected_version" ]; then
-                inconsistent_files+=("$pom_file: $actual_version")
+                inconsistent_files+=("$version_file: $actual_version")
             fi
         fi
     done
@@ -177,22 +175,22 @@ validate_versions() {
     fi
 }
 
-# Update only backend pom.xml files with VERSION
+# Update only backend gradle.properties files with VERSION
 update_backend_versions() {
     local version=$(get_version)
-    echo "Updating backend pom.xml files with version: $version"
+    echo "Updating backend gradle.properties files with version: $version"
 
     for service in "${BACKEND_SERVICES[@]}"; do
-        local pom_file="backend/${service}/pom.xml"
-        if [ -f "$pom_file" ]; then
-            sed -i.bak "/^[[:space:]]*<artifactId>${service}<\/artifactId>/,/^[[:space:]]*<properties>/ s|<version>[0-9]*\.[0-9]*\.[0-9]*</version>|<version>${version}</version>|" "$pom_file"
-            echo "Updated $pom_file to version $version"
-            rm -f "${pom_file}.bak"
+        local version_file="backend/${service}/gradle.properties"
+        if [ -f "$version_file" ]; then
+            sed -i.bak "s/^serviceVersion=.*/serviceVersion=${version}/" "$version_file"
+            echo "Updated $version_file to version $version"
+            rm -f "${version_file}.bak"
         fi
     done
 }
 
-# Update only frontend and simulation-client package.json files (not backend pom.xml)
+# Update only frontend and simulation-client package.json files (not backend gradle.properties)
 update_frontend_versions() {
     local version=$(get_version)
     echo "Updating frontend package.json files with version: $version"
@@ -319,7 +317,7 @@ case "${1:-help}" in
         echo "  image <service>        - Get full image name for service with SHA"
         echo "  update-frontend        - Update frontend/simulation-client package.json with current version"
         echo "  update-k8s             - Update Kubernetes manifests with simple version"
-        echo "  update-all             - Update all project files (pom.xml, package.json) with current version"
+        echo "  update-all             - Update all project files (gradle.properties, package.json) with current version"
         echo "  validate               - Validate that all project files have consistent versions"
         echo "  sync                   - Update all project files and Kubernetes manifests"
         echo "  info                   - Show version information"

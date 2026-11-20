@@ -32,7 +32,10 @@ build_image() {
 images=()
 for service in accounts-service ai-service api-gateway disputes-service fraud-service notification-service transactions-service user-service; do
   image="microsvc-journeys/$service:checkout"
-  build_image -t "$image" "backend/$service"
+  case "$service" in
+    accounts-service|api-gateway|payments-service|transactions-service) build_image -t "$image" -f "backend/$service/Dockerfile" . ;;
+    *) build_image -t "$image" "backend/$service" ;;
+  esac
   images+=("$image")
 done
 build_image -t microsvc-journeys/frontend:checkout frontend
@@ -154,7 +157,7 @@ movement="$(kubectl -n banking-app exec deployment/banking-postgres -- psql -At 
 matched="$(kubectl -n banking-app exec banking-payments-postgres-0 -- psql -At -U payments -d payments \
   -v ON_ERROR_STOP=1 -c "SELECT count(*) FROM payments.reconciliation_result WHERE payment_id = '$payment_id' AND outcome = 'MATCHED'")"
 [[ "$matched" == 1 ]]
-backend/accounts-service/mvnw -B -f backend/payments-service/pom.xml -Dtest=MqClearingRecoveryTest test
+./gradlew :payments-service:test --tests "*MqClearingRecoveryTest"
 inbox="$(kubectl -n banking-app exec banking-payments-postgres-0 -- psql -At -U payments -d payments \
   -v ON_ERROR_STOP=1 -c "SELECT count(*) FROM payments.clearing_inbox WHERE payment_id = '$payment_id' AND kind = 'SETTLED'")"
 [[ "$inbox" == 1 ]]
