@@ -129,6 +129,9 @@ thoughts/
 # Local Temporal integration reports
 /tests/integration/temporal/results/
 
+# Local development certificates
+/certs/dev/
+
 .gradle/
 **/build/
 !gradle/wrapper/gradle-wrapper.jar

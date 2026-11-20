@@ -23,14 +23,19 @@ Browser banking requests flow through the frontend server. The AI chat proxy use
 Client → Frontend Service → API Gateway → Backend Services
 ```
 
+`proto/` is the only protobuf contract. KYC is `proto/kyc/kyc.proto` and cards is `proto/cards/cards.proto`. `scripts/frontend-proto.sh` writes the checked-in TypeScript under `frontend/src/gen` with Buf 1.75.0 and `protoc-gen-es` 2.16.0. Next.js route handlers import those stubs and call the Go servers with the gRPC protocol. The browser uses the HTTP routes. Those routes forward the incoming `Authorization` header as gRPC metadata.
+
+KYC stores the case and starts a Temporal review on the `kyc-review` task queue. Cards calls `fraud-service` over gRPC and reads the account from `accounts-service` over HTTP before it issues a card. `docker-compose.mtls.yml` is the optional mutual TLS overlay for the frontend, KYC, cards, and fraud clients.
+
 ## Application services and infrastructure
 
 See the [deployment matrix](README.md#quick-start) for which services each environment runs.
 
 The application backend services are `api-gateway`, `user-service`,
 `accounts-service`, `transactions-service`, `fraud-service`,
-`notification-service`, `disputes-service`, `ai-service`, and the optional
-`payments-service`. MongoDB provides infrastructure
+`kyc-service`, `cards-service`, `notification-service`,
+`disputes-service`, `ai-service`, and the optional `payments-service`.
+MongoDB provides infrastructure
 for notification event storage. Kafka carries transaction events and
 PostgreSQL stores identity, account, transaction, dispute, and payment data.
 

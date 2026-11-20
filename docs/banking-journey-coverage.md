@@ -1,7 +1,9 @@
 # Banking journey coverage
 
 This matrix tracks the frontend API contracts and their test evidence.
-Bracketed catch-all route handlers expose multiple operations.
+Bracketed catch-all route handlers expose multiple operations. The KYC and
+cards rows are Next.js HTTP adapters over the Buf clients generated from
+`proto/kyc/kyc.proto` and `proto/cards/cards.proto`.
 
 | Method and frontend route | Expected outcome | Test layer | Evidence |
 | --- | --- | --- | --- |
@@ -38,6 +40,11 @@ Bracketed catch-all route handlers expose multiple operations.
 | POST `/api/users/register` | Register synthetic identity and reject duplicates | Temporal | `IdentityJourney.Register` and `AssertIdentityConflicts` check registration and conflicts on username and email |
 | POST `/api/users/logout` | Clear the browser session cookie | Playwright | `real-backend.spec.ts` checks logout |
 | GET and POST `/api/disputes/[[...casePath]]` | File and read owned disputes and respond to evidence requests | Playwright and integration | `disputes.real-backend.spec.ts` and the disputes scenario |
+| POST `/api/kyc` | Store a KYC application and return the pending case | Service | `kyc-service` store and workflow tests |
+| GET `/api/kyc` | Return the customer's latest KYC status | Service | `GetStatus` is gated by the same JWT as Apply |
+| GET and POST `/api/operations/kyc` | List review cases and record an operator decision | Service | `Queue` and `Decide` require `KYC_OPERATOR_IDS` |
+| POST `/api/cards` | Issue a virtual card after KYC approval | Service | `TestIssueRequiresKycAndAuthorizeIsIdempotent` |
+| POST `/api/cards/authorize` | Authorize a purchase once for an idempotency key | Service | The same cards test covers replay and `DECLINE` |
 | GET and POST `/api/operations/disputes/[[...casePath]]` | List disputes, request evidence, and resolve cases for allowlisted operators | Playwright and integration | `disputes.real-backend.spec.ts` and the disputes scenario |
 | GET and POST `/api/accounts/[id]/statement-jobs/[[...jobPath]]` | Queue an export, inspect job state, and download it before expiry | Integration | Statement jobs and worker recovery in the [integration guide](../tests/integration/README.md#disputes-and-statement-worker-recovery) |
 

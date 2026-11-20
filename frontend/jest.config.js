@@ -24,6 +24,7 @@ const customJestConfig = {
     '!src/app/**/page.tsx',
     '!src/app/api/ai/**',
     '!src/lib/constants/**',
+    '!src/gen/**',
   ],
   coverageThreshold: {
     global: {

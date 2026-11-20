@@ -332,6 +332,61 @@ services:
     networks:
       - banking-network
 
+  kyc-service:
+    build: ./backend/kyc-service
+    environment:
+      DATABASE_URL: postgres://postgres:password@postgres:5432/banking_app?sslmode=disable
+      JWT_SECRET: banking-app-super-secret-key-change-this-in-production-256-bit
+      TEMPORAL_ADDRESS: disputes-temporal:7233
+      KYC_OPERATOR_IDS: ${KYC_OPERATOR_IDS:-}
+      GRPC_PORT: "8091"
+      METRICS_PORT: "9092"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      disputes-temporal:
+        condition: service_healthy
+    ports: ["8091:8091"]
+    networks: [banking-network]
+
+  kyc-worker:
+    build: ./backend/kyc-service
+    environment:
+      KYC_MODE: worker
+      DATABASE_URL: postgres://postgres:password@postgres:5432/banking_app?sslmode=disable
+      TEMPORAL_ADDRESS: disputes-temporal:7233
+    depends_on:
+      kyc-service:
+        condition: service_started
+      disputes-temporal:
+        condition: service_healthy
+    networks: [banking-network]
+
+  cards-service:
+    build:
+      context: ./backend
+      dockerfile: cards-service/Dockerfile
+    environment:
+      DATABASE_URL: postgres://postgres:password@postgres:5432/banking_app?sslmode=disable
+      JWT_SECRET: banking-app-super-secret-key-change-this-in-production-256-bit
+      MOVEMENT_SECRET: banking-app-super-secret-key-change-this-in-production-256-bit
+      ACCOUNTS_SERVICE_URL: http://accounts-service:8080
+      KYC_GRPC_ADDR: kyc-service:8091
+      FRAUD_GRPC_ADDR: fraud-service:8080
+      GRPC_PORT: "8092"
+      METRICS_PORT: "9093"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kyc-service:
+        condition: service_started
+      fraud-service:
+        condition: service_started
+      accounts-service:
+        condition: service_started
+    ports: ["8092:8092"]
+    networks: [banking-network]
+
   ai-service:
     build: ./backend/ai-service
     container_name: banking-ai
@@ -365,6 +420,8 @@ services:
       - NEXT_PUBLIC_API_URL=http://localhost:8080
       - API_GATEWAY_URL=http://api-gateway:8080
       - AI_SERVICE_URL=http://ai-service:8080
+      - KYC_GRPC_ADDR=kyc-service:8091
+      - CARDS_GRPC_ADDR=cards-service:8092
       - NODE_ENV=development
       # OpenTelemetry Configuration
       - OTEL_SERVICE_NAME=frontend

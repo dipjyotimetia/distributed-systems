@@ -7,8 +7,11 @@ import (
 	"os"
 	"time"
 
+	"crypto/tls"
+	"crypto/x509"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/keepalive"
 
 	"github.com/dipjyotimetia/distributed-systems/backend/fraud-service/internal/fraud"
@@ -29,12 +32,29 @@ func main() {
 
 	// ebpf observability: force connections to recycle after 1 minute so nettap can observe the connection
 	// start and allow rrpairs to be correctly identified and parsed
-	srv := grpc.NewServer(
-		grpc.KeepaliveParams(keepalive.ServerParameters{
-			MaxConnectionAge:      1 * time.Minute,
-			MaxConnectionAgeGrace: 5 * time.Second,
-		}),
-	)
+	options := []grpc.ServerOption{grpc.KeepaliveParams(keepalive.ServerParameters{
+		MaxConnectionAge:      1 * time.Minute,
+		MaxConnectionAgeGrace: 5 * time.Second,
+	})}
+	if os.Getenv("MTLS_ENABLED") == "true" {
+		certificate, err := tls.LoadX509KeyPair(os.Getenv("MTLS_CERT"), os.Getenv("MTLS_KEY"))
+		if err != nil {
+			log.Fatal(err)
+		}
+		pem, err := os.ReadFile(os.Getenv("MTLS_CA"))
+		if err != nil {
+			log.Fatal(err)
+		}
+		pool := x509.NewCertPool()
+		pool.AppendCertsFromPEM(pem)
+		options = append(options, grpc.Creds(credentials.NewTLS(&tls.Config{
+			Certificates: []tls.Certificate{certificate},
+			ClientAuth:   tls.RequireAndVerifyClientCert,
+			ClientCAs:    pool,
+			MinVersion:   tls.VersionTLS12,
+		})))
+	}
+	srv := grpc.NewServer(options...)
 	fraudv1.RegisterFraudCheckerServer(srv, &fraud.Checker{})
 
 	log.Printf("fraud-service listening on :%s", port)

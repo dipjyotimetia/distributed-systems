@@ -52,6 +52,8 @@ const Header: React.FC = () => {
             >
               Accounts
             </Link>
+            <Link href="/cards" className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors">Cards</Link>
+            <Link href="/kyc" className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors">KYC</Link>
             <Link
               href="/transactions"
               className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
@@ -103,6 +105,8 @@ const Header: React.FC = () => {
             >
               Accounts
             </Link>
+            <Link href="/cards" className="text-gray-700 hover:text-blue-600 block px-3 py-2 rounded-md text-base font-medium">Cards</Link>
+            <Link href="/kyc" className="text-gray-700 hover:text-blue-600 block px-3 py-2 rounded-md text-base font-medium">KYC</Link>
             <Link
               href="/transactions"
               className="text-gray-700 hover:text-blue-600 block px-3 py-2 rounded-md text-base font-medium"

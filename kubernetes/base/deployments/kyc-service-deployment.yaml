@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: banking-kyc
+  namespace: banking-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: banking-kyc
+  template:
+    metadata:
+      labels:
+        app: banking-kyc
+        app.kubernetes.io/service: kyc-service
+    spec:
+      serviceAccountName: banking-app-sa
+      containers:
+      - name: kyc-service
+        image: ghcr.io/dipjyotimetia/distributed-systems/kyc-service:v1.4.139
+        ports:
+        - containerPort: 8091
+          name: grpc
+        - containerPort: 9092
+          name: metrics
+        env:
+        - name: GRPC_PORT
+          value: "8091"
+        - name: METRICS_PORT
+          value: "9092"
+        - name: DATABASE_URL
+          value: postgres://postgres:password@banking-postgres:5432/banking_app?sslmode=disable
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: banking-jwt-secret
+              key: secret
+        - name: TEMPORAL_ADDRESS
+          value: banking-temporal:7233

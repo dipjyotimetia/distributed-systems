@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: banking-kyc-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: banking-kyc-worker
+  template:
+    metadata:
+      labels:
+        app: banking-kyc-worker
+    spec:
+      serviceAccountName: banking-app-sa
+      containers:
+      - name: kyc-worker
+        image: ghcr.io/dipjyotimetia/distributed-systems/kyc-service:v1.4.139
+        env:
+        - name: KYC_MODE
+          value: worker
+        - name: DATABASE_URL
+          value: postgres://postgres:password@banking-postgres:5432/banking_app?sslmode=disable
+        - name: TEMPORAL_ADDRESS
+          value: banking-temporal:7233

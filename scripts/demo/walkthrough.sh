@@ -57,6 +57,33 @@ curl -fsS -c "$jar" -b "$jar" -H 'content-type: application/json' \
 curl -fsS -c "$jar" -b "$jar" -H 'content-type: application/json' -H "Idempotency-Key: statement-${suffix}" \
   -d '{}' "${base}/api/accounts/${from}/statement-jobs" >/dev/null
 
+echo "Apply for KYC and wait until the worker approves it"
+curl -fsS -c "$jar" -b "$jar" -H 'content-type: application/json' \
+  -d '{"fullName":"Demo Customer","documentReference":"passport"}' \
+  "${base}/api/kyc" >/dev/null
+python3 - "$base" "$jar" <<'PY'
+import json, sys, time, urllib.request
+base, jar = sys.argv[1:]
+cookie = open(jar).read().splitlines()[-1].split("\t")[-1]
+for _ in range(30):
+    request = urllib.request.Request(base + "/api/kyc", headers={"Cookie": "auth_token=" + cookie})
+    status = json.load(urllib.request.urlopen(request)).get("status")
+    if status == "APPROVED":
+        print("kyc approved")
+        break
+    time.sleep(1)
+else:
+    raise SystemExit("kyc did not approve")
+PY
+
+echo "Issue a card and authorize a purchase"
+card="$(curl -fsS -c "$jar" -b "$jar" -H 'content-type: application/json' \
+  -d "{\"accountId\":${from}}" "${base}/api/cards")"
+token="$(printf '%s' "$card" | python3 -c 'import json,sys; print(json.load(sys.stdin)["token"])')"
+curl -fsS -c "$jar" -b "$jar" -H 'content-type: application/json' \
+  -d "{\"cardToken\":\"${token}\",\"idempotencyKey\":\"card-${suffix}\",\"amount\":\"5.00\",\"merchant\":\"Cafe\"}" \
+  "${base}/api/cards/authorize" >/dev/null
+
 echo "Ask the fixture AI assistant"
 curl -fsS -c "$jar" -b "$jar" -H 'content-type: application/json' \
   -d '{"message":"What can you see?","locale":"en-US"}' \
