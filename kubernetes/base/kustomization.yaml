@@ -34,6 +34,8 @@ resources:
   - deployments/accounts-service-deployment.yaml
   - deployments/transactions-service-deployment.yaml
   - deployments/fraud-service-deployment.yaml
+  - deployments/kyc-service-deployment.yaml
+  - deployments/cards-service-deployment.yaml
   - deployments/notification-service-deployment.yaml
   - deployments/ai-service-deployment.yaml
   - deployments/api-gateway-deployment.yaml
@@ -46,6 +48,8 @@ resources:
   - services/accounts-service-service.yaml
   - services/transactions-service-service.yaml
   - services/fraud-service-service.yaml
+  - services/kyc-service-service.yaml
+  - services/cards-service-service.yaml
   - services/notification-service-service.yaml
   - services/ai-service-service.yaml
   - services/api-gateway-service.yaml

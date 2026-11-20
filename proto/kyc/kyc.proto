@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package kyc.v1;
+
+option go_package = "github.com/dipjyotimetia/distributed-systems/backend/kyc-service/gen/kyc/v1;kycv1";
+
+// Kyc reviews a customer before a card can be issued.
+service Kyc {
+  rpc Apply(ApplyRequest) returns (Case);
+  rpc GetStatus(GetStatusRequest) returns (Status);
+  rpc Queue(QueueRequest) returns (QueueResponse);
+  rpc Decide(DecideRequest) returns (Case);
+}
+
+message ApplyRequest {
+  string full_name = 1;
+  string document_reference = 2;
+}
+
+message GetStatusRequest {}
+
+message QueueRequest {}
+
+message DecideRequest {
+  string case_id = 1;
+  bool approve = 2;
+}
+
+message Case {
+  string id = 1;
+  int64 customer_id = 2;
+  string full_name = 3;
+  string document_reference = 4;
+  string status = 5;
+}
+
+message Status {
+  string status = 1;
+  Case latest = 2;
+}
+
+message QueueResponse {
+  repeated Case cases = 1;
+}

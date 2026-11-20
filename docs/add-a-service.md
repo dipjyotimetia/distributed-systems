@@ -1,6 +1,6 @@
 # Add a service
 
-Use this when the playground needs another backend. Keep cards, KYC, and service-to-service mTLS out of the demo until a specific story needs them.
+Use this when the playground needs another backend. Cards and KYC are Go gRPC services. Their mutual TLS overlay is `docker-compose.mtls.yml`.
 
 ## 1. Code and contract
 

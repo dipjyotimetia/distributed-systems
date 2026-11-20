@@ -1,0 +1,33 @@
+services:
+  kyc-service:
+    environment:
+      MTLS_ENABLED: "true"
+      MTLS_CA: /certs/ca.crt
+      MTLS_CERT: /certs/kyc-service.crt
+      MTLS_KEY: /certs/kyc-service.key
+    volumes:
+      - ./certs/dev:/certs:ro
+  cards-service:
+    environment:
+      MTLS_ENABLED: "true"
+      MTLS_CA: /certs/ca.crt
+      MTLS_CERT: /certs/cards-service.crt
+      MTLS_KEY: /certs/cards-service.key
+    volumes:
+      - ./certs/dev:/certs:ro
+  fraud-service:
+    environment:
+      MTLS_ENABLED: "true"
+      MTLS_CA: /certs/ca.crt
+      MTLS_CERT: /certs/fraud-service.crt
+      MTLS_KEY: /certs/fraud-service.key
+    volumes:
+      - ./certs/dev:/certs:ro
+  frontend:
+    environment:
+      MTLS_ENABLED: "true"
+      MTLS_CA: /certs/ca.crt
+      MTLS_CERT: /certs/frontend.crt
+      MTLS_KEY: /certs/frontend.key
+    volumes:
+      - ./certs/dev:/certs:ro

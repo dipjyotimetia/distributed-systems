@@ -17,7 +17,7 @@ open http://localhost:16686     # Jaeger
 ```
 
 Docker with the Compose plugin is sufficient for the container workflow.
-Register a local user, then sign in and create an account. `scripts/demo/walkthrough.sh` does that path against the frontend, including a retried transfer, a dispute, a statement job, and fixture AI chat. `scripts/demo/failure-scenarios.sh` pauses Kafka, stops fraud, and points at the Grafana outbox panel. Outbound payments stay on the optional Compose overlay. If the gateway
+Register a local user, then sign in and create an account. `scripts/demo/walkthrough.sh` does that path against the frontend, including a retried transfer, a dispute, a statement job, KYC approval, a virtual card purchase, and fixture AI chat. Cards and KYC are Go gRPC services. `scripts/certs/dev-ca.sh` and `docker compose -f docker-compose.yml -f docker-compose.mtls.yml up` enable mutual TLS for those calls. `scripts/demo/failure-scenarios.sh` pauses Kafka, stops fraud, and points at the Grafana outbox panel. Outbound payments stay on the optional Compose overlay. If the gateway
 exits with an OpenTelemetry `ContainerAttributes` error, apply the
 [local gateway workaround](TROUBLESHOOTING.md#gateway-exits-during-opentelemetry-startup).
 

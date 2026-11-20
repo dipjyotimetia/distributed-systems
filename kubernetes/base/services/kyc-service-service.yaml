@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: banking-kyc
+  namespace: banking-app
+spec:
+  selector:
+    app: banking-kyc
+  ports:
+  - name: grpc
+    port: 8091
+    targetPort: grpc
+  - name: metrics
+    port: 9092
+    targetPort: metrics

@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package cards.v1;
+
+option go_package = "github.com/dipjyotimetia/distributed-systems/backend/cards-service/gen/cards/v1;cardsv1";
+
+service Cards {
+  rpc IssueCard(IssueCardRequest) returns (Card);
+  rpc Authorize(AuthorizeRequest) returns (Authorization);
+}
+
+message IssueCardRequest {
+  int64 account_id = 1;
+}
+
+message AuthorizeRequest {
+  string card_token = 1;
+  string idempotency_key = 2;
+  string amount = 3;
+  string merchant = 4;
+}
+
+message Card {
+  string token = 1;
+  int64 account_id = 2;
+  string last_four = 3;
+}
+
+message Authorization {
+  string id = 1;
+  string card_token = 2;
+  bool approved = 3;
+  string reason = 4;
+  string amount = 5;
+  string merchant = 6;
+}
