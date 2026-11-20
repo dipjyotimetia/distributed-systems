@@ -18,8 +18,23 @@ jobs:
           go install github.com/bufbuild/buf/cmd/buf@v1.75.0
           go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.12
           go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.2
-          curl -fsSL https://repo.maven.apache.org/maven2/com/google/protobuf/protoc/4.36.2/protoc-4.36.2-linux-x86_64.exe -o "$(go env GOPATH)/bin/protoc"
-          chmod +x "$(go env GOPATH)/bin/protoc"
+          protoc_dest="$(go env GOPATH)/bin/protoc"
+          urls=(
+            https://repo1.maven.org/maven2/com/google/protobuf/protoc/4.36.2/protoc-4.36.2-linux-x86_64.exe
+            https://repo.maven.apache.org/maven2/com/google/protobuf/protoc/4.36.2/protoc-4.36.2-linux-x86_64.exe
+          )
+          downloaded=0
+          for attempt in 1 2 3 4 5; do
+            for url in "${urls[@]}"; do
+              if curl -fsSL --retry 3 --retry-all-errors "$url" -o "$protoc_dest"; then
+                downloaded=1
+                break 2
+              fi
+            done
+            sleep "$attempt"
+          done
+          test "$downloaded" -eq 1
+          chmod +x "$protoc_dest"
           go env GOPATH | sed 's|$|/bin|' >> "$GITHUB_PATH"
       - name: Verify generated bindings
         run: |
