@@ -3,18 +3,15 @@ FROM --platform=$BUILDPLATFORM maven:3.10.0-amazoncorretto-25 AS builder
 
 WORKDIR /app
 
-RUN dnf install -y tar && dnf clean all
-
 # Copy pom.xml and download dependencies
-COPY pom.xml mvnw ./
-COPY .mvn .mvn
-RUN ./mvnw dependency:go-offline -B
+COPY pom.xml ./
+RUN mvn -B dependency:go-offline
 
 # Copy source code
 COPY src ./src
 
 # Build the application
-RUN ./mvnw clean package -DskipTests
+RUN mvn -B clean package -DskipTests
 
 # Extract layers from the JAR
 RUN cp target/api-gateway-*.jar application.jar && \
