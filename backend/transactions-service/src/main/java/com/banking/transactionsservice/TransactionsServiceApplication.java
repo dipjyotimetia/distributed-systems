@@ -1,6 +1,6 @@
 package com.banking.transactionsservice;
 
-import com.banking.transactions.grpc.FraudCheckerGrpc;
+import fraud.v1.FraudCheckerGrpc;
 import org.springframework.boot.SpringApplication;
 import org.springframework.grpc.client.ImportGrpcClients;
 import org.springframework.boot.autoconfigure.SpringBootApplication;

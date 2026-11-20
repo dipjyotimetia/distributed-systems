@@ -9,6 +9,7 @@ COPY backend/api-gateway/build.gradle.kts backend/api-gateway/gradle.properties 
 COPY backend/payments-service/build.gradle.kts backend/payments-service/gradle.properties backend/payments-service/
 COPY backend/transactions-service/build.gradle.kts backend/transactions-service/gradle.properties backend/transactions-service/
 COPY backend/transactions-service/src backend/transactions-service/src
+COPY proto/fraud/ proto/fraud/
 RUN --mount=type=cache,target=/root/.gradle,sharing=locked ./gradlew --no-daemon :transactions-service:bootJar
 RUN java -Djarmode=tools -jar backend/transactions-service/build/libs/application.jar extract --layers --destination extracted
 

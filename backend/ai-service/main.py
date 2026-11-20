@@ -281,6 +281,14 @@ def _elapsed(start: float) -> int:
 
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat(req: ChatRequest):
+    if os.environ.get("AI_PROVIDER_MODE", "live") == "fixture":
+        results = [
+            ProviderResult(**info, message=f"{info['name']} fixture reply", durationMs=1)
+            for info in PROVIDERS
+        ]
+        for result in results:
+            prepare_for_delivery(result.message, req.locale)
+        return ChatResponse(results=results)
     # Pass the user's locale through to the model so replies match their language/conventions.
     context = req.accountContext
     if req.locale:

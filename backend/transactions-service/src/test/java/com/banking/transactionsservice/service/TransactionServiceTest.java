@@ -1,9 +1,8 @@
 package com.banking.transactionsservice.service;
 
-import com.banking.transactions.grpc.FraudCheckResponse;
+import fraud.v1.Fraud.FraudCheckResponse;
 import com.banking.transactionsservice.client.FraudServiceClient;
 import com.banking.transactionsservice.dto.*;
-import com.banking.transactionsservice.event.TransactionEventProducer;
 import com.banking.transactionsservice.entity.Transaction;
 import com.banking.transactionsservice.repository.TransactionRepository;
 import io.opentelemetry.api.metrics.DoubleHistogram;
@@ -45,9 +44,6 @@ class TransactionServiceTest {
 
     @Mock
     private FraudServiceClient fraudServiceClient;
-
-    @Mock
-    private TransactionEventProducer transactionEventProducer;
 
     @Mock
     private PaymentComplianceService paymentComplianceService;
@@ -137,8 +133,38 @@ class TransactionServiceTest {
         assertThrows(RuntimeException.class, () -> {
             transactionService.deposit(request, testUserId, httpServletRequest);
         });
-        
-        verifyNoInteractions(transactionEventProducer);
+    }
+
+    @Test
+    void replaysADepositWithTheSameIdempotencyKey() {
+        DepositRequest request = new DepositRequest(testAccountId, 100.00, "Test deposit");
+        Transaction existing = new Transaction(testUserId, null, testAccountId, 100.00,
+                Transaction.TransactionType.DEPOSIT, "Test deposit");
+        existing.setId(9L);
+        existing.setStatus(Transaction.TransactionStatus.COMPLETED);
+        existing.setIdempotencyHash(Idempotency.fingerprint(existing));
+        when(httpServletRequest.getHeader("Idempotency-Key")).thenReturn("retry-1");
+        when(transactionRepository.findByUserIdAndIdempotencyKey(testUserId, "retry-1")).thenReturn(java.util.Optional.of(existing));
+
+        TransactionResponse result = transactionService.deposit(request, testUserId, httpServletRequest);
+
+        assertEquals(9L, result.getId());
+        verify(movementCoordinator, never()).execute(any());
+    }
+
+    @Test
+    void rejectsAReusedIdempotencyKeyForADifferentDeposit() {
+        DepositRequest request = new DepositRequest(testAccountId, 100.00, "Test deposit");
+        Transaction existing = new Transaction(testUserId, null, testAccountId, 50.00,
+                Transaction.TransactionType.DEPOSIT, "Test deposit");
+        existing.setId(9L);
+        existing.setIdempotencyHash(Idempotency.fingerprint(existing));
+        when(httpServletRequest.getHeader("Idempotency-Key")).thenReturn("retry-1");
+        when(transactionRepository.findByUserIdAndIdempotencyKey(testUserId, "retry-1")).thenReturn(java.util.Optional.of(existing));
+
+        var conflict = assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> transactionService.deposit(request, testUserId, httpServletRequest));
+        assertEquals(409, conflict.getStatusCode().value());
     }
 
     @Test

@@ -1,9 +1,9 @@
 package com.banking.transactionsservice;
 
 import com.banking.transactionsservice.client.FraudServiceClient;
-import com.banking.transactionsservice.event.TransactionEventProducer;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.ActiveProfiles;
 
@@ -16,7 +16,7 @@ class TransactionsServiceApplicationTests {
     private FraudServiceClient fraudServiceClient;
 
     @MockitoBean
-    private TransactionEventProducer transactionEventProducer;
+    private KafkaTemplate<String, String> kafkaTemplate;
 
     @Test
     void contextLoads() {

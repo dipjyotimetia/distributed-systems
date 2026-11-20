@@ -48,6 +48,12 @@ public class Transaction {
     
     @Column(name = "processed_at")
     private LocalDateTime processedAt;
+
+    @Column(name = "idempotency_key", length = 128)
+    private String idempotencyKey;
+
+    @Column(name = "idempotency_hash", length = 64)
+    private String idempotencyHash;
     
     public Transaction() {}
     
@@ -141,6 +147,22 @@ public class Transaction {
     
     public void setProcessedAt(LocalDateTime processedAt) {
         this.processedAt = processedAt;
+    }
+
+    public String getIdempotencyKey() {
+        return idempotencyKey;
+    }
+
+    public void setIdempotencyKey(String idempotencyKey) {
+        this.idempotencyKey = idempotencyKey;
+    }
+
+    public String getIdempotencyHash() {
+        return idempotencyHash;
+    }
+
+    public void setIdempotencyHash(String idempotencyHash) {
+        this.idempotencyHash = idempotencyHash;
     }
     
     public enum TransactionType {

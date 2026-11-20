@@ -17,13 +17,13 @@ open http://localhost:16686     # Jaeger
 ```
 
 Docker with the Compose plugin is sufficient for the container workflow.
-Register a local user, then sign in and create an account. If the gateway
+Register a local user, then sign in and create an account. `scripts/demo/walkthrough.sh` does that path against the frontend, including a retried transfer, a dispute, a statement job, and fixture AI chat. `scripts/demo/failure-scenarios.sh` pauses Kafka, stops fraud, and points at the Grafana outbox panel. Outbound payments stay on the optional Compose overlay. If the gateway
 exits with an OpenTelemetry `ContainerAttributes` error, apply the
 [local gateway workaround](TROUBLESHOOTING.md#gateway-exits-during-opentelemetry-startup).
 
 | Environment | Features and dependencies |
 |---|---|
-| Default Compose | Identity, accounts, transactions, fraud, disputes and statement workers, PostgreSQL, Redis, Redpanda, MongoDB, notifications, Jaeger, Prometheus, Grafana |
+| Default Compose | Identity, accounts, transactions, fraud, disputes, statement workers, fixture-backed AI chat, PostgreSQL, Redis, Redpanda, MongoDB, notifications, Jaeger, Prometheus, Grafana |
 | Kubernetes base and local overlay | Identity, accounts, transactions, fraud, AI, notifications, simulation, PostgreSQL, Redis, Redpanda and MongoDB |
 | Kubernetes full overlay | Base services plus disputes, the statement worker, and PostgreSQL-backed Temporal |
 | Temporal integration stack | Isolated banking journeys with scenario-specific workers and provider fixtures |
@@ -95,6 +95,9 @@ flowchart LR
   gateway --> disputes
   disputes --> transactions
   disputes --> postgres
+  gateway -.-> outboundPayments[payments-service<br/>optional overlay]
+  outboundPayments -.-> artemis[(Artemis)]
+  outboundPayments -.-> temporal
   worker --> postgres
   worker --> temporal
 
@@ -287,6 +290,7 @@ frontend and simulation package versions and Kubernetes image tags. See
 - **[OBSERVABILITY.md](./OBSERVABILITY.md)** — Monitoring, tracing, and metrics setup
 - **[plan.md](./plan.md)** — Detailed implementation phases and testing criteria
 - **[architecture.md](./architecture.md)** — System architecture and design decisions
+- **[docs/add-a-service.md](./docs/add-a-service.md)** — How to add a service to the playground
 
 ## Local Health Checks
 

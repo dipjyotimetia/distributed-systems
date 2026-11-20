@@ -104,6 +104,7 @@ services:
     networks: [banking-network]
     environment:
       OTEL_SDK_DISABLED: "true"
+      AI_PROVIDER_MODE: live
       ANTHROPIC_URL: http://provider-fixtures:8081/ai/anthropic
       OPENAI_URL: http://provider-fixtures:8081/ai/openai
       GEMINI_URL: http://provider-fixtures:8081/ai/gemini

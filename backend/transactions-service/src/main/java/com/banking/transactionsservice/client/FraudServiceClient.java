@@ -1,10 +1,12 @@
 package com.banking.transactionsservice.client;
 
-import com.banking.transactions.grpc.FraudCheckResponse;
-import com.banking.transactions.grpc.FraudCheckerGrpc;
-import com.banking.transactions.grpc.TransactionRequest;
+import fraud.v1.Fraud.FraudCheckResponse;
+import fraud.v1.Fraud.TransactionRequest;
+import fraud.v1.FraudCheckerGrpc;
+import io.opentelemetry.api.trace.Span;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -13,9 +15,12 @@ public class FraudServiceClient {
     private static final Logger logger = LoggerFactory.getLogger(FraudServiceClient.class);
 
     private final FraudCheckerGrpc.FraudCheckerBlockingStub fraudCheckerStub;
+    private final boolean failOpen;
 
-    public FraudServiceClient(FraudCheckerGrpc.FraudCheckerBlockingStub fraudCheckerStub) {
+    public FraudServiceClient(FraudCheckerGrpc.FraudCheckerBlockingStub fraudCheckerStub,
+                              @Value("${fraud.fail-open:true}") boolean failOpen) {
         this.fraudCheckerStub = fraudCheckerStub;
+        this.failOpen = failOpen;
     }
 
     public FraudCheckResponse checkTransaction(String accountId, String userId, double amount, String transactionType, String merchantCategory) {
@@ -34,13 +39,19 @@ public class FraudServiceClient {
                     response.getApproved(), response.getRiskScore(), response.getReason());
             return response;
         } catch (Exception e) {
-            logger.warn("Fraud service unavailable for account={} user={}, failing open: {}", accountId, userId, e.getMessage());
-            // Fail open so fraud service outage does not block transactions
-            return FraudCheckResponse.newBuilder()
-                    .setApproved(true)
-                    .setRiskScore(0.0)
-                    .setReason("fraud-service unavailable, fail-open")
-                    .build();
+            return unavailable(accountId, userId, e);
         }
+    }
+
+    FraudCheckResponse unavailable(String accountId, String userId, Exception failure) {
+        String decision = failOpen ? "fail-open" : "fail-closed";
+        Span.current().setAttribute("fraud.decision", decision);
+        logger.warn("Fraud service unavailable for account={} user={}, {}: {}",
+                accountId, userId, decision, failure.getMessage());
+        return FraudCheckResponse.newBuilder()
+                .setApproved(failOpen)
+                .setRiskScore(0.0)
+                .setReason("fraud-service unavailable, " + decision)
+                .build();
     }
 }

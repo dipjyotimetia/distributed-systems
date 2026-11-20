@@ -6,7 +6,6 @@ import com.banking.transactionsservice.dto.TransferRequest;
 import com.banking.transactionsservice.dto.TransactionQuery;
 import com.banking.transactionsservice.dto.TransactionResponse;
 import com.banking.transactionsservice.entity.Transaction;
-import com.banking.transactionsservice.event.TransactionEventProducer;
 import com.banking.transactionsservice.repository.TransactionRepository;
 import com.banking.transactionsservice.service.PaymentComplianceService;
 import com.banking.transactionsservice.service.TransactionService;
@@ -27,7 +26,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
-import com.banking.transactions.grpc.FraudCheckResponse;
+import fraud.v1.Fraud.FraudCheckResponse;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -50,9 +49,6 @@ class TransactionRollbackTest {
 
     @MockitoBean
     private FraudServiceClient fraudServiceClient;
-
-    @MockitoBean
-    private TransactionEventProducer transactionEventProducer;
 
     @MockitoBean
     private PaymentComplianceService paymentComplianceService;
@@ -123,6 +119,7 @@ class TransactionRollbackTest {
 
     @BeforeEach
     void setUp() {
+        jdbc.update("DELETE FROM transactions_service.event_outbox");
         jdbc.update("DELETE FROM transactions_service.movement_decisions");
         transactionRepository.deleteAll();
         // Fraud service approves all transactions by default in tests

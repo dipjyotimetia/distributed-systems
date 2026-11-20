@@ -250,6 +250,7 @@ services:
       - ACCOUNTS_SERVICE_URL=http://accounts-service:8080
       - FRAUD_SERVICE_HOST=fraud-service
       - FRAUD_SERVICE_PORT=8080
+      - FRAUD_FAIL_OPEN=${FRAUD_FAIL_OPEN:-true}
       - KAFKA_BROKERS=redpanda:9092
       # OpenTelemetry Configuration
       - OTEL_SERVICE_NAME=transactions-service
@@ -310,6 +311,7 @@ services:
       - DISPUTES_SERVICE_URL=http://disputes-service:8080
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - FAULT_INJECTION_RATE=${FAULT_INJECTION_RATE:-0}
       # JWT Configuration
       - JWT_SECRET=banking-app-super-secret-key-change-this-in-production-256-bit
       - JWT_EXPIRATION=86400000
@@ -330,6 +332,24 @@ services:
     networks:
       - banking-network
 
+  ai-service:
+    build: ./backend/ai-service
+    container_name: banking-ai
+    environment:
+      - AI_PROVIDER_MODE=fixture
+      - OTEL_SERVICE_NAME=ai-service
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
+      - OTEL_RESOURCE_ATTRIBUTES=service.namespace=banking-app
+    ports:
+      - "8084:8080"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    networks:
+      - banking-network
+
   # Frontend
   frontend:
     build:
@@ -337,10 +357,14 @@ services:
       dockerfile: Dockerfile
     container_name: banking-frontend
     depends_on:
-      - api-gateway
+      api-gateway:
+        condition: service_started
+      ai-service:
+        condition: service_healthy
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:8080
       - API_GATEWAY_URL=http://api-gateway:8080
+      - AI_SERVICE_URL=http://ai-service:8080
       - NODE_ENV=development
       # OpenTelemetry Configuration
       - OTEL_SERVICE_NAME=frontend

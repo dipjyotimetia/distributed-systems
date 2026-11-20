@@ -1,4 +1,5 @@
 const axios = require('axios');
+const { randomUUID } = require('crypto');
 const logger = require('../utils/logger');
 const config = require('../config');
 
@@ -169,7 +170,7 @@ class ApiClient {
     const payload = { currency: 'USD', ...transactionData };
     return this.retryRequest(async () => {
       const response = await this.client.post('/api/transactions/create', payload, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}`, 'Idempotency-Key': randomUUID() }
       });
       return response.data;
     });
@@ -201,7 +202,7 @@ class ApiClient {
     const payload = { currency: 'USD', ...transactionData };
     return this.retryRequest(async () => {
       const response = await this.client.post('/api/transactions/deposit', payload, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}`, 'Idempotency-Key': randomUUID() }
       });
       return response.data;
     });
@@ -211,7 +212,7 @@ class ApiClient {
     const payload = { currency: 'USD', ...transactionData };
     return this.retryRequest(async () => {
       const response = await this.client.post('/api/transactions/withdraw', payload, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}`, 'Idempotency-Key': randomUUID() }
       });
       return response.data;
     });
@@ -221,7 +222,7 @@ class ApiClient {
     const payload = { currency: 'USD', ...transactionData };
     return this.retryRequest(async () => {
       const response = await this.client.post('/api/transactions/transfer', payload, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}`, 'Idempotency-Key': randomUUID() }
       });
       return response.data;
     });
@@ -240,6 +241,40 @@ class ApiClient {
     return this.retryRequest(async () => {
       const response = await this.client.get('/api/users/check-email', {
         params: { email }
+      });
+      return response.data;
+    });
+  }
+
+  async fileDispute(transferId, token) {
+    return this.retryRequest(async () => {
+      const response = await this.client.post('/api/disputes', {
+        transferId,
+        reason: 'Simulation dispute for a completed transfer'
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      return response.data;
+    });
+  }
+
+  async queueStatementJob(accountId, token) {
+    return this.retryRequest(async () => {
+      const response = await this.client.post(`/api/accounts/${accountId}/statement-jobs`, {}, {
+        headers: { Authorization: `Bearer ${token}`, 'Idempotency-Key': randomUUID() }
+      });
+      return response.data;
+    });
+  }
+
+  async submitPayment(accountId, token) {
+    return this.retryRequest(async () => {
+      const response = await this.client.post('/api/payments', {
+        accountId,
+        destination: 'SIMULATE0001',
+        amountMinor: 100
+      }, {
+        headers: { Authorization: `Bearer ${token}`, 'Idempotency-Key': randomUUID() }
       });
       return response.data;
     });

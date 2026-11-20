@@ -51,6 +51,10 @@ export interface TransactionFilters {
   description?: string;
 }
 
+function idempotencyConfig() {
+  return { headers: { 'Idempotency-Key': crypto.randomUUID() } };
+}
+
 export class TransactionsAPI {
   // Get all transactions for the current user
   static async getTransactions(): Promise<ApiResponse<Transaction[]>> {
@@ -119,7 +123,7 @@ export class TransactionsAPI {
 
   // Create new transaction
   static async createTransaction(transactionData: CreateTransactionRequest): Promise<ApiResponse<Transaction>> {
-    return await apiClient.post<Transaction>('/api/transactions', transactionData);
+    return await apiClient.post<Transaction>('/api/transactions', transactionData, idempotencyConfig());
   }
 
   // Create deposit transaction
@@ -137,7 +141,7 @@ export class TransactionsAPI {
       currency,
     };
 
-    const result = await apiClient.post<Transaction>('/api/transactions/deposit', depositData);
+    const result = await apiClient.post<Transaction>('/api/transactions/deposit', depositData, idempotencyConfig());
     logTransaction('deposit', accountId, amount, result.success);
     return result;
   }
@@ -157,7 +161,7 @@ export class TransactionsAPI {
       currency,
     };
 
-    const result = await apiClient.post<Transaction>('/api/transactions/withdraw', withdrawalData);
+    const result = await apiClient.post<Transaction>('/api/transactions/withdraw', withdrawalData, idempotencyConfig());
     logTransaction('withdrawal', accountId, amount, result.success);
     return result;
   }
@@ -179,7 +183,7 @@ export class TransactionsAPI {
       currency,
     };
 
-    const result = await apiClient.post<Transaction>('/api/transactions/transfer', transferData);
+    const result = await apiClient.post<Transaction>('/api/transactions/transfer', transferData, idempotencyConfig());
     logTransaction('transfer', fromAccountId, amount, result.success);
     return result;
   }

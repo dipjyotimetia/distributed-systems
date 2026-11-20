@@ -2,6 +2,7 @@ package com.banking.transactionsservice.service;
 
 import com.banking.transactionsservice.client.AccountsServiceClient;
 import com.banking.transactionsservice.entity.Transaction;
+import com.banking.transactionsservice.event.TransactionEventOutbox;
 import com.banking.transactionsservice.repository.TransactionRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,12 +31,14 @@ public class MovementCoordinator {
     private final TransactionTemplate durable;
     private final AccountsServiceClient accounts;
     private final TransactionRepository ledger;
+    private final TransactionEventOutbox outbox;
 
     public MovementCoordinator(JdbcTemplate jdbc, PlatformTransactionManager manager, AccountsServiceClient accounts,
-                               TransactionRepository ledger) {
+                               TransactionRepository ledger, TransactionEventOutbox outbox) {
         this.jdbc = jdbc;
         this.accounts = accounts;
         this.ledger = ledger;
+        this.outbox = outbox;
         durable = new TransactionTemplate(manager);
         durable.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
@@ -67,6 +70,7 @@ public class MovementCoordinator {
                 transaction.setStatus(Transaction.TransactionStatus.COMPLETED);
                 transaction.setProcessedAt(LocalDateTime.now());
                 Transaction entry = ledger.saveAndFlush(transaction);
+                outbox.enqueue(entry);
                 jdbc.update("""
                         UPDATE transactions_service.movement_decisions SET state = 'COMMITTED', ledger_id = ?
                         WHERE operation_id = ?

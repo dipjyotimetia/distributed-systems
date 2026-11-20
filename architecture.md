@@ -27,11 +27,25 @@ Client → Frontend Service → API Gateway → Backend Services
 
 See the [deployment matrix](README.md#quick-start) for which services each environment runs.
 
-The eight application backend services are `api-gateway`, `user-service`,
+The application backend services are `api-gateway`, `user-service`,
 `accounts-service`, `transactions-service`, `fraud-service`,
-`notification-service`, `disputes-service`, and `ai-service`. MongoDB provides infrastructure
+`notification-service`, `disputes-service`, `ai-service`, and the optional
+`payments-service`. MongoDB provides infrastructure
 for notification event storage. Kafka carries transaction events and
-PostgreSQL stores identity, account, transaction, and dispute data.
+PostgreSQL stores identity, account, transaction, dispute, and payment data.
+
+Local Compose uses one PostgreSQL database with a schema per service
+(`user_service`, `accounts_service`, `transactions_service`, `payments`,
+`disputes`). That is a demo shortcut. A new service should still treat its
+schema as private and should not read another service's tables.
+
+Completed ledger movements record an `Idempotency-Key` when the client sends
+one, and write `transaction-events` through `transactions_service.event_outbox`
+in the same database transaction as the ledger row. Fraud screening fails open
+unless `FRAUD_FAIL_OPEN=false`. The gateway fault filter stays off unless
+`FAULT_INJECTION_RATE` is set above zero. Default Compose runs `ai-service`
+in fixture mode so chat does not call live LLM providers. `payments-service`
+stays on the Artemis and payments Compose overlays.
 
 The disputes API verifies transfer eligibility through the transaction
 read endpoint using the caller's JWT. PostgreSQL stores the case and

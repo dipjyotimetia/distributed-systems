@@ -62,6 +62,10 @@ tasks.jar { enabled = false }
 
 tasks.bootJar { archiveFileName.set("application.jar") }
 
+sourceSets.main {
+    proto.srcDir(rootProject.file("proto/fraud"))
+}
+
 protobuf {
     protoc { artifact = "com.google.protobuf:protoc:4.36.2" }
     plugins {

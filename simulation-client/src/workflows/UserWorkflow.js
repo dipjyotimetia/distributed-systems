@@ -64,6 +64,11 @@ class UserWorkflow {
       await this.randomDelay();
     }
 
+    if (config.features.statementJobsEnabled && Math.random() < 0.1 && user.accounts && user.accounts.length > 0) {
+      await this.queueStatementJob(user, user.accounts);
+      await this.randomDelay();
+    }
+
     // Step 5: Perform some transactions (optional)
     if (Math.random() < 0.7) { // 70% chance of making transactions
       await this.performRandomTransactions(user, accounts);
@@ -443,6 +448,14 @@ class UserWorkflow {
         }
       }
 
+      if (transactionType === 'transfer' && result?.id && config.features.disputesEnabled && Math.random() < 0.2) {
+        await this.fileDispute(user, result.id);
+      }
+      const paymentAccount = transactionData.accountId || transactionData.fromAccountId;
+      if (config.features.paymentsEnabled && paymentAccount && Math.random() < 0.05) {
+        await this.submitPayment(user, paymentAccount);
+      }
+
       user.updateLastAction();
     } catch (error) {
       logger.error('Transaction failed', {
@@ -507,6 +520,37 @@ class UserWorkflow {
         error: error.message
       });
       // Don't throw - notification check is optional
+    }
+  }
+
+  async fileDispute(user, transferId) {
+    try {
+      const result = await this.apiClient.fileDispute(transferId, user.token);
+      logger.info('Dispute filed', { userId: user.id, transferId, caseId: result?.id });
+      user.updateLastAction();
+    } catch (error) {
+      logger.warn('Dispute filing failed', { userId: user.id, transferId, error: error.message });
+    }
+  }
+
+  async queueStatementJob(user, accounts) {
+    const account = accounts[Math.floor(Math.random() * accounts.length)];
+    try {
+      const result = await this.apiClient.queueStatementJob(account.id, user.token);
+      logger.info('Statement job queued', { userId: user.id, accountId: account.id, jobId: result?.id });
+      user.updateLastAction();
+    } catch (error) {
+      logger.warn('Statement job failed', { userId: user.id, accountId: account.id, error: error.message });
+    }
+  }
+
+  async submitPayment(user, accountId) {
+    try {
+      const result = await this.apiClient.submitPayment(accountId, user.token);
+      logger.info('Outbound payment submitted', { userId: user.id, accountId, paymentId: result?.id });
+      user.updateLastAction();
+    } catch (error) {
+      logger.warn('Outbound payment failed', { userId: user.id, accountId, error: error.message });
     }
   }
 
