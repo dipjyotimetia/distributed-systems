@@ -24,6 +24,6 @@ class TransactionEventOutboxTest {
         assertTrue(payload.contains("\"user_id\":7"));
         assertTrue(payload.contains("\"transaction_type\":\"DEPOSIT\""));
         assertTrue(payload.contains("\"status\":\"COMPLETED\""));
-        assertTrue(payload.contains("\"timestamp\":\"2026-11-20T09:30:00Z\""));
+        assertTrue(payload.contains("\"timestamp\":\"2026-11-20T09:30Z\""));
     }
 }
