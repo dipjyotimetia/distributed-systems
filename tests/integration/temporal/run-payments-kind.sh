@@ -10,7 +10,7 @@ export MICROSVC_PAYMENTS=1
 pids=()
 cleanup() {
   local status=$?
-  for pid in "${pids[@]}"; do kill "$pid" 2>/dev/null || true; done
+  for pid in ${pids[@]+"${pids[@]}"}; do kill "$pid" 2>/dev/null || true; done
   if [[ "$status" != 0 ]]; then
     kubectl -n banking-app get pods,jobs,pvc || true
     for app in banking-payments banking-payments-worker banking-clearing-simulator; do
