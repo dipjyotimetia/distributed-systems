@@ -78,6 +78,13 @@ class Journey:
             finally:
                 subprocess.run([*self.kubectl, "scale", workload, "--replicas=1"], check=True, timeout=15)
                 subprocess.run([*self.kubectl, "rollout", "status", workload, "--timeout=90s"], check=True, timeout=95)
+        elif service == "redpanda":
+            # Restart the broker so Kafka clients must reconnect, as in Kind.
+            self.engine("stop", service)
+            try:
+                yield
+            finally:
+                self.engine("start", service)
         else:
             self.engine("pause", service)
             try:
