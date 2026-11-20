@@ -147,7 +147,9 @@ describe('TransactionsAPI', () => {
 
       const result = await TransactionsAPI.createTransaction(transactionData)
 
-      expect(mockApiClient.post).toHaveBeenCalledWith('/api/transactions', transactionData)
+      expect(mockApiClient.post).toHaveBeenCalledWith('/api/transactions', transactionData, {
+        headers: { 'Idempotency-Key': expect.any(String) },
+      })
       expect(result).toEqual(mockResponse)
     })
 
@@ -187,6 +189,8 @@ describe('TransactionsAPI', () => {
         amount: 1000,
         currency: 'USD',
         description: 'Test deposit',
+      }, {
+        headers: { 'Idempotency-Key': expect.any(String) },
       })
       expect(result).toEqual(mockResponse)
     })
@@ -202,6 +206,8 @@ describe('TransactionsAPI', () => {
         amount: 1000,
         currency: 'EUR',
         description: 'Test deposit',
+      }, {
+        headers: { 'Idempotency-Key': expect.any(String) },
       })
     })
   })
@@ -221,6 +227,8 @@ describe('TransactionsAPI', () => {
         amount: 500,
         currency: 'USD',
         description: 'Test withdrawal',
+      }, {
+        headers: { 'Idempotency-Key': expect.any(String) },
       })
       expect(result).toEqual(mockResponse)
     })
@@ -242,6 +250,8 @@ describe('TransactionsAPI', () => {
         amount: 300,
         currency: 'USD',
         description: 'Test transfer',
+      }, {
+        headers: { 'Idempotency-Key': expect.any(String) },
       })
       expect(result).toEqual(mockResponse)
     })

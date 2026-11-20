@@ -66,3 +66,13 @@ def test_chat_korean_locale_keeps_delivery_error():
 
     assert response.status_code == 500
     assert response.text == "Internal Server Error"
+
+
+def test_fixture_mode_returns_every_provider_without_calling_them(monkeypatch):
+    monkeypatch.setenv("AI_PROVIDER_MODE", "fixture")
+    response = TestClient(app).post("/api/chat", json={"message": "hello", "locale": "en-US"})
+
+    assert response.status_code == 200
+    results = response.json()["results"]
+    assert [item["provider"] for item in results] == ["anthropic", "openai", "gemini", "xai", "openrouter"]
+    assert all(item["error"] is None and "fixture reply" in item["message"] for item in results)

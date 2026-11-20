@@ -2,22 +2,11 @@
 
 > Historical specification. See the [current architecture](../../../architecture.md) and [project README](../../../README.md).
 
-Endpoints, fraud screening, ownership/balance rules, locked mutation with compensation,
-payment fan-out, Kafka events and observability are implemented (requirements 1–8), except
-the gaps in tasks 1–2. Tasks 3–5 address the known limitations in design.md and build on the
-locked mutation:
+Endpoints, fraud screening, ownership and balance rules, locked mutation with compensation,
+payment fan-out, Kafka events, and observability are implemented.
 
-- [ ] 1. Reject a same-account transfer in the service, not only in `TransactionController.transfer`: today
-  `POST /create` with `type=TRANSFER` and identical ids reaches `transfer`, which reads the
-  balance twice and then writes `balance - amount` and `balance + amount`. _Req 1.2_
-- [ ] 2. Persist `FAILED` records durably: `TransactionService` is class-level
-  `@Transactional` and the failure handlers save `FAILED` then throw `RuntimeException`, so
-  the save is rolled back. Save in an independent transaction (`REQUIRES_NEW`). Fraud,
-  ownership and insufficient-balance failures throw before any entity exists, so they also
-  need a record. _Req 4.3_
-
-- [ ] 3. Serialize balance writes across replicas (distributed lock or atomic balance op
-  on accounts-service), keeping fail-open fraud behavior. _Req 4.1_
-- [ ] 4. Add an outbox or saga so a crash between balance update and record persistence
-  cannot leave them inconsistent. _Req 4.2, 4.3_
-- [ ] 5. Accept a client idempotency key so retries do not double-apply. _Req 1, 4.3_
+- [x] 1. Same-account transfers are rejected in `MovementCoordinator` before a ledger write. _Req 1.2_
+- [x] 2. Movement decisions use `REQUIRES_NEW`, and account changes go through `MovementReservations`. _Req 4.3_
+- [x] 3. `MovementReservations` serializes balance writes in PostgreSQL. Fraud unavailability follows `fraud.fail-open` (default fail-open, `FRAUD_FAIL_OPEN=false` rejects). _Req 4.1_
+- [x] 4. `TransactionEventOutbox` inserts `transaction-events` in the same transaction as the ledger row. _Req 4.2, 4.3_
+- [x] 5. `Idempotency-Key` on deposit, withdraw, transfer, and create returns the original transaction. A reused key with a different body returns 409. _Req 1, 4.3_

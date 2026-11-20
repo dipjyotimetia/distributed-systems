@@ -1,19 +1,16 @@
-# Multi-stage build for Transactions Service
+# Multi-stage build for Transactions Service.
+# The build context is the repository root so the shared fraud protobuf is available.
 FROM --platform=$BUILDPLATFORM maven:3.10.0-amazoncorretto-25 AS builder
 
-WORKDIR /app
+WORKDIR /src/backend/transactions-service
 
-# Copy pom.xml and download dependencies
-COPY pom.xml ./
+COPY proto/fraud/fraud.proto /src/proto/fraud/fraud.proto
+COPY backend/transactions-service/pom.xml ./
 RUN mvn -B dependency:go-offline
 
-# Copy source code
-COPY src ./src
-
-# Build the application
+COPY backend/transactions-service/src ./src
 RUN mvn -B clean package -DskipTests
 
-# Extract layers from the JAR
 RUN cp target/transactions-service-*.jar application.jar && \
     java -Djarmode=tools -jar application.jar extract --layers --destination extracted
 
@@ -23,26 +20,20 @@ FROM --platform=$TARGETPLATFORM amazoncorretto:25-alpine@sha256:1124f698f69d2185
 
 WORKDIR /app
 
-# Create non-root user
 RUN addgroup -g 1001 spring && \
     adduser -D -s /bin/sh -u 1001 -G spring spring
 
-# Copy layers in order of likelihood to change (dependencies first, then application)
-COPY --from=builder /app/extracted/dependencies/ ./
-COPY --from=builder /app/extracted/spring-boot-loader/ ./
-COPY --from=builder /app/extracted/snapshot-dependencies/ ./
-COPY --from=builder /app/extracted/application/ ./
+COPY --from=builder /src/backend/transactions-service/extracted/dependencies/ ./
+COPY --from=builder /src/backend/transactions-service/extracted/spring-boot-loader/ ./
+COPY --from=builder /src/backend/transactions-service/extracted/snapshot-dependencies/ ./
+COPY --from=builder /src/backend/transactions-service/extracted/application/ ./
 
-# Change ownership to non-root user
 RUN chown -R spring:spring /app
 
-# Switch to non-root user
 USER spring
 
-# Expose port
 EXPOSE 8080
 
-# Run the application with optimized JVM flags for faster startup
 ENTRYPOINT ["java", \
     "-XX:+UseContainerSupport", \
     "-XX:MaxRAMPercentage=50.0", \

@@ -551,6 +551,7 @@ payment signals under the `hybrid-payments` scrape job. Artemis queue counts can
 | --- | --- |
 | Age of the oldest nonterminal payment | `payments_oldest_pending_seconds` |
 | Age of the oldest unpublished outbox record | `payments_outbox_oldest_seconds{destination="workflow|mq|kafka"}`, with one series per destination |
+| Age of the oldest unpublished transaction event | `transactions_outbox_oldest_seconds` on the Banking App dashboard |
 | Reconciliation discrepancies retained for review | `payments_reconciliation_discrepancies` |
 
 Use the backout queue depth to see messages awaiting operator inspection.

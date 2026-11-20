@@ -88,7 +88,10 @@ const config = {
   // Feature toggles
   features: {
     aiChatEnabled: (process.env.AI_CHAT_ENABLED || 'true') === 'true',
-    exportStatementEnabled: (process.env.EXPORT_STATEMENT_ENABLED || 'true') === 'true'
+    exportStatementEnabled: (process.env.EXPORT_STATEMENT_ENABLED || 'true') === 'true',
+    disputesEnabled: (process.env.DISPUTES_ENABLED || 'true') === 'true',
+    statementJobsEnabled: (process.env.STATEMENT_JOBS_ENABLED || 'true') === 'true',
+    paymentsEnabled: (process.env.PAYMENTS_ENABLED || 'false') === 'true'
   },
 
   // Transaction simulation settings

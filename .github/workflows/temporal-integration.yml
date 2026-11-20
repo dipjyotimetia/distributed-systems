@@ -104,9 +104,14 @@ jobs:
         run: |
           for service in api-gateway accounts-service user-service transactions-service fraud-service notification-service ai-service disputes-service; do
             image="microsvc-journeys/$service:checkout"
-            if ! docker build -t "$image" "backend/$service"; then
+            if [ "$service" = "transactions-service" ]; then
+              build=(docker build -f backend/transactions-service/Dockerfile -t "$image" .)
+            else
+              build=(docker build -t "$image" "backend/$service")
+            fi
+            if ! "${build[@]}"; then
               sleep 5
-              docker build -t "$image" "backend/$service"
+              "${build[@]}"
             fi
             kind load docker-image "$image" --name banking-journeys
           done

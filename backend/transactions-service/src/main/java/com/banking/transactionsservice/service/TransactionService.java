@@ -6,7 +6,6 @@ import com.banking.transactionsservice.dto.*;
 import com.banking.transactionsservice.entity.Transaction;
 import com.banking.transactionsservice.entity.Transaction.TransactionStatus;
 import com.banking.transactionsservice.entity.Transaction.TransactionType;
-import com.banking.transactionsservice.event.TransactionEventProducer;
 import com.banking.transactionsservice.repository.TransactionRepository;
 import io.opentelemetry.api.metrics.DoubleHistogram;
 import jakarta.servlet.http.HttpServletRequest;
@@ -16,6 +15,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -80,9 +80,6 @@ public class TransactionService {
 
     @Autowired
     private FraudServiceClient fraudServiceClient;
-
-    @Autowired
-    private TransactionEventProducer transactionEventProducer;
 
     @Autowired
     private PaymentComplianceService paymentComplianceService;
@@ -248,15 +245,10 @@ public class TransactionService {
             throw new RuntimeException("Transaction rejected by fraud check: " + fraudResult.getReason());
         }
 
-        Transaction savedTransaction = movementCoordinator.execute(new Transaction(userId, null, request.getAccountId(),
-                request.getAmount(), Transaction.TransactionType.DEPOSIT, request.getDescription()));
-
-        depositAmountHistogram.record(request.getAmount().doubleValue());
-        transactionEventProducer.publishTransactionEvent(savedTransaction);
-        paymentComplianceService.fanOutPaymentAndCompliance(
-                savedTransaction.getId(), "DEPOSIT", request.getAmount());
-
-        return convertToResponse(savedTransaction);
+        return complete(new Transaction(userId, null, request.getAccountId(),
+                request.getAmount(), Transaction.TransactionType.DEPOSIT, request.getDescription()), httpRequest,
+                () -> depositAmountHistogram.record(request.getAmount().doubleValue()),
+                saved -> paymentComplianceService.fanOutPaymentAndCompliance(saved.getId(), "DEPOSIT", request.getAmount()));
     }
     
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -272,15 +264,10 @@ public class TransactionService {
             throw new RuntimeException("Transaction rejected by fraud check: " + fraudResult.getReason());
         }
 
-        Transaction savedTransaction = movementCoordinator.execute(new Transaction(userId, request.getAccountId(), null,
-                request.getAmount(), Transaction.TransactionType.WITHDRAWAL, request.getDescription()));
-
-        withdrawAmountHistogram.record(request.getAmount().doubleValue());
-        transactionEventProducer.publishTransactionEvent(savedTransaction);
-        paymentComplianceService.fanOutPaymentAndCompliance(
-                savedTransaction.getId(), "WITHDRAWAL", request.getAmount());
-
-        return convertToResponse(savedTransaction);
+        return complete(new Transaction(userId, request.getAccountId(), null,
+                request.getAmount(), Transaction.TransactionType.WITHDRAWAL, request.getDescription()), httpRequest,
+                () -> withdrawAmountHistogram.record(request.getAmount().doubleValue()),
+                saved -> paymentComplianceService.fanOutPaymentAndCompliance(saved.getId(), "WITHDRAWAL", request.getAmount()));
     }
     
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -297,15 +284,44 @@ public class TransactionService {
         }
 
         paymentComplianceService.verifyTransferCompliance(request.getFromAccountId(), request.getToAccountId());
-        Transaction savedTransaction = movementCoordinator.execute(new Transaction(userId, request.getFromAccountId(), request.getToAccountId(),
-                request.getAmount(), Transaction.TransactionType.TRANSFER, request.getDescription()));
+        return complete(new Transaction(userId, request.getFromAccountId(), request.getToAccountId(),
+                request.getAmount(), Transaction.TransactionType.TRANSFER, request.getDescription()), httpRequest,
+                () -> transferAmountHistogram.record(request.getAmount().doubleValue()),
+                saved -> paymentComplianceService.fanOutPaymentAndCompliance(saved.getId(), "TRANSFER", request.getAmount()));
+    }
 
-        transferAmountHistogram.record(request.getAmount().doubleValue());
-        transactionEventProducer.publishTransactionEvent(savedTransaction);
-        paymentComplianceService.fanOutPaymentAndCompliance(
-                savedTransaction.getId(), "TRANSFER", request.getAmount());
+    private TransactionResponse complete(Transaction draft, HttpServletRequest httpRequest, Runnable metrics,
+                                         java.util.function.Consumer<Transaction> afterCommit) {
+        String key = Idempotency.key(httpRequest);
+        String hash = null;
+        if (key != null) {
+            hash = Idempotency.fingerprint(draft);
+            draft.setIdempotencyKey(key);
+            draft.setIdempotencyHash(hash);
+            var existing = transactionRepository.findByUserIdAndIdempotencyKey(draft.getUserId(), key);
+            if (existing.isPresent()) {
+                return replay(existing.get(), hash);
+            }
+        }
+        try {
+            Transaction saved = movementCoordinator.execute(draft);
+            metrics.run();
+            afterCommit.accept(saved);
+            return convertToResponse(saved);
+        } catch (DataIntegrityViolationException conflict) {
+            if (key == null) {
+                throw conflict;
+            }
+            return replay(transactionRepository.findByUserIdAndIdempotencyKey(draft.getUserId(), key)
+                    .orElseThrow(() -> conflict), hash);
+        }
+    }
 
-        return convertToResponse(savedTransaction);
+    private TransactionResponse replay(Transaction existing, String hash) {
+        if (hash == null || !hash.equals(existing.getIdempotencyHash())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Idempotency key was reused for a different transaction");
+        }
+        return convertToResponse(existing);
     }
     
     @Transactional(propagation = Propagation.NOT_SUPPORTED)

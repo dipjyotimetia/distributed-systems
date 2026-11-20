@@ -1,0 +1,5 @@
+*
+!proto/fraud/fraud.proto
+!backend/transactions-service/pom.xml
+!backend/transactions-service/src
+!backend/transactions-service/src/**

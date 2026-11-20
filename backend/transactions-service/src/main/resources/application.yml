@@ -65,6 +65,14 @@ kafka:
   topic:
     transactions: ${KAFKA_TOPIC:transaction-events}
 
+fraud:
+  fail-open: ${FRAUD_FAIL_OPEN:true}
+
+transactions:
+  outbox:
+    publish-enabled: ${TRANSACTIONS_OUTBOX_PUBLISH_ENABLED:true}
+    delay-ms: ${TRANSACTIONS_OUTBOX_DELAY_MS:1000}
+
 # Logging Configuration
 logging:
   level:

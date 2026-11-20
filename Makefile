@@ -32,7 +32,7 @@ docker-build:
 	@echo "Building Docker images with version: $(IMAGE_TAG)..."
 	@for service in $(SERVICES); do \
 		echo "Building Docker image for $$service..."; \
-		docker build -t $(REGISTRY)/$$service:$(IMAGE_TAG) backend/$$service/; \
+		if [ "$$service" = "transactions-service" ]; then docker build -f backend/transactions-service/Dockerfile -t $(REGISTRY)/$$service:$(IMAGE_TAG) .; else docker build -t $(REGISTRY)/$$service:$(IMAGE_TAG) backend/$$service/; fi; \
 	done
 	@echo "Building Docker image for frontend..."
 	docker build -t $(REGISTRY)/frontend:$(IMAGE_TAG) frontend/
@@ -53,7 +53,7 @@ docker-build-versioned:
 	@VERSION_TAG=$$(./scripts/version.sh tag); \
 	for service in $(SERVICES); do \
 		echo "Building Docker image for $$service with tag: $$VERSION_TAG..."; \
-		docker build -t $(REGISTRY)/$$service:$$VERSION_TAG backend/$$service/; \
+		if [ "$$service" = "transactions-service" ]; then docker build -f backend/transactions-service/Dockerfile -t $(REGISTRY)/$$service:$$VERSION_TAG .; else docker build -t $(REGISTRY)/$$service:$$VERSION_TAG backend/$$service/; fi; \
 	done
 	@VERSION_TAG=$$(./scripts/version.sh tag); \
 	echo "Building Docker image for frontend with tag: $$VERSION_TAG..."; \

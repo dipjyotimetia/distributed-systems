@@ -2,7 +2,7 @@ spring:
   sql:
     init:
       mode: ${MICROSVC_TX_SQL_INIT:always}
-      schema-locations: classpath:db/migration/V3__Movement_decisions.sql
+      schema-locations: classpath:db/migration/V3__Movement_decisions.sql,classpath:db/migration/V4__Idempotency_and_event_outbox.sql
   datasource:
     url: ${MICROSVC_TX_POSTGRES_URL:jdbc:h2:mem:${random.uuid};INIT=CREATE SCHEMA IF NOT EXISTS transactions_service}
     driver-class-name: ${MICROSVC_TX_DRIVER:org.h2.Driver}
@@ -23,6 +23,13 @@ spring:
     url: ${MICROSVC_TX_POSTGRES_URL:}
     user: ${MICROSVC_POSTGRES_USER:postgres}
     password: ${MICROSVC_POSTGRES_PASSWORD:}
+
+transactions:
+  outbox:
+    publish-enabled: false
+
+fraud:
+  fail-open: true
 
 # External Service URLs for Testing
 accounts:
