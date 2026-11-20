@@ -81,7 +81,7 @@ for role in reader writer; do
 done
 
 kubectl -n banking-app wait --for=condition=complete job/banking-workflow-bootstrap-v2 --timeout=5m
-for resource in statefulset/banking-clearing-mq statefulset/banking-payments-postgres statefulset/banking-clearing-postgres \
+for resource in statefulset/banking-clearing-mq statefulset/banking-payments-postgres-19 statefulset/banking-clearing-postgres-19 \
   deployment/banking-kafka deployment/mongodb deployment/banking-temporal deployment/provider-fixtures \
   deployment/banking-gateway deployment/banking-frontend deployment/banking-accounts deployment/banking-user \
   deployment/banking-fraud deployment/banking-transactions deployment/banking-payments deployment/banking-notification \
@@ -154,11 +154,11 @@ payment_id="$(python3 -c 'import json,sys,uuid; print(uuid.UUID(json.load(open(s
 movement="$(kubectl -n banking-app exec deployment/banking-postgres -- psql -At -U postgres -d banking_app \
   -v ON_ERROR_STOP=1 -c "SELECT state || '|' || amount FROM accounts_service.movement_reservations WHERE operation_id = '$payment_id'")"
 [[ "$movement" == 'COMMITTED|25.00' ]]
-matched="$(kubectl -n banking-app exec banking-payments-postgres-0 -- psql -At -U payments -d payments \
+matched="$(kubectl -n banking-app exec banking-payments-postgres-19-0 -- psql -At -U payments -d payments \
   -v ON_ERROR_STOP=1 -c "SELECT count(*) FROM payments.reconciliation_result WHERE payment_id = '$payment_id' AND outcome = 'MATCHED'")"
 [[ "$matched" == 1 ]]
 ./gradlew :payments-service:test --tests "*MqClearingRecoveryTest"
-inbox="$(kubectl -n banking-app exec banking-payments-postgres-0 -- psql -At -U payments -d payments \
+inbox="$(kubectl -n banking-app exec banking-payments-postgres-19-0 -- psql -At -U payments -d payments \
   -v ON_ERROR_STOP=1 -c "SELECT count(*) FROM payments.clearing_inbox WHERE payment_id = '$payment_id' AND kind = 'SETTLED'")"
 [[ "$inbox" == 1 ]]
 MICROSVC_PAYMENT_FIXTURES="$fixtures" python3 tests/integration/temporal/payment-recovery.py --kind

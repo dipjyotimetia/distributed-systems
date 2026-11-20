@@ -52,7 +52,7 @@ class Journey:
             raise AssertionError(f"{path} returned HTTP {error.code}, expected {expected}") from None
 
     def sql(self, statement):
-        target = ([*self.kubectl, "exec", "-i", "banking-payments-postgres-0", "--"] if self.kind
+        target = ([*self.kubectl, "exec", "-i", "banking-payments-postgres-19-0", "--"] if self.kind
                   else [*self.compose, "exec", "-T", "payments-postgres"])
         return subprocess.run([*target, "psql", "-Atq", "-U", "payments", "-d", "payments", "-v", "ON_ERROR_STOP=1"],
             input=statement, text=True, capture_output=True, check=True, timeout=15).stdout.strip()

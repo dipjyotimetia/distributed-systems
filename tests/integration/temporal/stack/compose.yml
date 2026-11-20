@@ -2,7 +2,7 @@ services:
   postgres:
     container_name: !reset null
     ports: !reset []
-    tmpfs: ["/var/lib/postgresql/data:size=384m"]
+    tmpfs: ["/var/lib/postgresql:size=384m"]
     volumes: !override
       - ./database/init:/docker-entrypoint-initdb.d:ro
   redis:

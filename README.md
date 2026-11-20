@@ -155,6 +155,8 @@ npm test               # Run tests
 
 ### Database Operations
 
+Existing PostgreSQL 18 installations can follow the [PostgreSQL 19 upgrade runbook](docs/postgresql-19-upgrade.md).
+
 For manual Flyway tasks, provide `FLYWAY_PASSWORD` and optionally override `FLYWAY_URL` and `FLYWAY_USER`. Use the corresponding Gradle subproject for each schema.
 ```bash
 # Postgres

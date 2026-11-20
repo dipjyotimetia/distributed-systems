@@ -16,7 +16,7 @@ jobs:
     
     services:
       postgres:
-        image: postgres:18.7
+        image: postgres:19.0
         env:
           POSTGRES_PASSWORD: password
           POSTGRES_DB: banking_test
@@ -149,7 +149,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       disputes_postgres:
-        image: postgres:18.7-alpine
+        image: postgres:19.0-alpine
         env:
           POSTGRES_PASSWORD: password
         ports:

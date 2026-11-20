@@ -1,7 +1,7 @@
 services:
   # Database
   postgres:
-    image: postgres:18.7-alpine
+    image: postgres:19.0-alpine
     container_name: banking-postgres
     healthcheck:
       test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "postgres", "-d", "banking_app"]
@@ -9,14 +9,13 @@ services:
       timeout: 3s
       retries: 20
     environment:
-      PGDATA: /var/lib/postgresql/data
       POSTGRES_DB: banking_app
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data_19:/var/lib/postgresql
       - ./database/init:/docker-entrypoint-initdb.d
     networks:
       - banking-network
@@ -47,7 +46,7 @@ services:
 
   # Backend Services
   disputes-schema:
-    image: postgres:18.7-alpine
+    image: postgres:19.0-alpine
     depends_on:
       postgres:
         condition: service_healthy
@@ -401,7 +400,7 @@ services:
       - banking-network
 
 volumes:
-  postgres_data:
+  postgres_data_19:
   disputes_temporal_data:
   grafana_data:
   mongodb_data:

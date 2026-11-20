@@ -17,13 +17,13 @@ services:
       retries: 24
 
   clearing-postgres:
-    image: postgres:18.7-alpine
+    image: postgres:19.0-alpine
     environment:
       POSTGRES_DB: clearing
       POSTGRES_USER: clearing
       POSTGRES_PASSWORD: ${BANKING_CLEARING_DB_PASSWORD:?Set the clearing database password}
     volumes:
-      - clearing_postgres_data:/var/lib/postgresql
+      - clearing_postgres_data_19:/var/lib/postgresql
     networks: [banking-network]
     healthcheck:
       test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "clearing", "-d", "clearing"]
@@ -65,4 +65,4 @@ services:
 
 volumes:
   clearing_artemis_data:
-  clearing_postgres_data:
+  clearing_postgres_data_19:

@@ -13,7 +13,7 @@ spec:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: banking-payments-postgres
+  name: banking-payments-postgres-19
 spec:
   serviceName: banking-payments-postgres
   replicas: 1
@@ -28,7 +28,7 @@ spec:
       automountServiceAccountToken: false
       containers:
         - name: postgres
-          image: postgres:18.7-alpine
+          image: postgres:19.0-alpine
           ports:
             - name: postgres
               containerPort: 5432
@@ -110,7 +110,7 @@ spec:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: banking-clearing-postgres
+  name: banking-clearing-postgres-19
 spec:
   serviceName: banking-clearing-postgres
   replicas: 1
@@ -125,7 +125,7 @@ spec:
       automountServiceAccountToken: false
       containers:
         - name: postgres
-          image: postgres:18.7-alpine
+          image: postgres:19.0-alpine
           ports:
             - name: postgres
               containerPort: 5432

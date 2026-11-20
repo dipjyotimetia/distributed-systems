@@ -16,7 +16,7 @@ spec:
       automountServiceAccountToken: false
       initContainers:
         - name: wait-for-temporal-role
-          image: postgres:18.7-alpine
+          image: postgres:19.0-alpine
           command:
             - sh
             - -ec

@@ -182,8 +182,8 @@ The checked-in user-service recordings are CI fixtures. Use a separate working d
 ```bash
 # Enable PostgreSQL query logging
 # In postgres container:
-echo "log_statement = 'all'" >> /var/lib/postgresql/data/postgresql.conf
-echo "log_duration = on" >> /var/lib/postgresql/data/postgresql.conf
+echo "log_statement = 'all'" >> /var/lib/postgresql/19/docker/postgresql.conf
+echo "log_duration = on" >> /var/lib/postgresql/19/docker/postgresql.conf
 
 # Restart postgres container
 docker compose restart postgres
