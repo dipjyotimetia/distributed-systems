@@ -8,7 +8,8 @@ import com.banking.transactionsservice.entity.Transaction;
 import com.banking.transactionsservice.event.TransactionEventOutbox;
 import com.banking.transactionsservice.service.MovementCoordinator.Action;
 import com.banking.transactionsservice.service.MovementCoordinator.Movement;
-import com.google.protobuf.Timestamp;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.grpc.StatusRuntimeException;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;
@@ -24,7 +25,6 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.server.ResponseStatusException;
-import transactions.v1.MovementLifecycleEvent;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -73,19 +73,21 @@ public class CustomerMovements {
     private final FraudServiceClient fraud;
     private final PaymentComplianceService compliance;
     private final TransactionEventOutbox outbox;
+    private final ObjectMapper json;
     private final AtomicReference<Double> oldestPendingSeconds = new AtomicReference<>(0.0);
     private final Timer postingLatency;
     private final Counter screeningOutages;
 
     public CustomerMovements(JdbcTemplate jdbc, PlatformTransactionManager manager, AccountsServiceClient accounts,
                              FraudServiceClient fraud, PaymentComplianceService compliance,
-                             TransactionEventOutbox outbox, MeterRegistry metrics) {
+                             TransactionEventOutbox outbox, ObjectMapper json, MeterRegistry metrics) {
         this.jdbc = jdbc;
         transaction = new TransactionTemplate(manager);
         this.accounts = accounts;
         this.fraud = fraud;
         this.compliance = compliance;
         this.outbox = outbox;
+        this.json = json;
         postingLatency = metrics.timer("transactions.movements.accepted.to.posted");
         screeningOutages = metrics.counter("transactions.movements.screening.outages");
         Gauge.builder("transactions.movements.oldest.pending.seconds", oldestPendingSeconds, AtomicReference::get)
@@ -109,7 +111,7 @@ public class CustomerMovements {
         if (!intent.equals(entry.intent())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "IDEMPOTENCY_KEY_REUSED");
         }
-        if (inserted == 1) enqueueLifecycle(entry, MovementLifecycleEvent.Status.PENDING, entry.created());
+        if (inserted == 1) enqueueLifecycle(entry, "PENDING", entry.created());
         return entry.outcome();
     }
 
@@ -230,7 +232,7 @@ public class CustomerMovements {
             outbox.enqueue(legacy);
         }
 
-        enqueueLifecycle(entry, MovementLifecycleEvent.Status.POSTED, now);
+        enqueueLifecycle(entry, "POSTED", now);
         jdbc.update("""
                 UPDATE transactions_service.customer_movements SET stage = 'POSTED', reason_code = NULL, updated_at = ?
                 WHERE id = ?
@@ -238,18 +240,32 @@ public class CustomerMovements {
         postingLatency.record(Duration.between(entry.created(), now));
     }
 
-    private void enqueueLifecycle(Entry entry, MovementLifecycleEvent.Status status, OffsetDateTime at) {
+    private void enqueueLifecycle(Entry entry, String status, OffsetDateTime at) {
         Intent intent = entry.intent();
-        UUID eventId = UUID.nameUUIDFromBytes((entry.id() + ":" + status.name()).getBytes(StandardCharsets.UTF_8));
+        UUID eventId = UUID.nameUUIDFromBytes((entry.id() + ":" + status).getBytes(StandardCharsets.UTF_8));
         int scale = Currency.getInstance(intent.currency()).getDefaultFractionDigits();
-        var event = MovementLifecycleEvent.newBuilder().setSchemaVersion(1).setEventId(eventId.toString())
-                .setMovementId(entry.id().toString()).setType(MovementLifecycleEvent.Type.valueOf(intent.type().name()))
-                .setStatus(status).setMoney(MovementLifecycleEvent.Money.newBuilder()
-                        .setCurrency(intent.currency()).setAmount(intent.amount().setScale(scale).toPlainString()))
-                .setOccurredAt(Timestamp.newBuilder().setSeconds(at.toEpochSecond()).setNanos(at.getNano()));
-        if (intent.from() != null) event.setFromAccountId(intent.from());
-        if (intent.to() != null) event.setToAccountId(intent.to());
-        outbox.enqueueMovement(entry.id(), event.build());
+        ObjectNode money = json.createObjectNode()
+                .put("currency", intent.currency())
+                .put("amount", intent.amount().setScale(scale).toPlainString());
+        ObjectNode event = json.createObjectNode()
+                .put("schemaVersion", 1)
+                .put("eventId", eventId.toString())
+                .put("movementId", entry.id().toString())
+                .put("type", intent.type().name())
+                .put("status", status)
+                .put("occurredAt", at.toInstant().toString())
+                .set("money", money);
+        if (intent.from() != null) {
+            event.put("fromAccountId", intent.from());
+        }
+        if (intent.to() != null) {
+            event.put("toAccountId", intent.to());
+        }
+        try {
+            outbox.enqueueMovement(entry.id(), eventId.toString(), json.writeValueAsString(event));
+        } catch (com.fasterxml.jackson.core.JsonProcessingException failure) {
+            throw new IllegalStateException("Unable to serialize movement lifecycle event", failure);
+        }
     }
 
     private void apply(Entry entry, Action action) {
@@ -274,7 +290,7 @@ public class CustomerMovements {
                     """, entry.id(), screening);
         }
         if (stage == Stage.REJECTED) {
-            enqueueLifecycle(entry, MovementLifecycleEvent.Status.REJECTED, OffsetDateTime.now(ZoneOffset.UTC));
+            enqueueLifecycle(entry, "REJECTED", OffsetDateTime.now(ZoneOffset.UTC));
         }
     }
 

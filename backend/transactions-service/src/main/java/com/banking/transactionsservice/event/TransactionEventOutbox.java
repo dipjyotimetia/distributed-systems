@@ -1,9 +1,6 @@
 package com.banking.transactionsservice.event;
 
 import com.banking.transactionsservice.entity.Transaction;
-import com.google.protobuf.InvalidProtocolBufferException;
-import com.google.protobuf.util.JsonFormat;
-import transactions.v1.MovementLifecycleEvent;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
@@ -49,16 +46,12 @@ public class TransactionEventOutbox {
                 """, transaction.getId(), payload(transaction));
     }
 
-    public void enqueueMovement(UUID movementId, MovementLifecycleEvent event) {
-        try {
-            jdbc.update("""
-                    INSERT INTO transactions_service.event_outbox (movement_id, topic, payload, event_key)
-                    VALUES (?, 'movement-lifecycle-v1', ?, ?)
-                    ON CONFLICT (event_key) DO NOTHING
-                    """, movementId, JsonFormat.printer().omittingInsignificantWhitespace().print(event), event.getEventId());
-        } catch (InvalidProtocolBufferException invalid) {
-            throw new IllegalStateException("Unable to serialize movement event", invalid);
-        }
+    public void enqueueMovement(UUID movementId, String eventId, String payloadJson) {
+        jdbc.update("""
+                INSERT INTO transactions_service.event_outbox (movement_id, topic, payload, event_key)
+                VALUES (?, 'movement-lifecycle-v1', ?, ?)
+                ON CONFLICT (event_key) DO NOTHING
+                """, movementId, payloadJson, eventId);
     }
 
     @Scheduled(fixedDelayString = "${transactions.outbox.delay-ms:1000}")

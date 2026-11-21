@@ -53,7 +53,6 @@ dependencies {
     implementation("io.grpc:grpc-protobuf:1.85.1")
     implementation("io.grpc:grpc-stub:1.85.1")
     implementation("com.google.protobuf:protobuf-java:4.36.2")
-    implementation("com.google.protobuf:protobuf-java-util:4.36.2")
     implementation("org.springframework.boot:spring-boot-starter-kafka")
     implementation("org.apache.avro:avro:1.12.1")
     developmentOnly("org.springframework.boot:spring-boot-devtools")
