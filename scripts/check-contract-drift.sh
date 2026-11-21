@@ -50,4 +50,6 @@ PY
 diff -ru backend/notification-service/internal/api/openapi.gen.go "$generated/notifications.go"
 oapi-codegen -generate types,std-http-server -package httpapi -o "$generated/disputes.go" contracts/openapi/disputes.yaml
 diff -ru backend/disputes-service/internal/httpapi/openapi.gen.go "$generated/disputes.go"
+bash scripts/generate-openapi-temporal-clients.sh "$generated/temporal"
+diff -ru tests/integration/temporal/openapi "$generated/temporal"
 echo "contract stubs match"

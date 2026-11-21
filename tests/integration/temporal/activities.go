@@ -9,6 +9,10 @@ import (
 	"net/http"
 	"slices"
 	"time"
+
+	"microsvc/integration/temporal/openapi/accounts"
+	"microsvc/integration/temporal/openapi/transactions"
+	"microsvc/integration/temporal/openapi/users"
 )
 
 type Activities struct {
@@ -78,23 +82,41 @@ func call(ctx context.Context, base, path, token string, body any, status int, d
 }
 
 func (a *Activities) login(ctx context.Context, input Input) (string, error) {
-	var result struct{ Token string }
-	err := call(ctx, a.Frontend, "/api/v1/users/login", "", map[string]string{"usernameOrEmail": input.User, "password": a.Password}, 200, &result)
-	if err == nil && result.Token == "" {
-		err = fmt.Errorf("login returned an empty token")
+	client, err := a.usersAPI()
+	if err != nil {
+		return "", err
 	}
-	return result.Token, err
+	result, err := client.LoginWithResponse(ctx, users.LoginRequest{UsernameOrEmail: input.User, Password: a.Password})
+	if err != nil {
+		return "", fmt.Errorf("POST /api/v1/users/login request failed")
+	}
+	if result.StatusCode() != http.StatusOK {
+		return "", unexpectedStatus(http.MethodPost, "/api/v1/users/login", result.StatusCode(), http.StatusOK)
+	}
+	if result.JSON200 == nil || result.JSON200.Token == nil || *result.JSON200.Token == "" {
+		return "", fmt.Errorf("login returned an empty token")
+	}
+	return *result.JSON200.Token, nil
 }
 
 func (a *Activities) Register(ctx context.Context, input Input) (int64, error) {
-	var user struct{ ID int64 }
-	err := call(ctx, a.Frontend, "/api/v1/users/register", "", map[string]string{
-		"username": input.User, "email": input.email(), "password": a.Password,
-	}, 201, &user)
-	if err == nil && user.ID <= 0 {
-		err = fmt.Errorf("registration response missing user ID")
+	client, err := a.usersAPI()
+	if err != nil {
+		return 0, err
 	}
-	return user.ID, err
+	result, err := client.RegisterWithResponse(ctx, users.RegisterRequest{
+		Username: input.User, Email: input.email(), Password: a.Password,
+	})
+	if err != nil {
+		return 0, fmt.Errorf("POST /api/v1/users/register request failed")
+	}
+	if result.StatusCode() != http.StatusCreated {
+		return 0, unexpectedStatus(http.MethodPost, "/api/v1/users/register", result.StatusCode(), http.StatusCreated)
+	}
+	if result.JSON201 == nil || result.JSON201.Id == nil || *result.JSON201.Id <= 0 {
+		return 0, fmt.Errorf("registration response missing user ID")
+	}
+	return *result.JSON201.Id, nil
 }
 
 func (a *Activities) CreateAccount(ctx context.Context, input Input, kind string, balance int) (int64, error) {
@@ -102,14 +124,24 @@ func (a *Activities) CreateAccount(ctx context.Context, input Input, kind string
 	if err != nil {
 		return 0, err
 	}
-	var account struct{ ID int64 }
-	err = call(ctx, a.Frontend, "/api/v1/accounts", token, map[string]any{
-		"accountType": kind, "initialBalance": balance,
-	}, 201, &account)
-	if err == nil && account.ID <= 0 {
-		err = fmt.Errorf("account response missing ID")
+	client, err := a.accountsAPI()
+	if err != nil {
+		return 0, err
 	}
-	return account.ID, err
+	initial := float32(balance)
+	result, err := client.CreateAccountWithResponse(ctx, accounts.AccountCreateRequest{
+		AccountType: accounts.AccountCreateRequestAccountType(kind), InitialBalance: &initial,
+	}, accounts.RequestEditorFn(bearer(token)))
+	if err != nil {
+		return 0, fmt.Errorf("POST /api/v1/accounts request failed")
+	}
+	if result.StatusCode() != http.StatusCreated {
+		return 0, unexpectedStatus(http.MethodPost, "/api/v1/accounts", result.StatusCode(), http.StatusCreated)
+	}
+	if result.JSON201 == nil || result.JSON201.Id == nil || *result.JSON201.Id <= 0 {
+		return 0, fmt.Errorf("account response missing ID")
+	}
+	return *result.JSON201.Id, nil
 }
 
 func (a *Activities) SubmitTransfer(ctx context.Context, input Input, t Transfer) (int64, error) {
@@ -117,16 +149,29 @@ func (a *Activities) SubmitTransfer(ctx context.Context, input Input, t Transfer
 	if err != nil {
 		return 0, err
 	}
-	var result struct{ ID int64 }
-	err = call(ctx, a.Frontend, "/api/v1/transactions/transfer", token, transferBody(t, 25), 201, &result)
-	if err == nil && result.ID <= 0 {
-		err = fmt.Errorf("transfer response missing ID")
+	result, err := a.transfer(ctx, token, transferRequest(t, 25))
+	if err != nil {
+		return 0, err
 	}
-	return result.ID, err
+	if result.StatusCode() != http.StatusCreated || result.JSON201 == nil || result.JSON201.Id == nil || *result.JSON201.Id <= 0 {
+		if result.StatusCode() != http.StatusCreated {
+			return 0, unexpectedStatus(http.MethodPost, "/api/v1/transactions/transfer", result.StatusCode(), http.StatusCreated)
+		}
+		return 0, fmt.Errorf("transfer response missing ID")
+	}
+	return *result.JSON201.Id, nil
 }
 
-func transferBody(t Transfer, amount int) map[string]any {
-	return map[string]any{"fromAccountId": t.From, "toAccountId": t.To, "amount": amount, "description": "Temporal integration"}
+func (a *Activities) transfer(ctx context.Context, token string, body transactions.TransferRequest) (*transactions.TransferHTTP, error) {
+	client, err := a.transactionsAPI()
+	if err != nil {
+		return nil, err
+	}
+	result, err := client.TransferWithResponse(ctx, body, transactions.RequestEditorFn(bearer(token)))
+	if err != nil {
+		return nil, fmt.Errorf("POST /api/v1/transactions/transfer request failed")
+	}
+	return result, nil
 }
 
 func (a *Activities) Verify(ctx context.Context, input Input, t Transfer) error {
@@ -142,51 +187,69 @@ func (a *Activities) Reject(ctx context.Context, input Input, t Transfer) error 
 	if err != nil {
 		return err
 	}
-	var rejection struct{ Code string }
-	if err = call(ctx, a.Frontend, "/api/v1/transactions/transfer", token, transferBody(t, 90), 400, &rejection); err != nil {
+	result, err := a.transfer(ctx, token, transferRequest(t, 90))
+	if err != nil {
 		return err
 	}
-	if rejection.Code != "INSUFFICIENT_FUNDS" {
+	if result.StatusCode() != http.StatusBadRequest || !insufficientFunds(result.JSON400) {
 		return fmt.Errorf("transfer rejection did not return INSUFFICIENT_FUNDS")
 	}
 	return nil
 }
 
 func (a *Activities) verify(ctx context.Context, token string, t Transfer) error {
+	accountsClient, err := a.accountsAPI()
+	if err != nil {
+		return err
+	}
+	editor := accounts.RequestEditorFn(bearer(token))
 	for _, account := range []struct {
 		id      int64
 		balance int
 	}{{t.From, 75}, {t.To, 45}} {
-		var result struct{ Balance *json.Number }
-		path := fmt.Sprintf("/api/v1/accounts/%d/balance", account.id)
-		if err := call(ctx, a.Frontend, path, token, nil, 200, &result); err != nil {
-			return err
+		result, err := accountsClient.GetAccountBalanceWithResponse(ctx, account.id, editor)
+		if err != nil {
+			return fmt.Errorf("GET /api/v1/accounts/%d/balance request failed", account.id)
 		}
-		if result.Balance == nil {
-			return fmt.Errorf("account %d response missing balance", account.id)
+		if result.StatusCode() != http.StatusOK {
+			return unexpectedStatus(http.MethodGet, fmt.Sprintf("/api/v1/accounts/%d/balance", account.id), result.StatusCode(), http.StatusOK)
 		}
-		value, err := result.Balance.Float64()
-		if err != nil || value != float64(account.balance) {
+		if result.JSON200 == nil || result.JSON200.Balance == nil || float64(*result.JSON200.Balance) != float64(account.balance) {
 			return fmt.Errorf("account %d expected balance %d", account.id, account.balance)
 		}
 	}
-	var history []struct {
-		ID, FromAccountID, ToAccountID int64
-		Amount                         float64
-		Type, Status                   string
-	}
-	if err := call(ctx, a.Frontend, "/api/v1/transactions", token, nil, 200, &history); err != nil {
+	history, err := a.transactionList(ctx, token, nil)
+	if err != nil {
 		return err
 	}
 	if len(history) != 1 {
 		return fmt.Errorf("expected one transaction, got %d", len(history))
 	}
-	entry := history[0]
+	entry := ledgerFrom(history[0])
 	if entry.ID != t.ID || entry.FromAccountID != t.From || entry.ToAccountID != t.To ||
 		entry.Amount != 25 || entry.Type != "TRANSFER" || entry.Status != "COMPLETED" {
 		return fmt.Errorf("transaction history did not match committed transfer %d", t.ID)
 	}
 	return nil
+}
+
+func (a *Activities) transactionList(ctx context.Context, token string, params *transactions.ListTransactionsParams) (transactions.TransactionList, error) {
+	client, err := a.transactionsAPI()
+	if err != nil {
+		return nil, err
+	}
+	result, err := client.ListTransactionsWithResponse(ctx, params, transactions.RequestEditorFn(bearer(token)))
+	if err != nil {
+		return nil, fmt.Errorf("GET /api/v1/transactions request failed")
+	}
+	if result.StatusCode() != http.StatusOK || result.JSON200 == nil {
+		return nil, unexpectedStatus(http.MethodGet, "/api/v1/transactions", result.StatusCode(), http.StatusOK)
+	}
+	if params != nil && (params.Page != nil || params.Size != nil) {
+		page, err := result.JSON200.AsTransactionPage()
+		return page.Content, err
+	}
+	return result.JSON200.AsTransactionList()
 }
 
 func (a *Activities) VerifyChecks(ctx context.Context, t Transfer) error {
@@ -221,11 +284,11 @@ func (a *Activities) AssertFraudRejections(ctx context.Context, input Input, tra
 				return fmt.Errorf("configure fraud provider failure")
 			}
 		}
-		rejection, err := request(ctx, http.MethodPost, a.Frontend, "/api/v1/transactions/transfer", token, transferBody(transfer, amount))
+		rejection, err := a.transfer(ctx, token, transferRequest(transfer, amount))
 		if err != nil {
 			return err
 		}
-		if rejection.Status != 400 || len(rejection.Body) != 0 {
+		if rejection.StatusCode() != http.StatusBadRequest || len(rejection.Body) != 0 || rejection.JSON400 != nil {
 			return fmt.Errorf("expected empty fraud rejection for transfer amount %d", amount)
 		}
 	}

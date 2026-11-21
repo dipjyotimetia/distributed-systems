@@ -3,9 +3,11 @@ package integration
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"go.temporal.io/sdk/workflow"
+	"microsvc/integration/temporal/openapi/accounts"
 )
 
 type accountStatement struct {
@@ -41,17 +43,21 @@ func (a *Activities) ExportStatement(ctx context.Context, input Input, accountID
 	if err != nil {
 		return "", err
 	}
-	var response struct{ Status, Key string }
-	path := fmt.Sprintf("/api/v1/accounts/%d/export-statement", accountID)
-	if err := call(ctx, a.Frontend, path, token, struct{}{}, 200, &response); err != nil {
+	client, err := a.accountsAPI()
+	if err != nil {
 		return "", err
 	}
+	response, err := client.ExportStatementWithResponse(ctx, accountID, accounts.RequestEditorFn(bearer(token)))
+	if err != nil {
+		return "", fmt.Errorf("POST /api/v1/accounts/%d/export-statement request failed", accountID)
+	}
+	status, key, _, err := statementFrom(response.JSON200)
 	prefix := fmt.Sprintf("statements/account-%d/", accountID)
-	if response.Status != "exported" || !strings.HasPrefix(response.Key, prefix) ||
-		!strings.HasSuffix(response.Key, ".json") || strings.Contains(strings.TrimPrefix(response.Key, prefix), "/") {
+	if response.StatusCode() != http.StatusOK || err != nil || status != "exported" || !strings.HasPrefix(key, prefix) ||
+		!strings.HasSuffix(key, ".json") || strings.Contains(strings.TrimPrefix(key, prefix), "/") {
 		return "", fmt.Errorf("statement response did not identify the exported account object")
 	}
-	return response.Key, nil
+	return key, nil
 }
 
 func (a *Activities) VerifyStoredStatement(ctx context.Context, key string, userID, accountID int64) (BoundaryEvidence, error) {

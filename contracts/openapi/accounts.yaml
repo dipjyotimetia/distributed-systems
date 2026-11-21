@@ -20,13 +20,11 @@ paths:
       - $ref: '#/components/parameters/Sort'
       responses:
         '200':
-          description: Account array or a page when page or size is supplied
+          description: Account array, or an account page when page or size is supplied
           content:
             application/json:
               schema:
-                description: Account array or a page when page or size is supplied
-                nullable: true
-                x-java-type: java.lang.Object
+                $ref: '#/components/schemas/AccountListOrPage'
       tags:
       - accounts
       operationId: listAccounts
@@ -67,13 +65,11 @@ paths:
       - $ref: '#/components/parameters/Sort'
       responses:
         '200':
-          description: Matching account page
+          description: Account array, or an account page when page or size is supplied
           content:
             application/json:
               schema:
-                description: Matching account page
-                nullable: true
-                x-java-type: java.lang.Object
+                $ref: '#/components/schemas/AccountListOrPage'
       tags:
       - accounts
       operationId: searchAccounts
@@ -428,6 +424,15 @@ components:
       - INACTIVE
       - FROZEN
       - CLOSED
+    AccountListOrPage:
+      description: Account array, or an account page when page or size is supplied
+      nullable: true
+      x-java-type: java.lang.Object
+      oneOf:
+      - type: array
+        items:
+          $ref: '#/components/schemas/AccountResponse'
+      - $ref: '#/components/schemas/AccountPage'
     AccountPage:
       type: object
       required:

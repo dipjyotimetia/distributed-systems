@@ -3,7 +3,7 @@ export interface User {
   id: number;
   username: string;
   email: string;
-  roles: string;
+  roles: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -29,7 +29,7 @@ export interface AuthResponse {
     id: number;
     username: string;
     email: string;
-    roles: string;
+    roles: string[];
   };
   errors?: string[];
 }

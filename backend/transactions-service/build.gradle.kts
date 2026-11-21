@@ -69,6 +69,7 @@ openApiGenerate {
     outputDir.set(layout.buildDirectory.dir("generated/openapi").get().asFile.absolutePath)
     apiPackage.set("com.banking.transactionsservice.contract")
     modelPackage.set("com.banking.transactionsservice.contract.model")
+    schemaMappings.set(mapOf("TransactionListOrPage" to "java.lang.Object"))
     configOptions.set(mapOf(
         "interfaceOnly" to "true",
         "useSpringBoot3" to "true",

@@ -34,7 +34,7 @@ const ProfilePage: React.FC = () => {
                   </div>
                   <div>
                     <dt className="text-sm font-medium text-ink/60">Roles</dt>
-                    <dd className="mt-1 text-sm text-ink">{user.roles}</dd>
+                    <dd className="mt-1 text-sm text-ink">{user.roles.join(', ')}</dd>
                   </div>
                   <div>
                     <dt className="text-sm font-medium text-ink/60">Account Created</dt>

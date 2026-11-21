@@ -8,9 +8,15 @@ export async function GET() {
   try {
     const res = await fetch(`${AI_SERVICE_URL}/api/v1/providers`);
     const data = await res.json();
+    if (!res.ok || !Array.isArray(data)) {
+      return NextResponse.json(
+        { error: 'AI providers unavailable' },
+        { status: res.ok ? 502 : res.status || 503 }
+      );
+    }
     return NextResponse.json(data);
   } catch {
-    return NextResponse.json({ providers: [] });
+    return NextResponse.json({ error: 'AI providers unavailable' }, { status: 503 });
   }
 }
 

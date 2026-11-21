@@ -3,9 +3,10 @@ package integration
 import (
 	"context"
 	"fmt"
-	"net/url"
+	"net/http"
 
 	"go.temporal.io/sdk/workflow"
+	"microsvc/integration/temporal/openapi/users"
 )
 
 func IdentityJourney(ctx workflow.Context, input Input) ([]BoundaryEvidence, error) {
@@ -34,18 +35,21 @@ func IdentityJourney(ctx workflow.Context, input Input) ([]BoundaryEvidence, err
 }
 
 func (a *Activities) AssertAvailability(ctx context.Context, input Input, available bool) error {
-	for _, path := range []string{
-		"/api/v1/users/check-username?username=" + url.QueryEscape(input.User),
-		"/api/v1/users/check-email?email=" + url.QueryEscape(input.email()),
-	} {
-		var result struct {
-			Success   bool
-			Available *bool
-		}
-		if err := call(ctx, a.Frontend, path, "", nil, 200, &result); err != nil {
-			return err
-		}
-		if !result.Success || result.Available == nil || *result.Available != available {
+	client, err := a.usersAPI()
+	if err != nil {
+		return err
+	}
+	username, err := client.CheckUsernameWithResponse(ctx, &users.CheckUsernameParams{Username: input.User})
+	if err != nil {
+		return fmt.Errorf("GET /api/v1/users/check-username request failed")
+	}
+	email, err := client.CheckEmailWithResponse(ctx, &users.CheckEmailParams{Email: input.email()})
+	if err != nil {
+		return fmt.Errorf("GET /api/v1/users/check-email request failed")
+	}
+	for _, result := range []*users.Availability{username.JSON200, email.JSON200} {
+		if username.StatusCode() != http.StatusOK || email.StatusCode() != http.StatusOK ||
+			result == nil || result.Success == nil || !*result.Success || result.Available == nil || *result.Available != available {
 			return fmt.Errorf("expected availability %t", available)
 		}
 	}
@@ -59,38 +63,46 @@ func (a *Activities) AssertLoginAndProfile(ctx context.Context, input Input, id 
 	if err != nil {
 		return err
 	}
-	var profile struct {
-		Success bool
-		Data    struct {
-			ID              int64
-			Username, Email string
-		}
-	}
-	if err := call(ctx, a.Frontend, "/api/v1/users/profile", token, nil, 200, &profile); err != nil {
+	client, err := a.usersAPI()
+	if err != nil {
 		return err
 	}
-	if !profile.Success || profile.Data.ID != id || profile.Data.Username != input.User || profile.Data.Email != input.email() {
+	profile, err := client.GetProfileWithResponse(ctx, users.RequestEditorFn(bearer(token)))
+	if err != nil {
+		return fmt.Errorf("GET /api/v1/users/profile request failed")
+	}
+	if profile.StatusCode() != http.StatusOK || profile.JSON200 == nil || profile.JSON200.Success == nil || !*profile.JSON200.Success ||
+		profile.JSON200.Data == nil || profile.JSON200.Data.Id == nil || *profile.JSON200.Data.Id != id ||
+		textValue(profile.JSON200.Data.Username) != input.User || textValue(profile.JSON200.Data.Email) != input.email() {
 		return fmt.Errorf("authenticated profile did not match registered identity")
 	}
 	return nil
 }
 
 func (a *Activities) AssertIdentityConflicts(ctx context.Context, input Input) error {
-	for _, credentials := range []map[string]string{
-		{"username": input.User, "email": "unused-" + input.email(), "password": a.Password},
-		{"username": input.User + "unused", "email": input.email(), "password": a.Password},
+	client, err := a.usersAPI()
+	if err != nil {
+		return err
+	}
+	for _, credentials := range []users.RegisterRequest{
+		{Username: input.User, Email: "unused-" + input.email(), Password: a.Password},
+		{Username: input.User + "unused", Email: input.email(), Password: a.Password},
 	} {
-		var conflict struct {
-			Success bool
-			Message string
+		conflict, err := client.RegisterWithResponse(ctx, credentials)
+		if err != nil {
+			return fmt.Errorf("POST /api/v1/users/register request failed")
 		}
-		if err := call(ctx, a.Frontend, "/api/v1/users/register", "", credentials, 409, &conflict); err != nil {
-			return err
-		}
-		if conflict.Success || conflict.Message == "" {
+		if conflict.StatusCode() != http.StatusConflict || conflict.JSON409 == nil || conflict.JSON409.Success == nil ||
+			*conflict.JSON409.Success || textValue(conflict.JSON409.Message) == "" {
 			return fmt.Errorf("duplicate registration did not return a conflict message")
 		}
 	}
-	payload := map[string]string{"usernameOrEmail": input.User, "password": "invalid-" + a.Password}
-	return call(ctx, a.Frontend, "/api/v1/users/login", "", payload, 401, nil)
+	rejected, err := client.LoginWithResponse(ctx, users.LoginRequest{UsernameOrEmail: input.User, Password: "invalid-" + a.Password})
+	if err != nil {
+		return fmt.Errorf("POST /api/v1/users/login request failed")
+	}
+	if rejected.StatusCode() != http.StatusUnauthorized {
+		return unexpectedStatus(http.MethodPost, "/api/v1/users/login", rejected.StatusCode(), http.StatusUnauthorized)
+	}
+	return nil
 }
