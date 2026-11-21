@@ -24,6 +24,8 @@ import {
   CardSchema,
   Cards,
   IssueCardRequestSchema,
+  ListCardsRequestSchema,
+  ListCardsResponseSchema,
 } from '@/gen/cards/cards_pb';
 
 const jsonWrite = { alwaysEmitImplicit: true };
@@ -110,6 +112,11 @@ export async function call(
       return responseJson(
         CardSchema,
         await client.issueCard(fromJson(IssueCardRequestSchema, body), options),
+      );
+    case 'ListCards':
+      return responseJson(
+        ListCardsResponseSchema,
+        await client.listCards(fromJson(ListCardsRequestSchema, body), options),
       );
     case 'Authorize':
       return responseJson(

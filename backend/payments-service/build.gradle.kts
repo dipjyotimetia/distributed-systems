@@ -19,6 +19,7 @@ dependencyManagement {
 
 dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter")
+    testImplementation("org.springframework:spring-test")
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("com.fasterxml.jackson.core:jackson-databind")

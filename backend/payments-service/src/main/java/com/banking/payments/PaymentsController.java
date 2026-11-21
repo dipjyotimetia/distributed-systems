@@ -73,6 +73,14 @@ public class PaymentsController implements PaymentsApi {
     }
 
     @Override
+    public ResponseEntity<List<com.banking.payments.contract.model.Payment>> listPayments() {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(store.listOwned(customer(authorization())).stream()
+                        .map(payment -> contractJson.convert(payment, com.banking.payments.contract.model.Payment.class))
+                        .toList());
+    }
+
+    @Override
     public ResponseEntity<com.banking.payments.contract.model.Payment> getPayment(UUID id) {
         return ResponseEntity.ok().cacheControl(CacheControl.noStore())
                 .body(contractJson.convert(store.findOwned(customer(authorization()), id), com.banking.payments.contract.model.Payment.class));

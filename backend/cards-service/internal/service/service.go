@@ -29,6 +29,7 @@ type Authorization struct {
 
 type Repository interface {
 	InsertCard(context.Context, int64, Card) error
+	ListCards(context.Context, int64) ([]Card, error)
 	FindCard(context.Context, int64, string) (Card, error)
 	FindAuthorization(context.Context, string, string) (Authorization, bool, error)
 	SaveAuthorization(context.Context, Authorization) error
@@ -62,6 +63,22 @@ func (s *Server) IssueCard(ctx context.Context, request *cardsv1.IssueCardReques
 		return nil, status.Error(codes.Internal, "could not issue the card")
 	}
 	return &cardsv1.Card{Token: card.Token, AccountId: card.AccountID, LastFour: card.LastFour}, nil
+}
+
+func (s *Server) ListCards(ctx context.Context, _ *cardsv1.ListCardsRequest) (*cardsv1.ListCardsResponse, error) {
+	customer, _, err := auth.Customer(ctx, s.Secret)
+	if err != nil {
+		return nil, err
+	}
+	cards, err := s.Repo.ListCards(ctx, customer)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "could not list cards")
+	}
+	response := &cardsv1.ListCardsResponse{Cards: make([]*cardsv1.Card, 0, len(cards))}
+	for _, card := range cards {
+		response.Cards = append(response.Cards, &cardsv1.Card{Token: card.Token, AccountId: card.AccountID, LastFour: card.LastFour})
+	}
+	return response, nil
 }
 
 func (s *Server) Authorize(ctx context.Context, request *cardsv1.AuthorizeRequest) (*cardsv1.Authorization, error) {

@@ -7,6 +7,36 @@ servers:
   - url: http://localhost:8086
     description: Local development server
 paths:
+  /notifications/me:
+    get:
+      tags: [notifications]
+      operationId: listMyNotifications
+      summary: List notifications for the signed-in customer
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/limit'
+      responses:
+        '200':
+          description: Notifications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Notification'
+        '401':
+          description: Sign in required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Notification storage unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /notifications:
     get:
       tags: [notifications]
@@ -73,6 +103,11 @@ paths:
                   status:
                     type: string
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
   parameters:
     limit:
       name: limit

@@ -65,7 +65,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:    ":" + port,
-		Handler: api.NewHandler(mongoStore),
+		Handler: api.NewHandler(mongoStore, []byte(os.Getenv("JWT_SECRET"))),
 	}
 
 	go func() {

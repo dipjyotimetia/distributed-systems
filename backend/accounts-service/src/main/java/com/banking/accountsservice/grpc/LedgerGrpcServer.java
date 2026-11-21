@@ -11,12 +11,14 @@ import io.grpc.ServerInterceptor;
 import jakarta.annotation.PreDestroy;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
 @Component
+@Lazy(false)
 @ConditionalOnProperty(name = "ledger.grpc.enabled", havingValue = "true", matchIfMissing = true)
 public class LedgerGrpcServer {
     private final Server server;

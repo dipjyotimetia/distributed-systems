@@ -10,12 +10,14 @@ import io.grpc.ServerCallHandler;
 import io.grpc.ServerInterceptor;
 import jakarta.annotation.PreDestroy;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
 @Component
+@Lazy(false)
 public class TransactionQueryGrpcServer {
     static final Context.Key<Metadata> HEADERS = Context.key("transaction-query-headers");
     private final Server server;

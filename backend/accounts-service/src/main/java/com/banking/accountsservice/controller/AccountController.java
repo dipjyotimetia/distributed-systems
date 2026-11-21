@@ -159,6 +159,9 @@ public class AccountController implements AccountsApi {
 
     @Override
     public ResponseEntity<AccountResponse> updateAccountStatus(Long accountId, StatusUpdateRequest statusUpdateRequest) {
+        if (statusUpdateRequest == null || statusUpdateRequest.getStatus() == null) {
+            return ResponseEntity.badRequest().build();
+        }
         var account = accountService.updateAccount(accountId, getUserIdFromAuthentication(), null,
                 Status.valueOf(statusUpdateRequest.getStatus().getValue()));
         return ResponseEntity.ok(contractJson.convert(account, AccountResponse.class));

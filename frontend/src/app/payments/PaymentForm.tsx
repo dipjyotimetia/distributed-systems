@@ -6,12 +6,21 @@ import AuthenticatedLayout from '@/components/layout/AuthenticatedLayout';
 import Button from '@/components/ui/Button';
 import { AccountsAPI, type Account } from '@/lib/api/accounts';
 
-type Payment = { id: string; status: string; clearingReference?: string; settlementBusinessDate?: string };
+type Payment = {
+  id: string;
+  status: string;
+  instruction?: { destination?: string; amountMinor?: number };
+  clearingReference?: string;
+  settlementBusinessDate?: string;
+};
 const inputClass = 'mt-1 block w-full rounded-xl border border-line bg-surface p-2.5 text-ink focus:border-brass focus:outline-none focus:ring-2 focus:ring-brass';
 
 function Form() {
   const retry = useRef<{ body: string; key: string } | null>(null);
+  const recordedPayment = useRef(false);
   const [payment, setPayment] = useState<Payment>();
+  const [payments, setPayments] = useState<Payment[]>();
+  const [paymentsError, setPaymentsError] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
   const [accounts, setAccounts] = useState<Account[]>();
@@ -36,6 +45,26 @@ function Form() {
     return () => { active = false; };
   }, []);
 
+  useEffect(() => {
+    let active = true;
+    async function loadPayments() {
+      try {
+        const response = await fetch('/api/payments', { cache: 'no-store' });
+        if (!active) return;
+        if (!response.ok) {
+          setPaymentsError(true);
+          return;
+        }
+        const body = await response.json();
+        if (!recordedPayment.current) setPayments(Array.isArray(body) ? body : []);
+      } catch {
+        if (active) setPaymentsError(true);
+      }
+    }
+    void loadPayments();
+    return () => { active = false; };
+  }, []);
+
   async function request(id?: string, submission?: { body: string; key: string }) {
     setPending(true);
     setError('');
@@ -48,7 +77,10 @@ function Form() {
         }),
       });
       if (!response.ok) throw new Error(response.status === 409 ? 'This request conflicts with a previous payment.' : 'Could not access the payment.');
-      setPayment(await response.json());
+      const saved = await response.json() as Payment;
+      recordedPayment.current = true;
+      setPayment(saved);
+      setPayments((current) => [saved, ...(current ?? []).filter((item) => item.id !== saved.id)]);
       if (submission) retry.current = null;
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : 'Could not access the payment.');
@@ -110,6 +142,24 @@ function Form() {
           <Button type="button" disabled={pending} onClick={() => void request(payment.id)}>Refresh status</Button>
         </div>
       )}
+      <section aria-labelledby="payment-history">
+        <h2 id="payment-history" className="text-lg font-semibold text-ink">Your payments</h2>
+        {paymentsError && <p role="alert" className="mt-2 text-red-700">Payments could not be loaded.</p>}
+        {!paymentsError && !payments && <p role="status" className="mt-2 text-sm text-ink/70">Loading payments…</p>}
+        {payments?.length === 0 && <p className="mt-2 text-sm text-ink/70">No outbound payments yet.</p>}
+        {payments && payments.length > 0 && (
+          <ul className="mt-3 space-y-2">
+            {payments.map((item) => (
+              <li key={item.id} className="rounded-2xl border border-line px-4 py-3 text-sm">
+                <p className="break-all font-medium">{item.id}</p>
+                <p>{item.status.replaceAll('_', ' ')}</p>
+                {item.instruction?.destination && <p>To {item.instruction.destination}</p>}
+                {item.instruction?.amountMinor != null && <p>{item.instruction.amountMinor} cents</p>}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </section>
   );
 }

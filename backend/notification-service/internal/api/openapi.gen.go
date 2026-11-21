@@ -6,11 +6,16 @@
 package api
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/oapi-codegen/runtime"
+)
+
+const (
+	BearerAuthScopes = "bearerAuth.Scopes"
 )
 
 // ErrorResponse defines model for ErrorResponse.
@@ -41,6 +46,11 @@ type ListNotificationsParams struct {
 	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
+// ListMyNotificationsParams defines parameters for ListMyNotifications.
+type ListMyNotificationsParams struct {
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
 // ListUserNotificationsParams defines parameters for ListUserNotifications.
 type ListUserNotificationsParams struct {
 	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
@@ -54,6 +64,9 @@ type ServerInterface interface {
 	// List the latest notifications
 	// (GET /notifications)
 	ListNotifications(w http.ResponseWriter, r *http.Request, params ListNotificationsParams)
+	// List notifications for the signed-in customer
+	// (GET /notifications/me)
+	ListMyNotifications(w http.ResponseWriter, r *http.Request, params ListMyNotificationsParams)
 	// List notifications for one user
 	// (GET /notifications/{user_id})
 	ListUserNotifications(w http.ResponseWriter, r *http.Request, userId string, params ListUserNotificationsParams)
@@ -100,6 +113,39 @@ func (siw *ServerInterfaceWrapper) ListNotifications(w http.ResponseWriter, r *h
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListNotifications(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListMyNotifications operation middleware
+func (siw *ServerInterfaceWrapper) ListMyNotifications(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListMyNotificationsParams
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "limit", r.URL.Query(), &params.Limit)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListMyNotifications(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -267,6 +313,7 @@ func OpenAPIHandlerWithOptions(si ServerInterface, options StdHTTPServerOptions)
 
 	m.HandleFunc("GET "+options.BaseURL+"/health", wrapper.NotificationHealth)
 	m.HandleFunc("GET "+options.BaseURL+"/notifications", wrapper.ListNotifications)
+	m.HandleFunc("GET "+options.BaseURL+"/notifications/me", wrapper.ListMyNotifications)
 	m.HandleFunc("GET "+options.BaseURL+"/notifications/{user_id}", wrapper.ListUserNotifications)
 
 	return m
