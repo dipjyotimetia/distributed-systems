@@ -118,7 +118,7 @@ func TestDisputeLifecycle(t *testing.T) {
 	routes := a.Routes()
 	const cases = "/api/v1/disputes"
 	const queue = "/api/v1/operations/disputes"
-	expect(t, call(routes, "GET", "/health", "", ""), 200)
+	expect(t, call(routes, "GET", "/api/v1/health", "", ""), 200)
 	expect(t, call(routes, "GET", queue+"?page=-1", operator, ""), 400)
 	expect(t, call(routes, "GET", cases+"/bad", customer, ""), 404)
 	expect(t, call(routes, "POST", queue+"/bad/resolve", operator, "{}"), 404)
@@ -337,7 +337,7 @@ func TestRuntime(t *testing.T) {
 	go func() { done <- run(ctx, "api") }()
 	probe := &http.Client{Timeout: time.Second}
 	waitUntil(t, func() bool {
-		res, err := probe.Get("http://localhost:8080/health")
+		res, err := probe.Get("http://localhost:8080/api/v1/health")
 		if err != nil {
 			return false
 		}
@@ -350,7 +350,7 @@ func TestRuntime(t *testing.T) {
 	}
 
 	db.Close()
-	expect(t, call(httpapi.HealthRoutes(db), "GET", "/health", "", ""), 503)
+	expect(t, call(httpapi.HealthRoutes(db), "GET", "/api/v1/health", "", ""), 503)
 	expect(t, call(httpapi.New(db, postgres.New(db), testKey, nil, nil, 0).Routes(), "GET", "/api/v1/disputes", signed(t, "7"), ""), 500)
 }
 
@@ -416,7 +416,7 @@ func TestWorkerDispatchesAndEscalates(t *testing.T) {
 		return db.QueryRowContext(ctx, "SELECT count(*) FROM disputes.signal_outbox WHERE case_id=$1", item.ID).Scan(&pending) == nil && pending == 0
 	})
 	waitUntil(t, func() bool {
-		res, err := (&http.Client{Timeout: time.Second}).Get("http://localhost:8080/health")
+		res, err := (&http.Client{Timeout: time.Second}).Get("http://localhost:8080/api/v1/health")
 		if err != nil {
 			return false
 		}

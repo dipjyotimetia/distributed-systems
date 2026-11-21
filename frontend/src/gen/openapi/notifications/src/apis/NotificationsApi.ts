@@ -117,7 +117,7 @@ export class NotificationsApi extends runtime.BaseAPI {
         const headerParameters: runtime.HTTPHeaders = {};
 
 
-        let urlPath = `/health`;
+        let urlPath = `/api/v1/health`;
 
         const response = await this.request({
             path: urlPath,

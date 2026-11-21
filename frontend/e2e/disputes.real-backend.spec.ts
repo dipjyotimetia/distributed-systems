@@ -41,7 +41,7 @@ test('transfer dispute survives replacement of the application worker', async ({
   for (const service of ['user-service', 'accounts-service', 'transactions-service']) {
     await expect.poll(async () => {
       try {
-        return (await request.get(`${process.env.MICROSVC_GATEWAY}/api/${service}/health`, { timeout: 2000 })).status();
+        return (await request.get(`${process.env.MICROSVC_GATEWAY}/api/v1/${service}/health`, { timeout: 2000 })).status();
       } catch {
         return 0;
       }

@@ -60,7 +60,7 @@ async def agent_chat(
 
 
 @router.get(
-    "/health",
+    "/api/v1/health",
     responses={
         200: {"model": Health, "description": "Healthy"},
     },

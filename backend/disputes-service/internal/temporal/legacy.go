@@ -123,7 +123,7 @@ func Run(ctx context.Context, db *sql.DB, s *postgres.Store, serve func(context.
 	}
 	defer w.Stop()
 	health := http.NewServeMux()
-	health.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
+	health.HandleFunc("GET /api/v1/health", func(w http.ResponseWriter, r *http.Request) {
 		probe, cancel := context.WithTimeout(r.Context(), time.Second)
 		defer cancel()
 		if err := db.PingContext(probe); err != nil {

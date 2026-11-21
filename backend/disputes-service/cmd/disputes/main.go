@@ -34,7 +34,7 @@ import (
 func main() {
 	if len(os.Args) == 2 && os.Args[1] == "healthcheck" {
 		probe := &http.Client{Timeout: 2 * time.Second}
-		res, err := probe.Get("http://localhost:8080/health")
+		res, err := probe.Get("http://localhost:8080/api/v1/health")
 		if err != nil {
 			os.Exit(1)
 		}
@@ -153,7 +153,7 @@ func serveResearch(ctx context.Context, api httpapi.API) error {
 
 func serve(ctx context.Context, mux *http.ServeMux) error {
 	handler := otelhttp.NewHandler(mux, "disputes.http", otelhttp.WithFilter(func(r *http.Request) bool {
-		return r.URL.Path != "/health"
+		return r.URL.Path != "/api/v1/health"
 	}))
 	server := &http.Server{
 		Addr: ":8080", Handler: handler, ReadHeaderTimeout: 5 * time.Second,

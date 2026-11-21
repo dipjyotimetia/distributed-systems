@@ -32,7 +32,7 @@ export class GatewayApi extends runtime.BaseAPI {
         const headerParameters: runtime.HTTPHeaders = {};
 
 
-        let urlPath = `/health`;
+        let urlPath = `/api/v1/health`;
 
         const response = await this.request({
             path: urlPath,
@@ -53,7 +53,7 @@ export class GatewayApi extends runtime.BaseAPI {
     }
 
     /**
-     * Public health alias rewritten to /health
+     * Public health alias rewritten to /api/v1/health
      */
     async healthzRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<HealthReport>> {
         const queryParameters: any = {};
@@ -74,7 +74,7 @@ export class GatewayApi extends runtime.BaseAPI {
     }
 
     /**
-     * Public health alias rewritten to /health
+     * Public health alias rewritten to /api/v1/health
      */
     async healthz(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<HealthReport> {
         const response = await this.healthzRaw(initOverrides);
@@ -90,7 +90,7 @@ export class GatewayApi extends runtime.BaseAPI {
         const headerParameters: runtime.HTTPHeaders = {};
 
 
-        let urlPath = `/health/live`;
+        let urlPath = `/api/v1/health/live`;
 
         const response = await this.request({
             path: urlPath,
@@ -119,7 +119,7 @@ export class GatewayApi extends runtime.BaseAPI {
         const headerParameters: runtime.HTTPHeaders = {};
 
 
-        let urlPath = `/health/ready`;
+        let urlPath = `/api/v1/health/ready`;
 
         const response = await this.request({
             path: urlPath,

@@ -117,7 +117,7 @@ func testJourney(t *testing.T, scenario string, definition any, replaceWorker bo
 		}
 
 		return call(ctx, frontend, "/api/v1/healthz", "", nil, 200, nil) == nil &&
-			call(ctx, os.Getenv("MICROSVC_NOTIFICATIONS"), "/health", "", nil, 200, nil) == nil
+			call(ctx, os.Getenv("MICROSVC_NOTIFICATIONS"), "/api/v1/health", "", nil, 200, nil) == nil
 	})
 	report["workflow_stage"] = "temporal_startup"
 	dev, err := testsuite.StartDevServer(ctx, testsuite.DevServerOptions{

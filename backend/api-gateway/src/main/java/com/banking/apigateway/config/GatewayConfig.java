@@ -57,7 +57,7 @@ public class GatewayConfig {
         var routes = builder.routes()
                 // API Gateway health check route
                 .route("api-gateway-health", r -> r.path("/api/v1/healthz")
-                        .filters(f -> f.rewritePath("/api/v1/healthz", "/health"))
+                        .filters(f -> f.rewritePath("/api/v1/healthz", "/api/v1/health"))
                         .uri("http://localhost:8080"))
                 // Health check routes (no authentication required)
                 .route("user-service-health", r -> r.path("/api/v1/user-service/health")

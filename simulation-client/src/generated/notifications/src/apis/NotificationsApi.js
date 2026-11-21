@@ -112,7 +112,7 @@ class NotificationsApi extends runtime.BaseAPI {
     async notificationHealthRaw(initOverrides) {
         const queryParameters = {};
         const headerParameters = {};
-        let urlPath = `/health`;
+        let urlPath = `/api/v1/health`;
         const response = await this.request({
             path: urlPath,
             method: 'GET',

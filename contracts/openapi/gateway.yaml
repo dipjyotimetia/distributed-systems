@@ -7,7 +7,7 @@ servers:
   - url: http://localhost:8080
     description: Local development server
 paths:
-  /health:
+  /api/v1/health:
     get:
       tags: [gateway]
       operationId: health
@@ -19,7 +19,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HealthReport'
-  /health/ready:
+  /api/v1/health/ready:
     get:
       tags: [gateway]
       operationId: readiness
@@ -31,7 +31,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HealthReport'
-  /health/live:
+  /api/v1/health/live:
     get:
       tags: [gateway]
       operationId: liveness
@@ -47,7 +47,7 @@ paths:
     get:
       tags: [gateway]
       operationId: healthz
-      summary: Public health alias rewritten to /health
+      summary: Public health alias rewritten to /api/v1/health
       responses:
         '200':
           description: Health

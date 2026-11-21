@@ -88,7 +88,7 @@ class AiApi extends runtime.BaseAPI {
     async aiHealthRaw(initOverrides) {
         const queryParameters = {};
         const headerParameters = {};
-        let urlPath = `/health`;
+        let urlPath = `/api/v1/health`;
         const response = await this.request({
             path: urlPath,
             method: 'GET',

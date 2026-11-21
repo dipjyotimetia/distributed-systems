@@ -327,7 +327,7 @@ func (a API) resolveCase(w http.ResponseWriter, r *http.Request, operator int64)
 }
 func HealthRoutes(db *sql.DB) *http.ServeMux {
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/v1/health", func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), time.Second)
 		defer cancel()
 		if err := db.PingContext(ctx); err != nil {

@@ -86,7 +86,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-  /health:
+  /api/v1/health:
     get:
       tags: [notifications]
       operationId: notificationHealth

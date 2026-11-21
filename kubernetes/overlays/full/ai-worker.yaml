@@ -49,13 +49,13 @@ spec:
               value: ai-worker
           startupProbe:
             httpGet:
-              path: /health
+              path: /api/v1/health
               port: 8080
             periodSeconds: 5
             failureThreshold: 30
           readinessProbe:
             httpGet:
-              path: /health
+              path: /api/v1/health
               port: 8080
           resources:
             requests:

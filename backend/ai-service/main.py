@@ -85,7 +85,7 @@ _PROVIDER_REQUESTS = Counter(
 
 @app.middleware("http")
 async def _record_http_metrics(request: Request, call_next):
-    if request.url.path in ("/metrics", "/actuator/prometheus", "/health"):
+    if request.url.path in ("/metrics", "/actuator/prometheus", "/api/v1/health"):
         return await call_next(request)
     start = time.monotonic()
     status_code = 500

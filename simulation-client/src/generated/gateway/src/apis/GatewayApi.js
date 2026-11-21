@@ -58,7 +58,7 @@ class GatewayApi extends runtime.BaseAPI {
     async healthRaw(initOverrides) {
         const queryParameters = {};
         const headerParameters = {};
-        let urlPath = `/health`;
+        let urlPath = `/api/v1/health`;
         const response = await this.request({
             path: urlPath,
             method: 'GET',
@@ -75,7 +75,7 @@ class GatewayApi extends runtime.BaseAPI {
         return await response.value();
     }
     /**
-     * Public health alias rewritten to /health
+     * Public health alias rewritten to /api/v1/health
      */
     async healthzRaw(initOverrides) {
         const queryParameters = {};
@@ -90,7 +90,7 @@ class GatewayApi extends runtime.BaseAPI {
         return new runtime.JSONApiResponse(response);
     }
     /**
-     * Public health alias rewritten to /health
+     * Public health alias rewritten to /api/v1/health
      */
     async healthz(initOverrides) {
         const response = await this.healthzRaw(initOverrides);
@@ -102,7 +102,7 @@ class GatewayApi extends runtime.BaseAPI {
     async livenessRaw(initOverrides) {
         const queryParameters = {};
         const headerParameters = {};
-        let urlPath = `/health/live`;
+        let urlPath = `/api/v1/health/live`;
         const response = await this.request({
             path: urlPath,
             method: 'GET',
@@ -124,7 +124,7 @@ class GatewayApi extends runtime.BaseAPI {
     async readinessRaw(initOverrides) {
         const queryParameters = {};
         const headerParameters = {};
-        let urlPath = `/health/ready`;
+        let urlPath = `/api/v1/health/ready`;
         const response = await this.request({
             path: urlPath,
             method: 'GET',

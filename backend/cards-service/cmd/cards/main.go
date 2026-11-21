@@ -62,7 +62,7 @@ func main() {
 	})
 	go func() {
 		mux := http.NewServeMux()
-		mux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
+		mux.HandleFunc("/api/v1/health", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
 		mux.Handle("/metrics", promhttp.Handler())
 		log.Fatal(http.ListenAndServe(":"+env("METRICS_PORT", "9093"), mux))
 	}()

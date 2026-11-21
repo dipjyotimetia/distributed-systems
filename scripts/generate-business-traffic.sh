@@ -39,7 +39,7 @@ setup_api_gateway() {
         sleep 5
         API_GATEWAY_URL="http://localhost:8080"
         
-        if ! curl -s --max-time 5 "$API_GATEWAY_URL/health" > /dev/null 2>&1; then
+        if ! curl -s --max-time 5 "$API_GATEWAY_URL/api/v1/health" > /dev/null 2>&1; then
             print_color $RED "❌ Failed to connect to API Gateway"
             kill $PORT_FORWARD_PID 2>/dev/null || true
             exit 1

@@ -95,7 +95,7 @@ paths:
           description: Internal token required
         '503':
           description: Dispute research unavailable
-  /health:
+  /api/v1/health:
     get:
       tags: [ai]
       operationId: aiHealth

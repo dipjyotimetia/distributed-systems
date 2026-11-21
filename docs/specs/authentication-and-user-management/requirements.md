@@ -32,7 +32,7 @@ Covers `backend/user-service` (.NET 8, registration/login/profile/token issuance
 
 ### 4. Gateway edge authentication
 1. Public (no token): `/api/v1/users/register`, `/login`, `/check-username`, `/check-email`,
-   `/api/*-service/health`, `/api/v1/healthz`.
+   `/api/v1/*-service/health`, `/api/v1/healthz`.
 2. Any other route without a valid, unexpired token SHALL return `401`.
 3. Routes: `/api/v1/users/**` → user-service, `/api/v1/accounts/**` → accounts-service,
    `/api/v1/transactions/**` → transactions-service.
