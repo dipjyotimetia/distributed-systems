@@ -10,6 +10,7 @@ COPY backend/api-gateway/build.gradle.kts backend/api-gateway/gradle.properties 
 COPY backend/payments-service/build.gradle.kts backend/payments-service/gradle.properties backend/payments-service/
 COPY backend/transactions-service/build.gradle.kts backend/transactions-service/gradle.properties backend/transactions-service/
 COPY backend/api-gateway/src backend/api-gateway/src
+COPY contracts/openapi/gateway.yaml contracts/openapi/gateway.yaml
 ARG GRADLE_CACHE_SUFFIX=0
 RUN --mount=type=cache,id=gradle-api-gateway-${GRADLE_CACHE_SUFFIX},target=/root/.gradle,sharing=locked \
     sh scripts/docker-bootjar.sh :api-gateway:bootJar

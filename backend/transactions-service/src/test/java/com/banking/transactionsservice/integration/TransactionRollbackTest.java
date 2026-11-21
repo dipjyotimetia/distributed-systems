@@ -2,10 +2,9 @@ package com.banking.transactionsservice.integration;
 
 import com.banking.transactionsservice.client.AccountsServiceClient;
 import com.banking.transactionsservice.client.FraudServiceClient;
+import com.banking.transactionsservice.dto.TransferRequest;
 import com.banking.transactionsservice.dto.TransactionQuery;
-import com.banking.transactionsservice.generated.TransactionResponse;
-import com.banking.transactionsservice.generated.TransactionStatus;
-import com.banking.transactionsservice.generated.TransferRequest;
+import com.banking.transactionsservice.dto.TransactionResponse;
 import com.banking.transactionsservice.entity.Transaction;
 import com.banking.transactionsservice.repository.TransactionRepository;
 import com.banking.transactionsservice.service.PaymentComplianceService;
@@ -66,16 +65,16 @@ class TransactionRollbackTest {
                 Transaction.TransactionType.TRANSFER, "Seeded pending");
         Long pendingId = transactionRepository.saveAndFlush(pending).getId();
 
-        assertEquals(TransactionStatus.PENDING,
+        assertEquals(Transaction.TransactionStatus.PENDING,
                 transactionService.getTransaction(pendingId, 501L).getStatus());
         var notFound = assertThrows(ResponseStatusException.class,
                 () -> transactionService.cancelTransaction(pendingId, 502L));
         assertEquals(404, notFound.getStatusCode().value());
-        assertEquals(TransactionStatus.PENDING,
+        assertEquals(Transaction.TransactionStatus.PENDING,
                 transactionService.getTransaction(pendingId, 501L).getStatus());
 
         var cancelled = transactionService.cancelTransaction(pendingId, 501L);
-        assertEquals(TransactionStatus.CANCELLED, cancelled.getStatus());
+        assertEquals(Transaction.TransactionStatus.CANCELLED, cancelled.getStatus());
         assertNotNull(cancelled.getProcessedAt());
         assertEquals(cancelled.getProcessedAt(),
                 transactionService.cancelTransaction(pendingId, 501L).getProcessedAt());
@@ -87,7 +86,7 @@ class TransactionRollbackTest {
         var conflict = assertThrows(ResponseStatusException.class,
                 () -> transactionService.cancelTransaction(settledId, 501L));
         assertEquals(409, conflict.getStatusCode().value());
-        assertEquals(TransactionStatus.COMPLETED,
+        assertEquals(Transaction.TransactionStatus.COMPLETED,
                 transactionService.getTransaction(settledId, 501L).getStatus());
     }
 
@@ -113,8 +112,8 @@ class TransactionRollbackTest {
         var page = (Page<?>) transactionService.queryTransactions(userId, filters, true, request);
         assertEquals(2, page.getTotalElements());
         assertEquals(first.getId(), ((TransactionResponse) page.getContent().get(0)).getId());
-        assertEquals(2L, transactionService.summarize(userId, accountId, request).getTotalTransactions());
-        assertEquals(3L, transactionService.summarize(userId, null, request).getPendingTransactions());
+        assertEquals(2, transactionService.summarize(userId, accountId, request).totalTransactions());
+        assertEquals(3, transactionService.summarize(userId, null, request).pendingTransactions());
         assertEquals(unrelated.getId(), transactionService.recentTransactions(userId, 1).get(0).getId());
     }
 
@@ -133,15 +132,15 @@ class TransactionRollbackTest {
     void compensatesAfterLedgerFailureAndAllowsRetry() {
         long owner = 901L;
         assertThrows(RuntimeException.class, () -> transactionService.transfer(
-                new TransferRequest(11L, 12L, 25.00).description("x".repeat(501)), owner, httpServletRequest));
+                new TransferRequest(11L, 12L, 25.00, "x".repeat(501)), owner, httpServletRequest));
 
         var calls = inOrder(accountsServiceClient);
         calls.verify(accountsServiceClient).applyMovement(any(), eq(Action.RESERVE), any());
         calls.verify(accountsServiceClient).applyMovement(any(), eq(Action.COMPENSATE), any());
         assertTrue(transactionRepository.findByUserIdOrderByCreatedAtDesc(owner).isEmpty());
 
-        var result = transactionService.transfer(new TransferRequest(11L, 12L, 25.00).description("Retry"), owner, httpServletRequest);
-        assertEquals(TransactionStatus.COMPLETED, result.getStatus());
+        var result = transactionService.transfer(new TransferRequest(11L, 12L, 25.00, "Retry"), owner, httpServletRequest);
+        assertEquals(Transaction.TransactionStatus.COMPLETED, result.getStatus());
         calls.verify(accountsServiceClient).applyMovement(any(), eq(Action.RESERVE), any());
         calls.verify(accountsServiceClient).applyMovement(any(), eq(Action.COMMIT), any());
         assertEquals(1, transactionRepository.findByUserIdOrderByCreatedAtDesc(owner).size());
@@ -155,14 +154,14 @@ class TransactionRollbackTest {
                 .when(accountsServiceClient).applyMovement(any(), eq(Action.COMMIT), any());
 
         var ambiguous = assertThrows(ResponseStatusException.class, () -> transactionService.transfer(
-                new TransferRequest(21L, 22L, 15.00).description("First"), owner, httpServletRequest));
+                new TransferRequest(21L, 22L, 15.00, "First"), owner, httpServletRequest));
         assertEquals(503, ambiguous.getStatusCode().value());
         assertEquals(1, transactionRepository.findByUserIdOrderByCreatedAtDesc(owner).size());
 
         // The next distinct movement resolves the first operation with its original ID.
         var first = org.mockito.ArgumentCaptor.forClass(java.util.UUID.class);
         verify(accountsServiceClient).applyMovement(first.capture(), eq(Action.COMMIT), any());
-        transactionService.transfer(new TransferRequest(21L, 22L, 20.00).description("Second"), owner, httpServletRequest);
+        transactionService.transfer(new TransferRequest(21L, 22L, 20.00, "Second"), owner, httpServletRequest);
         verify(accountsServiceClient, times(2)).applyMovement(eq(first.getValue()), eq(Action.COMMIT), any());
         assertEquals(2, transactionRepository.findByUserIdOrderByCreatedAtDesc(owner).size());
     }

@@ -1,11 +1,10 @@
 package com.banking.accountsservice.service;
 
+import com.banking.accountsservice.dto.AccountCreateRequest;
+import com.banking.accountsservice.dto.AccountResponse;
 import com.banking.accountsservice.dto.AccountQuery;
-import com.banking.accountsservice.generated.AccountCreateRequest;
-import com.banking.accountsservice.generated.AccountResponse;
-import com.banking.accountsservice.generated.AccountStatus;
-import com.banking.accountsservice.generated.AccountSummary;
-import com.banking.accountsservice.generated.BalanceResponse;
+import com.banking.accountsservice.dto.AccountSummary;
+import com.banking.accountsservice.dto.BalanceResponse;
 import com.banking.accountsservice.entity.Account;
 import com.banking.accountsservice.repository.AccountRepository;
 import io.opentelemetry.api.metrics.LongCounter;
@@ -102,7 +101,7 @@ public class AccountService {
             total += group.getTotal();
             if (group.getStatus() == Account.Status.ACTIVE) active += group.getTotal();
         }
-        return new AccountSummary(total, active, balance, byType);
+        return new AccountSummary(total, balance, active, byType);
     }
 
     private static Sort accountSort(String value) {
@@ -128,7 +127,9 @@ public class AccountService {
         logger.info("Fetching balance for account {} for user: {}", accountId, userId);
         Account account = accountRepository.findByIdAndUserId(accountId, userId)
                 .orElseThrow(() -> new RuntimeException("Account not found or access denied"));
-        return new BalanceResponse(account.getId(), account.getAccountNumber(), account.getCurrency(), account.getBalance());
+        BalanceResponse response = new BalanceResponse(account.getId(), account.getAccountNumber(), account.getBalance());
+        response.setCurrency(account.getCurrency());
+        return response;
     }
     
     public AccountResponse createAccount(AccountCreateRequest request, Long userId) {
@@ -141,7 +142,7 @@ public class AccountService {
         account.setUserId(userId);
         account.setAccountNumber(accountNumber);
         account.setBalance(request.getInitialBalance() != null ? request.getInitialBalance() : BigDecimal.ZERO);
-        account.setAccountType(request.getAccountType().getValue());
+        account.setAccountType(request.getAccountType());
         if (request.getCurrency() != null) {
             account.setCurrency(request.getCurrency());
         }
@@ -208,16 +209,17 @@ public class AccountService {
     }
 
     private AccountResponse convertToResponse(Account account) {
-        return new AccountResponse(
+        AccountResponse response = new AccountResponse(
                 account.getId(),
                 account.getUserId(),
                 account.getAccountNumber(),
                 account.getBalance(),
                 account.getAccountType(),
-                account.getCurrency(),
-                AccountStatus.fromValue(account.getStatus().name()),
                 account.getCreatedAt(),
                 account.getUpdatedAt()
         );
+        response.setCurrency(account.getCurrency());
+        response.setStatus(account.getStatus());
+        return response;
     }
 }

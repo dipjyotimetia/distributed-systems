@@ -40,6 +40,6 @@ it('loads KYC status when the page opens', async () => {
 
   expect(await screen.findByText('Approved')).toBeInTheDocument();
   expect(screen.getByText('Ada Lovelace · DOC-1')).toBeInTheDocument();
-  expect(fetchMock).toHaveBeenCalledWith('/api/kyc');
+  expect(fetchMock).toHaveBeenCalledWith('/api/v1/kyc');
   expect(screen.queryByText('not loaded')).not.toBeInTheDocument();
 });

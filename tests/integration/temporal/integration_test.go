@@ -106,18 +106,18 @@ func testJourney(t *testing.T, scenario string, definition any, replaceWorker bo
 	report["workflow_stage"] = "readiness"
 	waitFor(t, ctx, func(ctx context.Context) bool {
 		if scenario == "ai" {
-			return call(ctx, frontend, "/api/healthz", "", nil, 200, nil) == nil &&
-				call(ctx, frontend, "/api/ai/chat", "", nil, 200, &[]struct{ Provider string }{}) == nil
+			return call(ctx, frontend, "/api/v1/healthz", "", nil, 200, nil) == nil &&
+				call(ctx, frontend, "/api/v1/ai/chat", "", nil, 200, &[]struct{ Provider string }{}) == nil
 		}
 		gateway := os.Getenv("MICROSVC_GATEWAY")
-		for _, path := range []string{"/api/user-service/health", "/api/accounts-service/health", "/api/transactions-service/health"} {
+		for _, path := range []string{"/api/v1/user-service/health", "/api/v1/accounts-service/health", "/api/v1/transactions-service/health"} {
 			if call(ctx, gateway, path, "", nil, 200, nil) != nil {
 				return false
 			}
 		}
 
-		return call(ctx, frontend, "/api/healthz", "", nil, 200, nil) == nil &&
-			call(ctx, os.Getenv("MICROSVC_NOTIFICATIONS"), "/health", "", nil, 200, nil) == nil
+		return call(ctx, frontend, "/api/v1/healthz", "", nil, 200, nil) == nil &&
+			call(ctx, os.Getenv("MICROSVC_NOTIFICATIONS"), "/api/v1/health", "", nil, 200, nil) == nil
 	})
 	report["workflow_stage"] = "temporal_startup"
 	dev, err := testsuite.StartDevServer(ctx, testsuite.DevServerOptions{

@@ -9,15 +9,15 @@ import java.util.function.Predicate;
 @Component
 public class RouterValidator {
 
-    public static final List<String> openApiEndpoints = List.of(
-            "/api/users/register",
-            "/api/users/login",
-            "/api/users/check-username",
-            "/api/users/check-email"
+    public static final List<String> publicEndpoints = List.of(
+            "/api/v1/users/register",
+            "/api/v1/users/login",
+            "/api/v1/users/check-username",
+            "/api/v1/users/check-email"
     );
 
     public Predicate<ServerHttpRequest> requiresAuthentication =
-            request -> openApiEndpoints
+            request -> publicEndpoints
                     .stream()
                     .noneMatch(uri -> request.getURI().getPath().contains(uri));
 }

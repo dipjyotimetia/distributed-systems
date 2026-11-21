@@ -3,11 +3,9 @@ package integration
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"slices"
 
 	"go.temporal.io/sdk/workflow"
-	banking "microsvc/integration/temporal/gen"
 )
 
 var aiProviders = []string{"anthropic", "openai", "gemini", "xai", "openrouter"}
@@ -31,26 +29,15 @@ func AIJourney(ctx workflow.Context, input Input) ([]BoundaryEvidence, error) {
 }
 
 func (a *Activities) VerifyAIProviders(ctx context.Context) error {
-	client, err := a.api("")
-	if err != nil {
+	var providers []struct{ Provider, Name, Model string }
+	if err := call(ctx, a.Frontend, "/api/v1/ai/chat", "", nil, 200, &providers); err != nil {
 		return err
 	}
-	response, err := client.ListAiProvidersWithResponse(ctx)
-	if err != nil {
-		return err
-	}
-	if err = expectStatus("GET /ai/chat", response.StatusCode(), http.StatusOK); err != nil {
-		return err
-	}
-	if response.JSON200 == nil || len(*response.JSON200) != len(aiProviders) {
-		found := 0
-		if response.JSON200 != nil {
-			found = len(*response.JSON200)
-		}
-		return fmt.Errorf("expected five AI providers, discovered %d", found)
+	if len(providers) != len(aiProviders) {
+		return fmt.Errorf("expected five AI providers, discovered %d", len(providers))
 	}
 	seen := make(map[string]bool)
-	for _, provider := range *response.JSON200 {
+	for _, provider := range providers {
 		if !slices.Contains(aiProviders, provider.Provider) || seen[provider.Provider] || provider.Name == "" || provider.Model == "" {
 			return fmt.Errorf("invalid AI provider metadata")
 		}
@@ -60,21 +47,19 @@ func (a *Activities) VerifyAIProviders(ctx context.Context) error {
 }
 
 func (a *Activities) VerifyAIChat(ctx context.Context, input Input, mode string) (BoundaryEvidence, error) {
-	client, err := a.api("")
-	if err != nil {
-		return BoundaryEvidence{}, err
+	var response struct {
+		Results []struct {
+			Provider, Message string
+			Error             *string
+		}
 	}
 	message := "journey-" + mode + "-" + input.User
-	locale := "fr-CA"
-	response, err := client.AiChatWithResponse(ctx, banking.ChatRequest{Message: message, Locale: &locale})
-	if err != nil {
+	payload := map[string]string{"message": message, "locale": "fr-CA"}
+	if err := call(ctx, a.Frontend, "/api/v1/ai/chat", "", payload, 200, &response); err != nil {
 		return BoundaryEvidence{}, err
 	}
-	if err = expectStatus("POST /ai/chat", response.StatusCode(), http.StatusOK); err != nil {
-		return BoundaryEvidence{}, err
-	}
-	if response.JSON200 == nil || len(response.JSON200.Results) != len(aiProviders) {
-		return BoundaryEvidence{}, fmt.Errorf("expected five AI results")
+	if len(response.Results) != len(aiProviders) {
+		return BoundaryEvidence{}, fmt.Errorf("expected five AI results, got %d", len(response.Results))
 	}
 	var attempts map[string][]int
 	if err := call(ctx, a.Deliveries, "/ai-evidence/"+message, "", nil, 200, &attempts); err != nil {
@@ -90,16 +75,16 @@ func (a *Activities) VerifyAIChat(ctx context.Context, input Input, mode string)
 		}
 	}
 	seen := make(map[string]bool)
-	for _, result := range response.JSON200.Results {
+	for _, result := range response.Results {
 		if !slices.Contains(aiProviders, result.Provider) || seen[result.Provider] {
 			return BoundaryEvidence{}, fmt.Errorf("unexpected or repeated AI provider")
 		}
 		seen[result.Provider] = true
 		fails := mode == "failure" || (mode == "partial" && result.Provider == "gemini")
-		if fails && (result.Error == nil || text(result.Message) != "") {
+		if fails && (result.Error == nil || result.Message != "") {
 			return BoundaryEvidence{}, fmt.Errorf("expected provider failure for %s", result.Provider)
 		}
-		if !fails && (result.Error != nil || text(result.Message) != result.Provider+" response") {
+		if !fails && (result.Error != nil || result.Message != result.Provider+" response") {
 			return BoundaryEvidence{}, fmt.Errorf("expected provider success for %s", result.Provider)
 		}
 	}

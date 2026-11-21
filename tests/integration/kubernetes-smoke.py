@@ -24,20 +24,20 @@ def get_json(base, path, expected=200, body=None, headers=None):
 
 
 def main(frontend, jaeger, notifications):
-    health = get_json(frontend, "/api/healthz")
+    health = get_json(frontend, "/api/v1/healthz")
     assert health["status"] == "UP" and health["service"] == "frontend"
 
     user = "smoke" + secrets.token_hex(8)
     password = "T3st!" + secrets.token_hex(16)
-    registration = get_json(frontend, "/api/users/register", 201, {
+    registration = get_json(frontend, "/api/v1/users/register", 201, {
         "username": user, "email": user + "@example.test", "password": password,
     })
     assert registration["username"] == user and registration["id"] > 0
 
-    login = get_json(frontend, "/api/users/login", body={"usernameOrEmail": user, "password": password})
+    login = get_json(frontend, "/api/v1/users/login", body={"usernameOrEmail": user, "password": password})
     assert login["id"] == registration["id"]
     trace_id, parent_id = secrets.token_hex(16), secrets.token_hex(8)
-    accounts = get_json(frontend, "/api/accounts", headers={
+    accounts = get_json(frontend, "/api/v1/accounts", headers={
         "Authorization": "Bearer " + login["token"],
         "traceparent": f"00-{trace_id}-{parent_id}-01",
     })
@@ -76,15 +76,15 @@ def verify_trace(jaeger, trace_id):
 
 def verify_notification(frontend, notifications, login):
     auth = {"Authorization": "Bearer " + login["token"]}
-    account = get_json(frontend, "/api/accounts", 201, {
+    account = get_json(frontend, "/api/v1/accounts", 201, {
         "accountType": "CHECKING", "initialBalance": 0,
     }, auth)
-    transaction = get_json(frontend, "/api/transactions/deposit", 201, {
+    transaction = get_json(frontend, "/api/v1/transactions/deposit", 201, {
         "accountId": account["id"], "amount": 10, "description": "Kubernetes smoke deposit",
     }, auth)
     deadline = time.monotonic() + 45
     while time.monotonic() < deadline:
-        events = get_json(notifications, f"/notifications/{login['id']}") or []
+        events = get_json(notifications, f"/api/v1/notifications/{login['id']}") or []
         if any(event["transaction_id"] == transaction["id"] and event["status"] == "COMPLETED"
                for event in events):
             print("The deposit notification reached the consumer through Redpanda")
@@ -95,24 +95,24 @@ def verify_notification(frontend, notifications, login):
 
 def verify_workflows(frontend, login):
     auth = {"Authorization": "Bearer " + login["token"]}
-    source = get_json(frontend, "/api/accounts", 201, {
+    source = get_json(frontend, "/api/v1/accounts", 201, {
         "accountType": "CHECKING", "initialBalance": 40,
     }, auth)
-    destination = get_json(frontend, "/api/accounts", 201, {
+    destination = get_json(frontend, "/api/v1/accounts", 201, {
         "accountType": "SAVINGS", "initialBalance": 0,
     }, auth)
-    transfer = get_json(frontend, "/api/transactions/transfer", 201, {
+    transfer = get_json(frontend, "/api/v1/transactions/transfer", 201, {
         "fromAccountId": source["id"], "toAccountId": destination["id"],
         "amount": 10, "description": "Banking journey fixture",
     }, auth)
     assert transfer["status"] == "COMPLETED"
-    dispute = get_json(frontend, "/api/disputes", 201, {
+    dispute = get_json(frontend, "/api/v1/disputes", 201, {
         "transferId": transfer["id"], "reason": "Please review this transfer.",
     }, auth)
-    detail = get_json(frontend, f"/api/disputes/{dispute['id']}", headers=auth)
+    detail = get_json(frontend, f"/api/v1/disputes/{dispute['id']}", headers=auth)
     assert detail["status"] == "OPEN" and detail["transferId"] == transfer["id"]
 
-    base = f"/api/accounts/{source['id']}/statement-jobs"
+    base = f"/api/v1/accounts/{source['id']}/statement-jobs"
     job = get_json(frontend, base, 202, {}, {**auth, "Idempotency-Key": secrets.token_hex(16)})
     deadline = time.monotonic() + 60
     while time.monotonic() < deadline:

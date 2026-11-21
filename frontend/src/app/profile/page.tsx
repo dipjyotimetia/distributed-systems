@@ -42,7 +42,7 @@ const ProfilePage: React.FC = () => {
                   </div>
                   <div>
                     <dt className="text-sm font-medium text-ink/60">Last Updated</dt>
-                    <dd className="mt-1 text-sm text-ink">{user.updatedAt ? new Date(user.updatedAt).toLocaleDateString() : '—'}</dd>
+                    <dd className="mt-1 text-sm text-ink">{new Date(user.updatedAt).toLocaleDateString()}</dd>
                   </div>
                 </dl>
               </div>

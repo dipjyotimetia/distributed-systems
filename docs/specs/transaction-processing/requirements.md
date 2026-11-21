@@ -10,7 +10,7 @@ event to Kafka `transaction-events` for notification-service.
 ## Requirements
 
 ### 1. Create a transaction
-1. The service SHALL expose `POST /api/transactions/deposit`, `/withdraw`, `/transfer`
+1. The service SHALL expose `POST /api/v1/transactions/deposit`, `/withdraw`, `/transfer`
    and `/create` (dispatches on `type`); success returns `201` with `TransactionResponse`.
 2. Validation failure SHALL return `400` with a map of field errors. A transfer to the
    same account, or without `toAccountId`, is invalid (the same-account check is missing
@@ -48,7 +48,7 @@ id, with transaction id, account id, user id, amount, type, status and timestamp
 is fire-and-forget; a broker outage SHALL NOT fail the transaction.
 
 ### 7. Query
-`GET /api/transactions` SHALL return the authenticated user's transactions, filtered by
+`GET /api/v1/transactions` SHALL return the authenticated user's transactions, filtered by
 `accountId` when supplied.
 
 ### 8. Persistence and observability

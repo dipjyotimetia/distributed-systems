@@ -46,6 +46,11 @@ spring:
     web-application-type: servlet
 
 # JWT Configuration
+ledger:
+  grpc:
+    enabled: ${LEDGER_GRPC_ENABLED:true}
+    port: ${LEDGER_GRPC_PORT:9092}
+
 jwt:
   secret: ${JWT_SECRET:banking-app-super-secret-key-change-this-in-production-256-bit}
   expiration: ${JWT_EXPIRATION:86400000}

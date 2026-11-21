@@ -20,19 +20,19 @@ spec:
             - |
               echo "Waiting for user-service..."
               BASE_URL=http://banking-gateway:80
-              until wget -q -O- "$BASE_URL/api/healthz" 2>/dev/null; do sleep 5; done
+              until wget -q -O- "$BASE_URL/api/v1/healthz" 2>/dev/null; do sleep 5; done
               echo "Registering Harper Clark..."
               wget -q -O- --post-data='{"username":"harper.clark.001","email":"harper.clark.001@northbridge.example","password":"SimUser123!"}' \
                 --header='Content-Type: application/json' \
-                "$BASE_URL/api/users/register" 2>&1 || echo "User may already exist"
+                "$BASE_URL/api/v1/users/register" 2>&1 || echo "User may already exist"
               echo "Logging in..."
               TOKEN=$(wget -q -O- --post-data='{"usernameOrEmail":"harper.clark.001","password":"SimUser123!"}' \
                 --header='Content-Type: application/json' \
-                "$BASE_URL/api/users/login" 2>&1 | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
+                "$BASE_URL/api/v1/users/login" 2>&1 | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
               if [ -z "$TOKEN" ]; then echo "Login failed"; exit 1; fi
 
               refresh_accounts() {
-                ACCOUNTS=$(wget -q -O- --header="Authorization: Bearer $TOKEN" "$BASE_URL/api/accounts" 2>&1)
+                ACCOUNTS=$(wget -q -O- --header="Authorization: Bearer $TOKEN" "$BASE_URL/api/v1/accounts" 2>&1)
               }
 
               account_record() {
@@ -53,7 +53,7 @@ spec:
                 wget -q -O- --post-data="{\"amount\":$amount,\"accountId\":$account_id,\"description\":\"$description\"}" \
                   --header="Authorization: Bearer $TOKEN" \
                   --header='Content-Type: application/json' \
-                  "$BASE_URL/api/transactions/deposit" 2>&1 || {
+                  "$BASE_URL/api/v1/transactions/deposit" 2>&1 || {
                     echo "Deposit failed for account $account_id amount $amount"
                     exit 1
                   }
@@ -83,7 +83,7 @@ spec:
                   created=$(wget -q -O- --post-data="{\"accountType\":\"$type\",\"initialBalance\":$target_balance}" \
                     --header="Authorization: Bearer $TOKEN" \
                     --header='Content-Type: application/json' \
-                    "$BASE_URL/api/accounts" 2>&1)
+                    "$BASE_URL/api/v1/accounts" 2>&1)
                   account_id=$(json_number id "$created")
                   if [ -z "$account_id" ]; then echo "Failed to create $type account: $created"; exit 1; fi
                   echo "$type account $account_id ready."

@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Dashboard Page', () => {
   test.beforeEach(async ({ page }) => {
     // Mock authentication
-    await page.route('**/api/users/profile', async (route) => {
+    await page.route('**/api/v1/users/profile', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -20,7 +20,7 @@ test.describe('Dashboard Page', () => {
     });
 
     // Mock accounts data
-    await page.route('**/api/accounts', async (route) => {
+    await page.route('**/api/v1/accounts', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -46,7 +46,7 @@ test.describe('Dashboard Page', () => {
     });
 
     // Mock transactions data
-    await page.route('**/api/transactions/recent*', async (route) => {
+    await page.route('**/api/v1/transactions/recent*', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -142,7 +142,7 @@ test.describe('Dashboard Page', () => {
 
   test('should handle loading state', async ({ page }) => {
     // Mock slow API response
-    await page.route('**/api/accounts', async (route) => {
+    await page.route('**/api/v1/accounts', async (route) => {
       await new Promise((resolve) => setTimeout(resolve, 1000));
       await route.fulfill({
         status: 200,
@@ -151,14 +151,14 @@ test.describe('Dashboard Page', () => {
       });
     });
 
-    const accountsLoaded = page.waitForResponse((response) => response.url().includes('/api/accounts'));
+    const accountsLoaded = page.waitForResponse((response) => response.url().includes('/api/v1/accounts'));
     await page.reload();
     await expect(page.getByText('Loading...')).toBeVisible();
     await accountsLoaded;
   });
 
   test('should handle empty accounts state', async ({ page }) => {
-    await page.route('**/api/accounts', async (route) => {
+    await page.route('**/api/v1/accounts', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -172,7 +172,7 @@ test.describe('Dashboard Page', () => {
   });
 
   test('should handle empty transactions state', async ({ page }) => {
-    await page.route('**/api/transactions/recent*', async (route) => {
+    await page.route('**/api/v1/transactions/recent*', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',

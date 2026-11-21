@@ -4,8 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net/url"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -129,6 +132,91 @@ func TestMaybeStartAiResearch(t *testing.T) {
 	if err != nil || internal.AiDraft == nil {
 		t.Fatalf("ByIDInternal missing draft: %+v %v", internal, err)
 	}
+}
+
+func TestDispatchSignals(t *testing.T) {
+	dsn := os.Getenv("DISPUTES_TEST_DATABASE_URL")
+	if dsn == "" {
+		t.Skip("DISPUTES_TEST_DATABASE_URL is required for signal dispatch tests")
+	}
+	base, err := sql.Open("pgx", dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer base.Close()
+	if _, err := base.Exec("CREATE DATABASE disputes_signal_test"); err != nil && !strings.Contains(err.Error(), "already exists") {
+		t.Fatal(err)
+	}
+	isolated, err := url.Parse(dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	isolated.Path = "/disputes_signal_test"
+	db, err := sql.Open("pgx", isolated.String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	schema, err := os.ReadFile("../../../../kubernetes/overlays/full/schema.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec("CREATE SCHEMA IF NOT EXISTS disputes;" + string(schema)); err != nil {
+		t.Fatal(err)
+	}
+	closed, err := sql.Open("pgx", isolated.String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	closed.Close()
+	if err := dispatchSignals(context.Background(), closed, &scriptedSignals{}); err == nil {
+		t.Fatal("closed database accepted")
+	}
+
+	ctx := context.Background()
+	var id int64
+	if err := db.QueryRowContext(ctx, "INSERT INTO disputes.cases (transfer_id, customer_id, reason) VALUES ($1, 7, 'signal') RETURNING id", time.Now().UnixNano()).Scan(&id); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(context.Background(), "DELETE FROM disputes.workflow_outbox WHERE case_id=$1", id)
+		_, _ = db.ExecContext(context.Background(), "DELETE FROM disputes.signal_outbox WHERE case_id=$1", id)
+		_, _ = db.ExecContext(context.Background(), "DELETE FROM disputes.cases WHERE id=$1", id)
+	})
+	if _, err := db.ExecContext(ctx, "INSERT INTO disputes.signal_outbox (case_id, revision) VALUES ($1, 2)", id); err != nil {
+		t.Fatal(err)
+	}
+	signals := &scriptedSignals{err: errors.New("temporal down")}
+	if err := dispatchSignals(ctx, db, signals); err == nil || signals.calls != 1 {
+		t.Fatalf("signal error calls=%d err=%v", signals.calls, err)
+	}
+	signals.err = &serviceerror.NotFound{}
+	if err := dispatchSignals(ctx, db, signals); err != nil || signals.calls != 2 {
+		t.Fatalf("closed workflow calls=%d err=%v", signals.calls, err)
+	}
+	var pending int
+	if err := db.QueryRowContext(ctx, "SELECT count(*) FROM disputes.signal_outbox WHERE case_id=$1", id).Scan(&pending); err != nil || pending != 0 {
+		t.Fatalf("pending signals %d, %v", pending, err)
+	}
+	if _, err := db.ExecContext(ctx, "INSERT INTO disputes.signal_outbox (case_id, revision) VALUES ($1, 3)", id); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, "INSERT INTO disputes.workflow_outbox (case_id, deadline) VALUES ($1, now())", id); err != nil {
+		t.Fatal(err)
+	}
+	if err := dispatchSignals(ctx, db, signals); err != nil || signals.calls != 2 {
+		t.Fatalf("queued workflow was signalled calls=%d err=%v", signals.calls, err)
+	}
+}
+
+type scriptedSignals struct {
+	err   error
+	calls int
+}
+
+func (s *scriptedSignals) SignalWorkflow(context.Context, string, string, string, interface{}) error {
+	s.calls++
+	return s.err
 }
 
 type workflowStartFunc func(context.Context, client.StartWorkflowOptions, interface{}, ...interface{}) (client.WorkflowRun, error)

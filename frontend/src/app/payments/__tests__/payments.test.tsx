@@ -44,7 +44,7 @@ it('submits from an AUD account and refreshes the settlement reference', async (
   fireEvent.change(screen.getByLabelText('Amount in AUD cents'), { target: { value: '2500' } });
   fireEvent.click(screen.getByRole('button', { name: 'Submit payment' }));
   expect(await screen.findAllByText(paymentId)).toHaveLength(2);
-  expect(fetchMock).toHaveBeenCalledWith('/api/payments', expect.objectContaining({
+  expect(fetchMock).toHaveBeenCalledWith('/api/v1/payments', expect.objectContaining({
     method: 'POST',
     body: JSON.stringify({ accountId: 11, destination: 'DEST00000001', amountMinor: 2500 }),
   }));
@@ -92,7 +92,7 @@ it('renders discrepancies and pages through the read-only queue', async () => {
   expect(screen.getByRole('button', { name: 'Previous' })).toBeDisabled();
   fireEvent.click(screen.getByRole('button', { name: 'Next' }));
   expect(await screen.findByText('No discrepancies on this page.')).toBeInTheDocument();
-  expect(fetchMock).toHaveBeenLastCalledWith('/api/operations/payments/reconciliation?offset=100', expect.anything());
+  expect(fetchMock).toHaveBeenLastCalledWith('/api/v1/operations/payments/reconciliation?offset=100', expect.anything());
 });
 
 it.each([

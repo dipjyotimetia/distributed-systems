@@ -10,7 +10,10 @@ COPY backend/api-gateway/build.gradle.kts backend/api-gateway/gradle.properties 
 COPY backend/payments-service/build.gradle.kts backend/payments-service/gradle.properties backend/payments-service/
 COPY backend/transactions-service/build.gradle.kts backend/transactions-service/gradle.properties backend/transactions-service/
 COPY backend/transactions-service/src backend/transactions-service/src
-COPY proto/fraud/ proto/fraud/
+COPY contracts/openapi/transactions.yaml contracts/openapi/transactions.yaml
+COPY contracts/proto/fraud/ contracts/proto/fraud/
+COPY contracts/proto/ledger/ contracts/proto/ledger/
+COPY contracts/proto/transactions/ contracts/proto/transactions/
 ARG GRADLE_CACHE_SUFFIX=0
 RUN --mount=type=cache,id=gradle-transactions-service-${GRADLE_CACHE_SUFFIX},target=/root/.gradle,sharing=locked \
     sh scripts/docker-bootjar.sh :transactions-service:bootJar

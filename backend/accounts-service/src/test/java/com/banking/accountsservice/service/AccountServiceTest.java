@@ -1,10 +1,8 @@
 package com.banking.accountsservice.service;
 
-import com.banking.accountsservice.generated.AccountCreateRequest;
-import com.banking.accountsservice.generated.AccountType;
-import com.banking.accountsservice.generated.AccountResponse;
-import com.banking.accountsservice.generated.AccountStatus;
-import com.banking.accountsservice.generated.BalanceResponse;
+import com.banking.accountsservice.dto.AccountCreateRequest;
+import com.banking.accountsservice.dto.AccountResponse;
+import com.banking.accountsservice.dto.BalanceResponse;
 import com.banking.accountsservice.entity.Account;
 import com.banking.accountsservice.repository.AccountRepository;
 import io.opentelemetry.api.metrics.LongCounter;
@@ -126,7 +124,7 @@ class AccountServiceTest {
     @Test
     void testCreateAccount() {
         // Arrange
-        AccountCreateRequest request = new AccountCreateRequest(AccountType.SAVINGS);
+        AccountCreateRequest request = new AccountCreateRequest("SAVINGS");
         when(accountRepository.existsByAccountNumber(anyString())).thenReturn(false);
         when(accountRepository.save(any(Account.class))).thenReturn(testAccount);
 
@@ -146,7 +144,7 @@ class AccountServiceTest {
     @Test
     void testCreateAccountWithDuplicateAccountNumber() {
         // Arrange
-        AccountCreateRequest request = new AccountCreateRequest(AccountType.CHECKING);
+        AccountCreateRequest request = new AccountCreateRequest("CHECKING");
         when(accountRepository.existsByAccountNumber(anyString()))
                 .thenReturn(true)  // First call returns true (duplicate)
                 .thenReturn(false); // Second call returns false (unique)

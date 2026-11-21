@@ -18,8 +18,11 @@ from prometheus_client.process_collector import ProcessCollector
 from prometheus_client.platform_collector import PlatformCollector
 from pydantic import BaseModel
 
+from ai_contract.apis.ai_api import router as contract_router
+from ai_contract.apis.ai_api_base import BaseAiApi
+from ai_contract.models.health import Health as ContractHealth
+
 from delivery import prepare_for_delivery
-from generated_models import ChatRequest, ChatResponse, ProviderResult
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -50,9 +53,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.include_router(contract_router)
 
 # Match the Spring Boot Micrometer metric name + label set the banking-app dashboards use,
-# so /api/chat shows up in the cross-service "Errors by Endpoint" / "Status Codes by Service"
+# so /api/v1/chat shows up in the cross-service "Errors by Endpoint" / "Status Codes by Service"
 # panels alongside the Java services. Histogram (not Counter) so the exposed series is named
 # http_server_requests_seconds_count — without prometheus_client's automatic `_total` suffix.
 _metrics_registry = CollectorRegistry()
@@ -81,7 +85,7 @@ _PROVIDER_REQUESTS = Counter(
 
 @app.middleware("http")
 async def _record_http_metrics(request: Request, call_next):
-    if request.url.path in ("/metrics", "/actuator/prometheus", "/health"):
+    if request.url.path in ("/metrics", "/actuator/prometheus", "/api/v1/health"):
         return await call_next(request)
     start = time.monotonic()
     status_code = 500
@@ -123,6 +127,25 @@ PROVIDER_URLS = {
     "xai": os.environ.get("XAI_URL", "https://api.x.ai/v1/chat/completions"),
     "openrouter": os.environ.get("OPENROUTER_URL", "https://openrouter.ai/api/v1/chat/completions"),
 }
+
+class ChatRequest(BaseModel):
+    message: str
+    accountContext: str = ""
+    locale: str = "en-US"
+
+
+class ProviderResult(BaseModel):
+    provider: str
+    name: str
+    model: str
+    message: str = ""
+    error: str | None = None
+    durationMs: int = 0
+
+
+class ChatResponse(BaseModel):
+    results: list[ProviderResult]
+
 
 async def call_anthropic(client: httpx.AsyncClient, message: str, context: str) -> ProviderResult:
     info = PROVIDERS[0]
@@ -261,7 +284,6 @@ def _elapsed(start: float) -> int:
     return int((time.monotonic() - start) * 1000)
 
 
-@app.post("/api/chat", response_model=ChatResponse)
 async def chat(req: ChatRequest):
     if os.environ.get("AI_PROVIDER_MODE", "live") == "fixture":
         results = [
@@ -296,7 +318,6 @@ async def chat(req: ChatRequest):
     return ChatResponse(results=list(results))
 
 
-@app.get("/api/providers")
 async def providers():
     return PROVIDERS
 
@@ -316,13 +337,12 @@ class DisputeResearchRequest(BaseModel):
     wait: bool = True
 
 
-@app.post("/api/agent/chat")
-async def agent_chat(req: AgentChatRequest, request: Request):
+async def agent_chat(req: AgentChatRequest, authorization: str = ""):
     """Start a durable banking agent workflow (tool-calling + guardrails)."""
     from temporal.client import start_banking_agent
     from temporal.models import AgentInput
 
-    auth = req.authToken or (request.headers.get("Authorization") or "").removeprefix("Bearer ").strip()
+    auth = req.authToken or authorization.removeprefix("Bearer ").strip()
     try:
         return await start_banking_agent(
             AgentInput(
@@ -339,8 +359,7 @@ async def agent_chat(req: AgentChatRequest, request: Request):
         return Response(content=f"Agent workflow unavailable: {exc}", status_code=503)
 
 
-@app.post("/api/disputes/research")
-async def dispute_research(req: DisputeResearchRequest, request: Request):
+async def dispute_research(req: DisputeResearchRequest, internal_token: str = ""):
     """Start multi-agent dispute research; persists draft via disputes internal API.
 
     Protected by the shared DISPUTES_INTERNAL_TOKEN (service-to-service only).
@@ -350,7 +369,7 @@ async def dispute_research(req: DisputeResearchRequest, request: Request):
     from temporal.models import DisputeResearchInput
 
     expected = os.environ.get("DISPUTES_INTERNAL_TOKEN", "")
-    provided = request.headers.get("X-Internal-Token", "")
+    provided = internal_token
     if not expected or provided != expected:
         return Response(content="Internal token required", status_code=401)
 
@@ -364,6 +383,46 @@ async def dispute_research(req: DisputeResearchRequest, request: Request):
         return Response(content=f"Dispute research unavailable: {exc}", status_code=503)
 
 
-@app.get("/health")
 async def health():
     return {"status": "ok", "temporalQueue": "ai-banking"}
+
+
+class ContractAi(BaseAiApi):
+    async def chat(self, chat_request):
+        return await chat(
+            ChatRequest(
+                message=chat_request.message,
+                accountContext=chat_request.account_context or "",
+                locale=chat_request.locale or "en-US",
+            )
+        )
+
+    async def list_providers(self):
+        return await providers()
+
+    async def agent_chat(self, agent_chat_request, authorization):
+        return await agent_chat(
+            AgentChatRequest(
+                message=agent_chat_request.message,
+                accountId=agent_chat_request.account_id,
+                locale=agent_chat_request.locale or "en-US",
+                conversationClaim=agent_chat_request.conversation_claim,
+                authToken=agent_chat_request.auth_token or "",
+                wait=True if agent_chat_request.wait is None else agent_chat_request.wait,
+            ),
+            authorization or "",
+        )
+
+    async def dispute_research(self, dispute_research_request, x_internal_token):
+        return await dispute_research(
+            DisputeResearchRequest(
+                caseId=dispute_research_request.case_id,
+                locale=dispute_research_request.locale or "en-US",
+                wait=True if dispute_research_request.wait is None else dispute_research_request.wait,
+            ),
+            x_internal_token or "",
+        )
+
+    async def ai_health(self):
+        body = await health()
+        return ContractHealth(status=body["status"], temporalQueue=body["temporalQueue"])

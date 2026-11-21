@@ -9,7 +9,9 @@ COPY backend/api-gateway/build.gradle.kts backend/api-gateway/gradle.properties 
 COPY backend/payments-service/build.gradle.kts backend/payments-service/gradle.properties backend/payments-service/
 COPY backend/transactions-service/build.gradle.kts backend/transactions-service/gradle.properties backend/transactions-service/
 COPY backend/payments-service/src backend/payments-service/src
-COPY proto/fraud/ proto/fraud/
+COPY contracts/openapi/payments.yaml contracts/openapi/payments.yaml
+COPY contracts/proto/fraud/ contracts/proto/fraud/
+COPY contracts/proto/ledger/ contracts/proto/ledger/
 ARG GRADLE_CACHE_SUFFIX=0
 RUN --mount=type=cache,id=gradle-payments-service-${GRADLE_CACHE_SUFFIX},target=/root/.gradle,sharing=locked \
     sh scripts/docker-bootjar.sh :payments-service:bootJar

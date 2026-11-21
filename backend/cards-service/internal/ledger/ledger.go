@@ -1,17 +1,22 @@
 package ledger
 
 import (
-	"bytes"
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"math/big"
-	"net/http"
 	"strings"
+
+	ledgerv1 "github.com/dipjyotimetia/distributed-systems/backend/cards-service/gen/ledger/v1"
+	"google.golang.org/grpc/metadata"
 )
+
+type API interface {
+	Owns(ctx context.Context, authorization string, account int64) error
+	Withdraw(ctx context.Context, user, account int64, amount, operation string) error
+}
 
 func CanonicalAmount(raw string) (string, error) {
 	value, ok := new(big.Rat).SetString(strings.TrimSpace(raw))
@@ -28,23 +33,14 @@ func Sign(secret, operation, action string, user, from int64, amount string) str
 }
 
 type Client struct {
-	Base   string
+	Ledger ledgerv1.AccountLedgerClient
 	Secret string
-	HTTP   *http.Client
 }
 
 func (c Client) Owns(ctx context.Context, authorization string, account int64) error {
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/api/accounts/%d", c.Base, account), nil)
+	ctx = metadata.AppendToOutgoingContext(ctx, "authorization", authorization)
+	_, err := c.Ledger.GetAccount(ctx, &ledgerv1.GetAccountRequest{AccountId: account})
 	if err != nil {
-		return err
-	}
-	request.Header.Set("Authorization", authorization)
-	response, err := c.client().Do(request)
-	if err != nil {
-		return err
-	}
-	defer response.Body.Close()
-	if response.StatusCode != http.StatusOK {
 		return fmt.Errorf("account %d is not owned", account)
 	}
 	return nil
@@ -62,27 +58,12 @@ func (c Client) Withdraw(ctx context.Context, user, account int64, amount, opera
 }
 
 func (c Client) action(ctx context.Context, action string, user, account int64, amount, operation string) error {
-	body, _ := json.Marshal(map[string]any{"userId": user, "fromAccountId": account, "toAccountId": nil, "amount": json.Number(amount)})
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/internal/account-movements/%s/%s", c.Base, operation, action), bytes.NewReader(body))
+	ctx = metadata.AppendToOutgoingContext(ctx, "x-movement-signature", Sign(c.Secret, operation, action, user, account, amount))
+	_, err := c.Ledger.ApplyMovement(ctx, &ledgerv1.MovementRequest{
+		OperationId: operation, Action: action, UserId: user, FromAccountId: &account, Amount: amount,
+	})
 	if err != nil {
-		return err
-	}
-	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("X-Movement-Signature", Sign(c.Secret, operation, action, user, account, amount))
-	response, err := c.client().Do(request)
-	if err != nil {
-		return err
-	}
-	defer response.Body.Close()
-	if response.StatusCode != http.StatusNoContent {
-		return fmt.Errorf("movement %s returned %d", action, response.StatusCode)
+		return fmt.Errorf("movement %s: %w", action, err)
 	}
 	return nil
-}
-
-func (c Client) client() *http.Client {
-	if c.HTTP != nil {
-		return c.HTTP
-	}
-	return http.DefaultClient
 }

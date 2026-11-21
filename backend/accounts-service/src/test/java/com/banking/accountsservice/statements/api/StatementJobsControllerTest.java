@@ -13,6 +13,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -31,31 +33,39 @@ class StatementJobsControllerTest {
         when(store.list(42, 7, 0)).thenReturn(List.of(job));
         when(store.find(42, 7, id)).thenReturn(Optional.of(job));
         when(store.download(42, 7, id)).thenReturn(Optional.of(new byte[] {'{', '}'}));
-        var api = MockMvcBuilders.standaloneSetup(new StatementJobsController(new StatementJobs(accounts, store))).build();
+        var api = MockMvcBuilders.standaloneSetup(new StatementJobsController(new StatementJobs(accounts, store), new com.banking.accountsservice.contract.ContractJson())).build();
         var owner = identity(7);
         var stranger = identity(8);
-        String base = "/api/accounts/42/statement-jobs";
+        String base = "/api/v1/accounts/42/statement-jobs";
         String resource = base + "/" + id;
 
-        api.perform(post(base).principal(owner).header("Idempotency-Key", "create-1"))
+        api.perform(post(base).with(signedIn(owner)).header("Idempotency-Key", "create-1"))
                 .andExpect(status().isAccepted()).andExpect(header().string("Location", resource));
-        api.perform(post(base).principal(owner)).andExpect(status().isBadRequest());
-        api.perform(post(base).principal(owner).header("Idempotency-Key", " ")).andExpect(status().isBadRequest());
-        api.perform(get(base).principal(owner)).andExpect(status().isOk())
+        api.perform(post(base).with(signedIn(owner))).andExpect(status().isBadRequest());
+        api.perform(post(base).with(signedIn(owner)).header("Idempotency-Key", " ")).andExpect(status().isBadRequest());
+        api.perform(get(base).with(signedIn(owner))).andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[0].status").value("READY")).andExpect(jsonPath("$.hasMore").value(false));
-        api.perform(get(base).principal(owner).param("page", "0")).andExpect(status().isBadRequest());
-        api.perform(get(base).principal(stranger)).andExpect(status().isNotFound());
-        api.perform(get(resource).principal(owner)).andExpect(status().isOk())
+        api.perform(get(base).with(signedIn(owner)).param("page", "0")).andExpect(status().isBadRequest());
+        api.perform(get(base).with(signedIn(stranger))).andExpect(status().isNotFound());
+        api.perform(get(resource).with(signedIn(owner))).andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(id.toString()));
-        api.perform(get(base + "/bad").principal(owner)).andExpect(status().isBadRequest());
-        api.perform(get(base + "/" + UUID.randomUUID()).principal(owner)).andExpect(status().isNotFound());
-        api.perform(get(resource + "/download").principal(stranger)).andExpect(status().isNotFound())
+        api.perform(get(base + "/bad").with(signedIn(owner))).andExpect(status().isBadRequest());
+        api.perform(get(base + "/" + UUID.randomUUID()).with(signedIn(owner))).andExpect(status().isNotFound());
+        api.perform(get(resource + "/download").with(signedIn(stranger))).andExpect(status().isNotFound())
                 .andExpect(header().string("Cache-Control", "no-store"));
-        api.perform(get(resource + "/download").principal(owner)).andExpect(status().isOk())
+        api.perform(get(resource + "/download").with(signedIn(owner))).andExpect(status().isOk())
                 .andExpect(header().string("Content-Disposition", "attachment; filename=\"statement-" + id + ".json\""))
                 .andExpect(content().json("{}"));
         when(store.download(42, 7, id)).thenReturn(Optional.empty());
-        api.perform(get(resource + "/download").principal(owner)).andExpect(status().isGone());
+        api.perform(get(resource + "/download").with(signedIn(owner))).andExpect(status().isGone());
+    }
+
+    private static RequestPostProcessor signedIn(UsernamePasswordAuthenticationToken auth) {
+        return request -> {
+            SecurityContextHolder.getContext().setAuthentication(auth);
+            request.setUserPrincipal(auth);
+            return request;
+        };
     }
 
     private static UsernamePasswordAuthenticationToken identity(long id) {

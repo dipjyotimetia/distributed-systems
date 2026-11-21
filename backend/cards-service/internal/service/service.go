@@ -39,7 +39,7 @@ type Server struct {
 	cardsv1.UnimplementedCardsServer
 	Repo   Repository
 	Secret []byte
-	Ledger ledger.Client
+	Ledger ledger.API
 	Fraud  fraudv1.FraudCheckerClient
 	Kyc    kycv1.KycClient
 }

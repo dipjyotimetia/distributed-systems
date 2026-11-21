@@ -54,9 +54,9 @@ them, so the recordings are **not committed**: `make proxymock-prepare-golden` m
 `recorded-golden/known-gaps/`, which is git-ignored (local inspection only), and the downstream
 mocks only they would need are pruned. The gaps are:
 
-- `GET /api/transactions?accountId=<id>` — the downstream fan-out was not captured, so no
+- `GET /api/v1/transactions?accountId=<id>` — the downstream fan-out was not captured, so no
   mock can serve it.
-- `GET /api/transactions` that recorded a **503** — a Redis rate-limiter rejection under
+- `GET /api/v1/transactions` that recorded a **503** — a Redis rate-limiter rejection under
   production load; the offline replay runs with the rate limiter disabled, so it returns 200.
 
 ## Rebuilding the snapshot

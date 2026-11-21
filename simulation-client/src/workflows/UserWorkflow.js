@@ -621,11 +621,11 @@ class UserWorkflow {
     const account = user.accounts && user.accounts.length > 0 ? user.accounts[0] : null;
 
     // Weighted scenario selection — pick from a bag with repeats. Light background
-    // noise only; the bigger errors are driven by normal /api/chat traffic, not by
+    // noise only; the bigger errors are driven by normal /api/v1/chat traffic, not by
     // this bag. Keep entries here minor so none dominates the errors board.
     const bag = [
-      'missingAccount',                                      // 404 /api/accounts/{id}/balance (a few, not dominant)
-      'statementExport',                                     // 200 /api/accounts/{id}/export-statement unless S3 is wired up
+      'missingAccount',                                      // 404 /api/v1/accounts/{id}/balance (a few, not dominant)
+      'statementExport',                                     // 200 /api/v1/accounts/{id}/export-statement unless S3 is wired up
       'badLogin',                                            // 401 (light realism)
       'expiredToken',                                        // 401 (light realism)
     ];
@@ -673,7 +673,7 @@ class UserWorkflow {
           // Uses rawRequest to avoid retry amplification on 5xx.
           if (account) {
             await this.apiClient.rawRequest(
-              'POST', `/api/accounts/${account.id}/export-statement`, {}, user.token
+              'POST', `/api/v1/accounts/${account.id}/export-statement`, {}, user.token
             );
           }
           break;

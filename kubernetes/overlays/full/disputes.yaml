@@ -76,6 +76,11 @@ spec:
         - name: disputes
           image: ghcr.io/dipjyotimetia/distributed-systems/disputes-service:v1.4.139
           imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: grpc
+              containerPort: 9096
           env:
             - name: DATABASE_URL
               valueFrom:
@@ -86,8 +91,10 @@ spec:
               value: http://otel-collector.observability:4317
             - name: OTEL_SERVICE_NAME
               value: disputes
-            - name: TRANSACTIONS_SERVICE_URL
-              value: http://banking-transactions
+            - name: TRANSACTIONS_GRPC_ADDRESS
+              value: banking-transactions:9095
+            - name: DISPUTES_GRPC_PORT
+              value: "9096"
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
@@ -101,13 +108,13 @@ spec:
                   optional: true
           startupProbe:
             httpGet:
-              path: /health
+              path: /api/v1/health
               port: 8080
             periodSeconds: 5
             failureThreshold: 30
           readinessProbe:
             httpGet:
-              path: /health
+              path: /api/v1/health
               port: 8080
           resources:
             requests:
@@ -150,13 +157,13 @@ spec:
               value: banking-temporal:7233
           startupProbe:
             httpGet:
-              path: /health
+              path: /api/v1/health
               port: 8080
             periodSeconds: 5
             failureThreshold: 30
           readinessProbe:
             httpGet:
-              path: /health
+              path: /api/v1/health
               port: 8080
           resources:
             requests:
@@ -176,3 +183,6 @@ spec:
     - name: http
       port: 80
       targetPort: 8080
+    - name: grpc
+      port: 9096
+      targetPort: 9096

@@ -27,7 +27,13 @@ public final class MqClearingTransport {
     }
 
     public static MqClearingTransport connect(String address, String username, String password) {
-        return new MqClearingTransport(new ActiveMQConnectionFactory(address), username, password);
+        var factory = new ActiveMQConnectionFactory(address);
+        // Kind replaces the broker. Without reconnect, a receive stays blocked on the dead socket
+        // and the clearing simulator never publishes settlement.
+        factory.setReconnectAttempts(-1);
+        factory.setRetryInterval(500);
+        factory.setCallTimeout(5_000);
+        return new MqClearingTransport(factory, username, password);
     }
 
     public void send(String queue, ClearingRecord record) throws JMSException {

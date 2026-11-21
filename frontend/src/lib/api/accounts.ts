@@ -1,20 +1,52 @@
-import type { AccountCreateRequest as GeneratedCreateAccountRequest } from '../../gen/http/AccountCreateRequest';
-import type { AccountResponse } from '../../gen/http/AccountResponse';
-import type { AccountSummary as GeneratedAccountSummary } from '../../gen/http/AccountSummary';
-import type { AccountUpdateRequest as GeneratedUpdateAccountRequest } from '../../gen/http/AccountUpdateRequest';
-import type { BalanceResponse } from '../../gen/http/BalanceResponse';
-import { apiClient, ApiResponse, PaginatedResponse } from './client';
-import type { Wire } from './wire';
+import { AccountsApi, Configuration } from '@/gen/openapi/accounts/src';
+import { ApiResponse, PaginatedResponse } from './client';
 
-export type Account = Wire<AccountResponse>;
-export type CreateAccountRequest = Wire<GeneratedCreateAccountRequest>;
-export type UpdateAccountRequest = Wire<GeneratedUpdateAccountRequest>;
-export type AccountSummary = Wire<GeneratedAccountSummary>;
+const accountsApi = new AccountsApi(new Configuration({ basePath: '' }));
+
+async function call<T>(request: () => Promise<unknown>): Promise<ApiResponse<T>> {
+  try {
+    return { success: true, data: (await request()) as T };
+  } catch (error) {
+    return { success: false, message: error instanceof Error ? error.message : 'Request failed' };
+  }
+}
+
+export interface Account {
+  id: number;
+  userId: number;
+  accountNumber: string;
+  accountType: 'CHECKING' | 'SAVINGS' | 'CREDIT' | 'INVESTMENT';
+  balance: number;
+  currency: string;
+  status: 'ACTIVE' | 'INACTIVE' | 'FROZEN' | 'CLOSED';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateAccountRequest {
+  accountType: 'CHECKING' | 'SAVINGS' | 'CREDIT' | 'INVESTMENT';
+  initialBalance?: number;
+  currency?: string;
+}
+
+export interface UpdateAccountRequest {
+  accountType?: 'CHECKING' | 'SAVINGS' | 'CREDIT' | 'INVESTMENT';
+  status?: 'ACTIVE' | 'FROZEN' | 'CLOSED';
+}
+
+export interface AccountSummary {
+  totalAccounts: number;
+  totalBalance: number;
+  activeAccounts: number;
+  accountsByType: {
+    [key in Account['accountType']]: number;
+  };
+}
 
 export class AccountsAPI {
   // Get all accounts for the current user
   static async getAccounts(): Promise<ApiResponse<Account[]>> {
-    return await apiClient.get<Account[]>('/api/accounts');
+    return call(() => accountsApi.listAccounts());
   }
 
   // Get paginated accounts
@@ -23,23 +55,17 @@ export class AccountsAPI {
     size: number = 10,
     sort: string = 'createdAt,desc'
   ): Promise<ApiResponse<PaginatedResponse<Account>>> {
-    const params = new URLSearchParams({
-      page: page.toString(),
-      size: size.toString(),
-      sort,
-    });
-
-    return await apiClient.get<PaginatedResponse<Account>>(`/api/accounts?${params}`);
+    return call(() => accountsApi.listAccounts({ page, size, sort }));
   }
 
   // Get account by ID
   static async getAccount(accountId: number): Promise<ApiResponse<Account>> {
-    return await apiClient.get<Account>(`/api/accounts/${accountId}`);
+    return call(() => accountsApi.getAccount({ accountId }));
   }
 
   // Create new account
   static async createAccount(accountData: CreateAccountRequest): Promise<ApiResponse<Account>> {
-    return await apiClient.post<Account>('/api/accounts', accountData);
+    return call(() => accountsApi.createAccount({ accountCreateRequest: accountData }));
   }
 
   // Update account
@@ -47,30 +73,30 @@ export class AccountsAPI {
     accountId: number,
     accountData: UpdateAccountRequest
   ): Promise<ApiResponse<Account>> {
-    return await apiClient.put<Account>(`/api/accounts/${accountId}`, accountData);
+    return call(() => accountsApi.updateAccount({ accountId, accountUpdateRequest: accountData }));
   }
 
   // Delete account
   static async deleteAccount(accountId: number): Promise<ApiResponse<void>> {
-    return await apiClient.delete<void>(`/api/accounts/${accountId}`);
+    return call(() => accountsApi.closeAccount({ accountId }));
   }
 
   // Get account summary/statistics
   static async getAccountSummary(): Promise<ApiResponse<AccountSummary>> {
-    return await apiClient.get<AccountSummary>('/api/accounts/summary');
+    return call(() => accountsApi.summarizeAccounts());
   }
 
   // Get account balance
-  static async getAccountBalance(accountId: number): Promise<ApiResponse<BalanceResponse>> {
-    return await apiClient.get<BalanceResponse>(`/api/accounts/${accountId}/balance`);
+  static async getAccountBalance(accountId: number): Promise<ApiResponse<{ balance: number; currency: string }>> {
+    return call(() => accountsApi.getAccountBalance({ accountId }));
   }
 
   // Update account status
   static async updateAccountStatus(
     accountId: number,
-    status: Account['status']
+    status: 'ACTIVE' | 'FROZEN' | 'CLOSED'
   ): Promise<ApiResponse<Account>> {
-    return await apiClient.patch<Account>(`/api/accounts/${accountId}/status`, { status });
+    return call(() => accountsApi.updateAccountStatus({ accountId, statusUpdateRequest: { status } }));
   }
 
   // Freeze account
@@ -92,14 +118,14 @@ export class AccountsAPI {
   static async getAccountsByType(
     accountType: Account['accountType']
   ): Promise<ApiResponse<Account[]>> {
-    return await apiClient.get<Account[]>(`/api/accounts?type=${accountType}`);
+    return call(() => accountsApi.listAccounts({ type: accountType }));
   }
 
   // Get accounts by status
   static async getAccountsByStatus(
     status: Account['status']
   ): Promise<ApiResponse<Account[]>> {
-    return await apiClient.get<Account[]>(`/api/accounts?status=${status}`);
+    return call(() => accountsApi.listAccounts({ status }));
   }
 
   // Search accounts
@@ -108,13 +134,7 @@ export class AccountsAPI {
     page: number = 0,
     size: number = 10
   ): Promise<ApiResponse<PaginatedResponse<Account>>> {
-    const params = new URLSearchParams({
-      q: query,
-      page: page.toString(),
-      size: size.toString(),
-    });
-
-    return await apiClient.get<PaginatedResponse<Account>>(`/api/accounts/search?${params}`);
+    return call(() => accountsApi.searchAccounts({ q: query, page, size }));
   }
 }
 

@@ -59,10 +59,10 @@ jobs:
         run: |
           generated="$(mktemp -d)"
           module=github.com/dipjyotimetia/distributed-systems/backend/fraud-service
-          protoc -I proto/fraud \
+          protoc -I contracts/proto/fraud \
             --go_out="$generated" --go_opt=module="$module" \
             --go-grpc_out="$generated" --go-grpc_opt=module="$module" \
-            proto/fraud/fraud.proto
+            contracts/proto/fraud/fraud.proto
           diff -ru backend/fraud-service/gen "$generated/gen"
       - uses: actions/setup-node@v7.1.0
         with:
@@ -72,17 +72,26 @@ jobs:
       - name: Install frontend protobuf plugin
         working-directory: frontend
         run: npm ci
+      - name: Verify internal gRPC and OpenAPI server stubs
+        run: |
+          python3 -m pip install --user 'grpcio-tools==1.83.2'
+          go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.5.0
+          bash scripts/check-contract-drift.sh
       - name: Verify frontend gRPC clients
         run: |
           generated="$(mktemp -d)"
           bash scripts/frontend-proto.sh "$generated"
-          diff -ru frontend/src/gen "$generated/frontend/src/gen"
+          diff -ru frontend/src/gen/kyc "$generated/frontend/src/gen/kyc"
+          diff -ru frontend/src/gen/cards "$generated/frontend/src/gen/cards"
       - name: Check compatibility with PR base
         if: github.event_name == 'pull_request'
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
-          if git cat-file -e "${BASE_SHA}:proto/workflows/buf.yaml"; then
+          if git cat-file -e "${BASE_SHA}:contracts/proto/workflows/buf.yaml"; then
+            git archive "$BASE_SHA" contracts/proto/workflows | tar -x -C "$RUNNER_TEMP"
+            buf breaking contracts/proto/workflows --against "$RUNNER_TEMP/contracts/proto/workflows"
+          elif git cat-file -e "${BASE_SHA}:proto/workflows/buf.yaml"; then
             git archive "$BASE_SHA" proto/workflows | tar -x -C "$RUNNER_TEMP"
-            buf breaking proto/workflows --against "$RUNNER_TEMP/proto/workflows"
+            buf breaking contracts/proto/workflows --against "$RUNNER_TEMP/proto/workflows"
           fi

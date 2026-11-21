@@ -23,10 +23,10 @@ class HealthControllerTest {
         assertNotNull(response);
         assertEquals(200, response.getStatusCode().value());
         assertNotNull(response.getBody());
-        assertEquals("UP", response.getBody().get("status"));
-        assertEquals("test-api-gateway", response.getBody().get("service"));
-        assertEquals("1.0.0", response.getBody().get("version"));
-        assertTrue(response.getBody().containsKey("timestamp"));
+        assertEquals("UP", response.getBody().getStatus());
+        assertEquals("test-api-gateway", response.getBody().getService());
+        assertEquals("1.0.0", response.getBody().getVersion());
+        assertNotNull(response.getBody().getTimestamp());
     }
 
     @Test
@@ -36,9 +36,9 @@ class HealthControllerTest {
         assertNotNull(response);
         assertEquals(200, response.getStatusCode().value());
         assertNotNull(response.getBody());
-        assertEquals("READY", response.getBody().get("status"));
-        assertEquals("test-api-gateway", response.getBody().get("service"));
-        assertTrue(response.getBody().containsKey("timestamp"));
+        assertEquals("READY", response.getBody().getStatus());
+        assertEquals("test-api-gateway", response.getBody().getService());
+        assertNotNull(response.getBody().getTimestamp());
     }
 
     @Test
@@ -48,8 +48,8 @@ class HealthControllerTest {
         assertNotNull(response);
         assertEquals(200, response.getStatusCode().value());
         assertNotNull(response.getBody());
-        assertEquals("ALIVE", response.getBody().get("status"));
-        assertEquals("test-api-gateway", response.getBody().get("service"));
-        assertTrue(response.getBody().containsKey("timestamp"));
+        assertEquals("ALIVE", response.getBody().getStatus());
+        assertEquals("test-api-gateway", response.getBody().getService());
+        assertNotNull(response.getBody().getTimestamp());
     }
 }

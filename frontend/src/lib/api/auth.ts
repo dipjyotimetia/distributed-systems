@@ -1,12 +1,5 @@
 import axios from 'axios';
-import type { LoginRequest } from '../../gen/http/LoginRequest';
-import type { ProfileResponse } from '../../gen/http/ProfileResponse';
-import type { RegisterRequest } from '../../gen/http/RegisterRequest';
-import { AuthResponse, User } from '../types/auth';
-import type { Wire } from './wire';
-
-export type { LoginRequest, RegisterRequest };
-export type UserProfile = Wire<ProfileResponse>;
+import { LoginRequest, RegisterRequest, AuthResponse, User } from '../types/auth';
 
 // Always use relative URLs - Next.js will handle API routing
 const API_BASE_URL = '';
@@ -25,7 +18,7 @@ export class AuthAPI {
   // User registration
   static async register(userData: RegisterRequest): Promise<AuthResponse> {
     try {
-      const response = await authAPI.post('/api/users/register', userData);
+      const response = await authAPI.post('/api/v1/users/register', userData);
       // Handle direct token response from server
       const tokenData = response.data;
       return {
@@ -52,7 +45,7 @@ export class AuthAPI {
   // User login
   static async login(credentials: LoginRequest): Promise<AuthResponse> {
     try {
-      const response = await authAPI.post('/api/users/login', credentials, { headers: { 'X-Banking-Session': 'cookie' } });
+      const response = await authAPI.post('/api/v1/users/login', credentials, { headers: { 'X-Banking-Session': 'cookie' } });
       // Handle direct token response from server
       const tokenData = response.data;
       return {
@@ -77,13 +70,13 @@ export class AuthAPI {
   }
 
   static async logout(): Promise<void> {
-    await authAPI.post('/api/users/logout');
+    await authAPI.post('/api/v1/users/logout');
   }
 
   // Get user profile
   static async getProfile(): Promise<{ success: boolean; data?: User; message?: string }> {
     try {
-      const response = await authAPI.get('/api/users/profile');
+      const response = await authAPI.get('/api/v1/users/profile');
       return response.data;
     } catch (error: unknown) {
       const axiosError = error as { response?: { data?: { message?: string } } };
@@ -97,7 +90,7 @@ export class AuthAPI {
   // Check username availability
   static async checkUsername(username: string): Promise<{ available: boolean }> {
     try {
-      const response = await authAPI.get(`/api/users/check-username?username=${username}`);
+      const response = await authAPI.get(`/api/v1/users/check-username?username=${username}`);
       return response.data;
     } catch {
       return { available: false };
@@ -107,7 +100,7 @@ export class AuthAPI {
   // Check email availability
   static async checkEmail(email: string): Promise<{ available: boolean }> {
     try {
-      const response = await authAPI.get(`/api/users/check-email?email=${email}`);
+      const response = await authAPI.get(`/api/v1/users/check-email?email=${email}`);
       return response.data;
     } catch {
       return { available: false };

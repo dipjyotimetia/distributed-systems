@@ -47,7 +47,7 @@ class AuthenticationFilterTest {
         when(chain.filter(any())).thenReturn(Mono.empty());
 
         ServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.get("/api/accounts")
+                MockServerHttpRequest.get("/api/v1/accounts")
                         .header("Authorization", "Bearer tok")
                         .header("X-User-Id", "spoofed")
                         .build());

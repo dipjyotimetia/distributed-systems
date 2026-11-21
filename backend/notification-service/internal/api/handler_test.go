@@ -37,13 +37,13 @@ func TestInboxRequiresTheSignedInCustomer(t *testing.T) {
 	}}, secret)
 
 	missing := httptest.NewRecorder()
-	handler.ServeHTTP(missing, httptest.NewRequest(http.MethodGet, "/notifications/me", nil))
+	handler.ServeHTTP(missing, httptest.NewRequest(http.MethodGet, "/api/v1/notifications/me", nil))
 	if missing.Code != http.StatusUnauthorized {
 		t.Fatalf("missing token status %d", missing.Code)
 	}
 
 	invalid := httptest.NewRecorder()
-	invalidRequest := httptest.NewRequest(http.MethodGet, "/notifications/me", nil)
+	invalidRequest := httptest.NewRequest(http.MethodGet, "/api/v1/notifications/me", nil)
 	invalidRequest.Header.Set("Authorization", "Bearer not-a-token")
 	handler.ServeHTTP(invalid, invalidRequest)
 	if invalid.Code != http.StatusUnauthorized {
@@ -51,7 +51,7 @@ func TestInboxRequiresTheSignedInCustomer(t *testing.T) {
 	}
 
 	owned := httptest.NewRecorder()
-	ownedRequest := httptest.NewRequest(http.MethodGet, "/notifications/me", nil)
+	ownedRequest := httptest.NewRequest(http.MethodGet, "/api/v1/notifications/me", nil)
 	ownedRequest.Header.Set("Authorization", "Bearer "+token(t, "7"))
 	handler.ServeHTTP(owned, ownedRequest)
 	if owned.Code != http.StatusOK {

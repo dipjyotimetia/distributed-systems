@@ -1,27 +1,29 @@
 package com.banking.accountsservice.integration;
 
-import com.banking.accountsservice.generated.AccountCreateRequest;
-import com.banking.accountsservice.generated.AccountType;
+import com.banking.accountsservice.dto.AccountCreateRequest;
 import com.banking.accountsservice.entity.Account.Status;
+import com.banking.accountsservice.grpc.LedgerGrpcServer;
 import com.banking.accountsservice.service.AccountService;
 import com.banking.accountsservice.service.MovementReservations;
+import io.grpc.ManagedChannel;
+import io.grpc.ManagedChannelBuilder;
+import io.grpc.Metadata;
+import io.grpc.StatusRuntimeException;
+import io.grpc.stub.MetadataUtils;
+import ledger.v1.AccountLedgerGrpc;
+import ledger.v1.MovementRequest;
 import com.banking.accountsservice.service.MovementReservations.Action;
 import com.banking.accountsservice.service.MovementReservations.Movement;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.math.BigDecimal;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.HexFormat;
 import java.util.UUID;
@@ -51,7 +53,7 @@ class MovementReservationsPostgresTest {
     @Autowired private AccountService accounts;
     @Autowired private MovementReservations reservations;
     @Autowired private JdbcTemplate jdbc;
-    @LocalServerPort private int port;
+    @Autowired private LedgerGrpcServer ledger;
 
     @Test
     void competingMovementsCannotBothReserveTheSameAccount() throws Exception {
@@ -129,21 +131,8 @@ class MovementReservationsPostgresTest {
     void internalMovementEndpointRequiresMatchingSignature() throws Exception {
         long from = account("100"), to = account("0");
         UUID operation = UUID.randomUUID();
-        String payload = """
-                {"userId":%d,"fromAccountId":%d,"toAccountId":%d,"amount":25.00}
-                """.formatted(OWNER, from, to);
-        String data = "account-movement:v1:" + operation + ":RESERVE:" + OWNER + ":" + from + ":" + to + ":25.00";
-        Mac mac = Mac.getInstance("HmacSHA256");
-        mac.init(new SecretKeySpec("synthetic-movement-signing-test-value".getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
-        String signature = HexFormat.of().formatHex(mac.doFinal(data.getBytes(StandardCharsets.UTF_8)));
-        URI endpoint = URI.create("http://127.0.0.1:" + port + "/internal/account-movements/" + operation + "/RESERVE");
-        var client = HttpClient.newHttpClient();
-        var request = HttpRequest.newBuilder(endpoint).header("Content-Type", "application/json")
-                .header("X-Movement-Signature", signature);
-        assertEquals(403, client.send(request.POST(HttpRequest.BodyPublishers.ofString(payload.replace("25.00", "26.00")))
-                .build(), HttpResponse.BodyHandlers.discarding()).statusCode());
-        assertEquals(204, client.send(request.POST(HttpRequest.BodyPublishers.ofString(payload)).build(),
-                HttpResponse.BodyHandlers.discarding()).statusCode());
+        assertEquals(403, callLedger(false, operation, Action.RESERVE, from, to, "26.00", "account-movement:v1:", "25.00"));
+        assertEquals(204, callLedger(false, operation, Action.RESERVE, from, to, "25.00", "account-movement:v1:", "25.00"));
         reservations.apply(operation, Action.COMPENSATE, movement(from, to));
         assertBalances(from, to, "100", "0");
     }
@@ -152,40 +141,61 @@ class MovementReservationsPostgresTest {
     void outboundRailChecksCurrencyAndBooksTheSameOperationOnlyOnce() throws Exception {
         long usd = account("100", "USD"), aud = account("100", "AUD");
         UUID operation = UUID.randomUUID();
-        try (var client = HttpClient.newHttpClient()) {
-            assertEquals(422, outbound(client, UUID.randomUUID(), Action.RESERVE, usd, "outbound-aud-movement:v1:"));
-            assertEquals(403, outbound(client, operation, Action.RESERVE, aud, "account-movement:v1:"));
-            assertEquals(204, outbound(client, operation, Action.RESERVE, aud, "outbound-aud-movement:v1:"));
-            assertBalances(aud, usd, "100", "100");
-            assertEquals(409, assertThrows(ResponseStatusException.class,
-                    () -> reservations.apply(UUID.randomUUID(), Action.RESERVE, movement(aud, usd)))
-                    .getStatusCode().value());
-            assertEquals(204, outbound(client, operation, Action.COMMIT, aud, "outbound-aud-movement:v1:"));
-            assertEquals(204, outbound(client, operation, Action.COMMIT, aud, "outbound-aud-movement:v1:"));
-            assertEquals(409, outbound(client, operation, Action.COMPENSATE, aud, "outbound-aud-movement:v1:"));
-            assertBalances(aud, usd, "75", "100");
+        assertEquals(422, callLedger(true, UUID.randomUUID(), Action.RESERVE, usd, null, "25.00", "outbound-aud-movement:v1:", "25.00"));
+        assertEquals(403, callLedger(true, operation, Action.RESERVE, aud, null, "25.00", "account-movement:v1:", "25.00"));
+        assertEquals(204, callLedger(true, operation, Action.RESERVE, aud, null, "25.00", "outbound-aud-movement:v1:", "25.00"));
+        assertBalances(aud, usd, "100", "100");
+        assertEquals(409, assertThrows(ResponseStatusException.class,
+                () -> reservations.apply(UUID.randomUUID(), Action.RESERVE, movement(aud, usd)))
+                .getStatusCode().value());
+        assertEquals(204, callLedger(true, operation, Action.COMMIT, aud, null, "25.00", "outbound-aud-movement:v1:", "25.00"));
+        assertEquals(204, callLedger(true, operation, Action.COMMIT, aud, null, "25.00", "outbound-aud-movement:v1:", "25.00"));
+        assertEquals(409, callLedger(true, operation, Action.COMPENSATE, aud, null, "25.00", "outbound-aud-movement:v1:", "25.00"));
+        assertBalances(aud, usd, "75", "100");
 
-            UUID rejected = UUID.randomUUID();
-            assertEquals(204, outbound(client, rejected, Action.RESERVE, aud, "outbound-aud-movement:v1:"));
-            assertEquals(204, outbound(client, rejected, Action.COMPENSATE, aud, "outbound-aud-movement:v1:"));
-            assertEquals(204, outbound(client, rejected, Action.COMPENSATE, aud, "outbound-aud-movement:v1:"));
-            assertEquals(409, outbound(client, rejected, Action.COMMIT, aud, "outbound-aud-movement:v1:"));
-            assertBalances(aud, usd, "75", "100");
-        }
+        UUID rejected = UUID.randomUUID();
+        assertEquals(204, callLedger(true, rejected, Action.RESERVE, aud, null, "25.00", "outbound-aud-movement:v1:", "25.00"));
+        assertEquals(204, callLedger(true, rejected, Action.COMPENSATE, aud, null, "25.00", "outbound-aud-movement:v1:", "25.00"));
+        assertEquals(204, callLedger(true, rejected, Action.COMPENSATE, aud, null, "25.00", "outbound-aud-movement:v1:", "25.00"));
+        assertEquals(409, callLedger(true, rejected, Action.COMMIT, aud, null, "25.00", "outbound-aud-movement:v1:", "25.00"));
+        assertBalances(aud, usd, "75", "100");
     }
 
-    private int outbound(HttpClient client, UUID operation, Action action, long account, String scope) throws Exception {
-        String payload = """
-                {"userId":%d,"fromAccountId":%d,"toAccountId":null,"amount":25.00}
-                """.formatted(OWNER, account);
-        String canonical = scope + operation + ":" + action + ":" + OWNER + ":" + account + ":null:25.00";
-        var mac = Mac.getInstance("HmacSHA256");
+    private int callLedger(boolean outbound, UUID operation, Action action, long account, Long to, String amount,
+                           String scope, String signedAmount) throws Exception {
+        String canonical = scope + operation + ":" + action + ":" + OWNER + ":" + account + ":"
+                + (to == null ? "null" : to) + ":" + signedAmount;
+        Mac mac = Mac.getInstance("HmacSHA256");
         mac.init(new SecretKeySpec("synthetic-movement-signing-test-value".getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
         String signature = HexFormat.of().formatHex(mac.doFinal(canonical.getBytes(StandardCharsets.UTF_8)));
-        URI endpoint = URI.create("http://127.0.0.1:" + port + "/internal/account-movements/outbound-aud/" + operation + "/" + action);
-        var request = HttpRequest.newBuilder(endpoint).header("Content-Type", "application/json")
-                .header("X-Movement-Signature", signature).POST(HttpRequest.BodyPublishers.ofString(payload)).build();
-        return client.send(request, HttpResponse.BodyHandlers.discarding()).statusCode();
+        MovementRequest.Builder request = MovementRequest.newBuilder().setOperationId(operation.toString())
+                .setAction(action.name()).setUserId(OWNER).setFromAccountId(account).setAmount(amount);
+        if (to != null) {
+            request.setToAccountId(to);
+        }
+        Metadata headers = new Metadata();
+        headers.put(Metadata.Key.of("x-movement-signature", Metadata.ASCII_STRING_MARSHALLER), signature);
+        ManagedChannel channel = ManagedChannelBuilder.forAddress("127.0.0.1", ledger.port()).usePlaintext().build();
+        try {
+            var stub = AccountLedgerGrpc.newBlockingStub(channel).withInterceptors(MetadataUtils.newAttachHeadersInterceptor(headers));
+            if (outbound) {
+                stub.applyOutboundAud(request.build());
+            } else {
+                stub.applyMovement(request.build());
+            }
+            return 204;
+        } catch (StatusRuntimeException failure) {
+            return switch (failure.getStatus().getCode()) {
+                case PERMISSION_DENIED -> 403;
+                case NOT_FOUND -> 404;
+                case ABORTED -> 409;
+                case FAILED_PRECONDITION -> 422;
+                case INVALID_ARGUMENT -> 400;
+                default -> 500;
+            };
+        } finally {
+            channel.shutdownNow();
+        }
     }
 
     private long account(String balance) {
@@ -193,7 +203,8 @@ class MovementReservationsPostgresTest {
     }
 
     private long account(String balance, String currency) {
-        var request = new AccountCreateRequest(AccountType.CHECKING);
+        var request = new AccountCreateRequest();
+        request.setAccountType("CHECKING");
         request.setCurrency(currency);
         request.setInitialBalance(new BigDecimal(balance));
         return accounts.createAccount(request, OWNER).getId();

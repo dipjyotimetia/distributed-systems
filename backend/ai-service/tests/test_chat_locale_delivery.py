@@ -38,7 +38,7 @@ def test_chat_western_locale_allows_model_emoji():
     client = TestClient(app, raise_server_exceptions=False)
 
     response = client.post(
-        "/api/chat",
+        "/api/v1/chat",
         json={
             "message": "What is my checking balance?",
             "accountContext": "Account: checking, balance: 1234.56",
@@ -56,7 +56,7 @@ def test_chat_korean_locale_keeps_delivery_error():
     client = TestClient(app, raise_server_exceptions=False)
 
     response = client.post(
-        "/api/chat",
+        "/api/v1/chat",
         json={
             "message": "내 계좌 잔액을 알려 주세요.",
             "accountContext": "Account: checking, balance: 1234.56",
@@ -70,7 +70,7 @@ def test_chat_korean_locale_keeps_delivery_error():
 
 def test_fixture_mode_returns_every_provider_without_calling_them(monkeypatch):
     monkeypatch.setenv("AI_PROVIDER_MODE", "fixture")
-    response = TestClient(app).post("/api/chat", json={"message": "hello", "locale": "en-US"})
+    response = TestClient(app).post("/api/v1/chat", json={"message": "hello", "locale": "en-US"})
 
     assert response.status_code == 200
     results = response.json()["results"]

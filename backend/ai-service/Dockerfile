@@ -5,8 +5,13 @@ COPY requirements.txt .
 # install requirements-live.txt in overlays that set AI_PROVIDER_MODE=live.
 ARG AI_INSTALL_LIVE_DEPS=0
 COPY requirements-live.txt .
-RUN pip install --no-cache-dir -r requirements.txt \
-    && if [ "$AI_INSTALL_LIVE_DEPS" = "1" ]; then pip install --no-cache-dir -r requirements-live.txt; fi
+# grpcio 1.85 publishes a Python 3.15 wheel. Compiling it here kept the
+# temporal integration job past its 25 minute limit.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libstdc++6 \
+    && pip install --no-cache-dir --only-binary=:all: -r requirements.txt \
+    && if [ "$AI_INSTALL_LIVE_DEPS" = "1" ]; then pip install --no-cache-dir -r requirements-live.txt; fi \
+    && rm -rf /var/lib/apt/lists/*
 COPY . .
 EXPOSE 8080
 # AI_MODE=worker runs the Temporal worker; default serves the FastAPI chat/agent API.

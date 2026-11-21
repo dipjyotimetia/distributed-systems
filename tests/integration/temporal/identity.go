@@ -3,10 +3,9 @@ package integration
 import (
 	"context"
 	"fmt"
-	"net/http"
+	"net/url"
 
 	"go.temporal.io/sdk/workflow"
-	banking "microsvc/integration/temporal/gen"
 )
 
 func IdentityJourney(ctx workflow.Context, input Input) ([]BoundaryEvidence, error) {
@@ -35,20 +34,18 @@ func IdentityJourney(ctx workflow.Context, input Input) ([]BoundaryEvidence, err
 }
 
 func (a *Activities) AssertAvailability(ctx context.Context, input Input, available bool) error {
-	client, err := a.api("")
-	if err != nil {
-		return err
-	}
-	username, err := client.CheckUsernameWithResponse(ctx, &banking.CheckUsernameParams{Username: input.User})
-	if err != nil {
-		return err
-	}
-	email, err := client.CheckEmailWithResponse(ctx, &banking.CheckEmailParams{Email: input.email()})
-	if err != nil {
-		return err
-	}
-	for _, result := range []*banking.Availability{username.JSON200, email.JSON200} {
-		if username.StatusCode() != http.StatusOK || email.StatusCode() != http.StatusOK || result == nil || !result.Success || result.Available != available {
+	for _, path := range []string{
+		"/api/v1/users/check-username?username=" + url.QueryEscape(input.User),
+		"/api/v1/users/check-email?email=" + url.QueryEscape(input.email()),
+	} {
+		var result struct {
+			Success   bool
+			Available *bool
+		}
+		if err := call(ctx, a.Frontend, path, "", nil, 200, &result); err != nil {
+			return err
+		}
+		if !result.Success || result.Available == nil || *result.Available != available {
 			return fmt.Errorf("expected availability %t", available)
 		}
 	}
@@ -62,43 +59,38 @@ func (a *Activities) AssertLoginAndProfile(ctx context.Context, input Input, id 
 	if err != nil {
 		return err
 	}
-	client, err := a.api(token)
-	if err != nil {
+	var profile struct {
+		Success bool
+		Data    struct {
+			ID              int64
+			Username, Email string
+		}
+	}
+	if err := call(ctx, a.Frontend, "/api/v1/users/profile", token, nil, 200, &profile); err != nil {
 		return err
 	}
-	profile, err := client.GetProfileWithResponse(ctx)
-	if err != nil {
-		return err
-	}
-	if err = expectStatus("GET /users/profile", profile.StatusCode(), http.StatusOK); err != nil {
-		return err
-	}
-	if profile.JSON200 == nil || !profile.JSON200.Success || profile.JSON200.Data.Id != id || profile.JSON200.Data.Username != input.User || profile.JSON200.Data.Email != input.email() {
+	if !profile.Success || profile.Data.ID != id || profile.Data.Username != input.User || profile.Data.Email != input.email() {
 		return fmt.Errorf("authenticated profile did not match registered identity")
 	}
 	return nil
 }
 
 func (a *Activities) AssertIdentityConflicts(ctx context.Context, input Input) error {
-	client, err := a.api("")
-	if err != nil {
-		return err
-	}
-	for _, credentials := range []banking.RegisterRequest{
-		{Username: input.User, Email: "unused-" + input.email(), Password: a.Password},
-		{Username: input.User + "unused", Email: input.email(), Password: a.Password},
+	for _, credentials := range []map[string]string{
+		{"username": input.User, "email": "unused-" + input.email(), "password": a.Password},
+		{"username": input.User + "unused", "email": input.email(), "password": a.Password},
 	} {
-		conflict, err := client.RegisterUserWithResponse(ctx, credentials)
-		if err != nil {
+		var conflict struct {
+			Success bool
+			Message string
+		}
+		if err := call(ctx, a.Frontend, "/api/v1/users/register", "", credentials, 409, &conflict); err != nil {
 			return err
 		}
-		if conflict.StatusCode() != http.StatusConflict || conflict.JSON409 == nil || conflict.JSON409.Success || conflict.JSON409.Message == "" {
+		if conflict.Success || conflict.Message == "" {
 			return fmt.Errorf("duplicate registration did not return a conflict message")
 		}
 	}
-	login, err := client.LoginUserWithResponse(ctx, banking.LoginRequest{UsernameOrEmail: input.User, Password: "invalid-" + a.Password})
-	if err != nil {
-		return err
-	}
-	return expectStatus("POST /users/login", login.StatusCode(), http.StatusUnauthorized)
+	payload := map[string]string{"usernameOrEmail": input.User, "password": "invalid-" + a.Password}
+	return call(ctx, a.Frontend, "/api/v1/users/login", "", payload, 401, nil)
 }

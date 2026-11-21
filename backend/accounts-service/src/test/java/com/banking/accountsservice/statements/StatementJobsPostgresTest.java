@@ -1,7 +1,6 @@
 package com.banking.accountsservice.statements;
 
 import com.banking.accountsservice.entity.Account;
-import com.banking.accountsservice.generated.StatementDocument;
 import com.banking.accountsservice.repository.AccountRepository;
 import com.banking.accountsservice.service.StatementExportService;
 import com.banking.accountsservice.statements.application.StatementJobs;
@@ -11,9 +10,8 @@ import com.banking.accountsservice.statements.temporal.StatementActivities;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.opentelemetry.api.OpenTelemetry;
 import io.temporal.failure.ApplicationFailure;
-import java.math.BigDecimal;
+import java.util.Map;
 import java.time.Duration;
-import java.time.LocalDateTime;
 import java.util.Optional;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
@@ -52,8 +50,7 @@ class StatementJobsPostgresTest {
 
         var request = StatementJob.newBuilder().setJobId(job.id().toString()).build();
         var generator = mock(StatementExportService.class);
-        when(generator.generateStatement(42L, 7L)).thenReturn(new StatementDocument(
-                42L, "100", "CHECKING", BigDecimal.valueOf(19), LocalDateTime.parse("2026-01-01T00:00:00"), 7L));
+        when(generator.generateStatement(42L, 7L)).thenReturn(Map.of("accountId", 42L, "balance", 19));
         var mapper = new ObjectMapper();
         var activities = new StatementActivities(stored, generator, mapper, OpenTelemetry.noop().getTracer("test"), Duration.ofDays(7));
         doAnswer(invocation -> {

@@ -1,13 +1,44 @@
-import type { CreateTransactionRequest as GeneratedCreateTransactionRequest } from '../../gen/http/CreateTransactionRequest';
-import type { TransactionResponse } from '../../gen/http/TransactionResponse';
-import type { TransactionSummary as GeneratedTransactionSummary } from '../../gen/http/TransactionSummary';
 import { apiClient, ApiResponse, PaginatedResponse } from './client';
 import { logTransaction } from '../logger';
-import type { Wire } from './wire';
 
-export type Transaction = Wire<TransactionResponse>;
-export type CreateTransactionRequest = Wire<GeneratedCreateTransactionRequest>;
-export type TransactionSummary = Wire<GeneratedTransactionSummary>;
+export interface Transaction {
+  id: number;
+  userId: number;
+  fromAccountId?: number;
+  toAccountId?: number;
+  type: 'DEPOSIT' | 'WITHDRAWAL' | 'TRANSFER';
+  amount: number;
+  description: string;
+  status: 'PENDING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
+  createdAt: string;
+  processedAt?: string;
+}
+
+export interface CreateTransactionRequest {
+  accountId: number;
+  toAccountId?: number;
+  type: 'DEPOSIT' | 'WITHDRAWAL' | 'TRANSFER';
+  amount: number;
+  currency?: string;
+  description: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface TransactionSummary {
+  totalTransactions: number;
+  totalDeposits: number;
+  totalWithdrawals: number;
+  totalTransfers: number;
+  pendingTransactions: number;
+  completedTransactions: number;
+  failedTransactions: number;
+  transactionsByType: {
+    [key in Transaction['type']]: number;
+  };
+  transactionsByStatus: {
+    [key in Transaction['status']]: number;
+  };
+}
 
 export interface TransactionFilters {
   accountId?: number;
@@ -27,7 +58,7 @@ function idempotencyConfig() {
 export class TransactionsAPI {
   // Get all transactions for the current user
   static async getTransactions(): Promise<ApiResponse<Transaction[]>> {
-    return await apiClient.get<Transaction[]>('/api/transactions');
+    return await apiClient.get<Transaction[]>('/api/v1/transactions');
   }
 
   // Get paginated transactions
@@ -42,7 +73,7 @@ export class TransactionsAPI {
       sort,
     });
 
-    return await apiClient.get<PaginatedResponse<Transaction>>(`/api/transactions?${params}`);
+    return await apiClient.get<PaginatedResponse<Transaction>>(`/api/v1/transactions?${params}`);
   }
 
   // Get filtered transactions
@@ -68,12 +99,12 @@ export class TransactionsAPI {
     if (filters.maxAmount) params.append('maxAmount', filters.maxAmount.toString());
     if (filters.description) params.append('description', filters.description);
 
-    return await apiClient.get<PaginatedResponse<Transaction>>(`/api/transactions?${params}`);
+    return await apiClient.get<PaginatedResponse<Transaction>>(`/api/v1/transactions?${params}`);
   }
 
   // Get transaction by ID
   static async getTransaction(transactionId: number): Promise<ApiResponse<Transaction>> {
-    return await apiClient.get<Transaction>(`/api/transactions/${transactionId}`);
+    return await apiClient.get<Transaction>(`/api/v1/transactions/${transactionId}`);
   }
 
   // Get transactions for a specific account
@@ -87,12 +118,12 @@ export class TransactionsAPI {
       accountId: accountId.toString(),
     });
 
-    return await apiClient.get<Transaction[]>(`/api/transactions?${params}`);
+    return await apiClient.get<Transaction[]>(`/api/v1/transactions?${params}`);
   }
 
   // Create new transaction
   static async createTransaction(transactionData: CreateTransactionRequest): Promise<ApiResponse<Transaction>> {
-    return await apiClient.post<Transaction>('/api/transactions', transactionData, idempotencyConfig());
+    return await apiClient.post<Transaction>('/api/v1/transactions', transactionData, idempotencyConfig());
   }
 
   // Create deposit transaction
@@ -110,7 +141,7 @@ export class TransactionsAPI {
       currency,
     };
 
-    const result = await apiClient.post<Transaction>('/api/transactions/deposit', depositData, idempotencyConfig());
+    const result = await apiClient.post<Transaction>('/api/v1/transactions/deposit', depositData, idempotencyConfig());
     logTransaction('deposit', accountId, amount, result.success);
     return result;
   }
@@ -130,7 +161,7 @@ export class TransactionsAPI {
       currency,
     };
 
-    const result = await apiClient.post<Transaction>('/api/transactions/withdraw', withdrawalData, idempotencyConfig());
+    const result = await apiClient.post<Transaction>('/api/v1/transactions/withdraw', withdrawalData, idempotencyConfig());
     logTransaction('withdrawal', accountId, amount, result.success);
     return result;
   }
@@ -152,24 +183,24 @@ export class TransactionsAPI {
       currency,
     };
 
-    const result = await apiClient.post<Transaction>('/api/transactions/transfer', transferData, idempotencyConfig());
+    const result = await apiClient.post<Transaction>('/api/v1/transactions/transfer', transferData, idempotencyConfig());
     logTransaction('transfer', fromAccountId, amount, result.success);
     return result;
   }
 
   // Cancel transaction (if pending)
   static async cancelTransaction(transactionId: number): Promise<ApiResponse<Transaction>> {
-    return await apiClient.patch<Transaction>(`/api/transactions/${transactionId}/cancel`);
+    return await apiClient.patch<Transaction>(`/api/v1/transactions/${transactionId}/cancel`);
   }
 
   // Get transaction summary/statistics
   static async getTransactionSummary(): Promise<ApiResponse<TransactionSummary>> {
-    return await apiClient.get<TransactionSummary>('/api/transactions/summary');
+    return await apiClient.get<TransactionSummary>('/api/v1/transactions/summary');
   }
 
   // Get transaction summary for a specific account
   static async getAccountTransactionSummary(accountId: number): Promise<ApiResponse<TransactionSummary>> {
-    return await apiClient.get<TransactionSummary>(`/api/accounts/${accountId}/transactions/summary`);
+    return await apiClient.get<TransactionSummary>(`/api/v1/accounts/${accountId}/transactions/summary`);
   }
 
   // Get transactions by type
@@ -185,7 +216,7 @@ export class TransactionsAPI {
       sort: 'createdAt,desc',
     });
 
-    return await apiClient.get<PaginatedResponse<Transaction>>(`/api/transactions?${params}`);
+    return await apiClient.get<PaginatedResponse<Transaction>>(`/api/v1/transactions?${params}`);
   }
 
   // Get transactions by status
@@ -201,17 +232,17 @@ export class TransactionsAPI {
       sort: 'createdAt,desc',
     });
 
-    return await apiClient.get<PaginatedResponse<Transaction>>(`/api/transactions?${params}`);
+    return await apiClient.get<PaginatedResponse<Transaction>>(`/api/v1/transactions?${params}`);
   }
 
   // Get pending transactions
   static async getPendingTransactions(): Promise<ApiResponse<Transaction[]>> {
-    return await apiClient.get<Transaction[]>('/api/transactions?status=PENDING');
+    return await apiClient.get<Transaction[]>('/api/v1/transactions?status=PENDING');
   }
 
   // Get recent transactions
   static async getRecentTransactions(limit: number = 10): Promise<ApiResponse<Transaction[]>> {
-    return await apiClient.get<Transaction[]>(`/api/transactions/recent?limit=${limit}`);
+    return await apiClient.get<Transaction[]>(`/api/v1/transactions/recent?limit=${limit}`);
   }
 
   // Search transactions
@@ -226,7 +257,7 @@ export class TransactionsAPI {
       size: size.toString(),
     });
 
-    return await apiClient.get<PaginatedResponse<Transaction>>(`/api/transactions/search?${params}`);
+    return await apiClient.get<PaginatedResponse<Transaction>>(`/api/v1/transactions/search?${params}`);
   }
 
   // Get transactions by date range
@@ -244,7 +275,7 @@ export class TransactionsAPI {
       sort: 'createdAt,desc',
     });
 
-    return await apiClient.get<PaginatedResponse<Transaction>>(`/api/transactions?${params}`);
+    return await apiClient.get<PaginatedResponse<Transaction>>(`/api/v1/transactions?${params}`);
   }
 
   // Get monthly transaction report
@@ -252,7 +283,7 @@ export class TransactionsAPI {
     year: number,
     month: number
   ): Promise<ApiResponse<TransactionSummary>> {
-    return await apiClient.get<TransactionSummary>(`/api/transactions/reports/monthly?year=${year}&month=${month}`);
+    return await apiClient.get<TransactionSummary>(`/api/v1/transactions/reports/monthly?year=${year}&month=${month}`);
   }
 
   // Export transactions
@@ -272,7 +303,7 @@ export class TransactionsAPI {
       if (filters.endDate) params.append('endDate', filters.endDate);
     }
 
-    return await apiClient.get<{ downloadUrl: string }>(`/api/transactions/export?${params}`);
+    return await apiClient.get<{ downloadUrl: string }>(`/api/v1/transactions/export?${params}`);
   }
 }
 

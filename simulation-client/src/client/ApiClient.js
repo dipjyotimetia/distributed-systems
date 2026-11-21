@@ -2,6 +2,14 @@ const axios = require('axios');
 const { randomUUID } = require('crypto');
 const logger = require('../utils/logger');
 const config = require('../config');
+const { UsersApi, Configuration: UsersConfiguration } = require('../generated/users/src');
+const { AccountsApi, StatementJobsApi, Configuration: AccountsConfiguration } = require('../generated/accounts/src');
+const { TransactionsApi, Configuration: TransactionsConfiguration } = require('../generated/transactions/src');
+const { DisputesApi, Configuration: DisputesConfiguration } = require('../generated/disputes/src');
+const { PaymentsApi, Configuration: PaymentsConfiguration } = require('../generated/payments/src');
+const { AiApi, Configuration: AiConfiguration } = require('../generated/ai/src');
+const { NotificationsApi, Configuration: NotificationsConfiguration } = require('../generated/notifications/src');
+const { GatewayApi, Configuration: GatewayConfiguration } = require('../generated/gateway/src');
 
 class ApiClient {
   constructor() {
@@ -20,6 +28,18 @@ class ApiClient {
     });
 
     this.setupInterceptors();
+  }
+
+  contract(Api, Configuration, base, token, extraHeaders = {}) {
+    return new Api(new Configuration({
+      basePath: base,
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'Banking-Simulation-Client/1.0.0',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...extraHeaders,
+      },
+    }));
   }
 
   setupInterceptors() {
@@ -93,218 +113,107 @@ class ApiClient {
 
   // Authentication endpoints
   async register(userData) {
-    return this.retryRequest(async () => {
-      const response = await this.client.post('/api/users/register', userData);
-      return response.data;
-    });
+    return this.retryRequest(async () => this.contract(UsersApi, UsersConfiguration, this.baseURL).register({ registerRequest: userData }));
   }
 
   async login(credentials) {
-    return this.retryRequest(async () => {
-      const response = await this.client.post('/api/users/login', credentials);
-      return response.data;
-    });
+    return this.retryRequest(async () => this.contract(UsersApi, UsersConfiguration, this.baseURL).login({ loginRequest: credentials }));
   }
 
   async getUserProfile(token) {
-    return this.retryRequest(async () => {
-      const response = await this.client.get('/api/users/profile', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      return response.data;
-    });
+    return this.retryRequest(async () => this.contract(UsersApi, UsersConfiguration, this.baseURL, token).getProfile());
   }
 
   // Account endpoints
   async getAccounts(token) {
-    return this.retryRequest(async () => {
-      const response = await this.client.get('/api/accounts', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      return response.data;
-    });
+    return this.retryRequest(async () => this.contract(AccountsApi, AccountsConfiguration, this.baseURL, token).listAccounts());
   }
 
   async createAccount(accountData, token) {
-    return this.retryRequest(async () => {
-      const response = await this.client.post('/api/accounts', accountData, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      return response.data;
-    });
+    return this.retryRequest(async () => this.contract(AccountsApi, AccountsConfiguration, this.baseURL, token).createAccount({ accountCreateRequest: accountData }));
   }
 
   async getAccountById(accountId, token) {
-    return this.retryRequest(async () => {
-      const response = await this.client.get(`/api/accounts/${accountId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      return response.data;
-    });
+    return this.retryRequest(async () => this.contract(AccountsApi, AccountsConfiguration, this.baseURL, token).getAccount({ accountId }));
   }
 
   async getAccountBalance(accountId, token) {
-    return this.retryRequest(async () => {
-      const response = await this.client.get(`/api/accounts/${accountId}/balance`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      return response.data;
-    });
+    return this.retryRequest(async () => this.contract(AccountsApi, AccountsConfiguration, this.baseURL, token).getAccountBalance({ accountId }));
   }
 
   async getAccountTransactions(accountId, token) {
-    // Per-account history is served by transactions-service at GET /api/transactions?accountId=.
-    // There is no /api/accounts/{id}/transactions route, so the old path 404'd -> stateless
-    // Spring Security re-dispatches to /error unauthenticated -> 401.
-    return this.retryRequest(async () => {
-      const response = await this.client.get('/api/transactions', {
-        params: { accountId },
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      return response.data;
-    });
+    return this.retryRequest(async () => this.contract(TransactionsApi, TransactionsConfiguration, this.baseURL, token).listTransactions({ accountId }));
   }
 
   // Transaction endpoints
   async createTransaction(transactionData, token) {
     const payload = { currency: 'USD', ...transactionData };
-    return this.retryRequest(async () => {
-      const response = await this.client.post('/api/transactions/create', payload, {
-        headers: { Authorization: `Bearer ${token}`, 'Idempotency-Key': randomUUID() }
-      });
-      return response.data;
-    });
+    return this.retryRequest(async () => this.contract(TransactionsApi, TransactionsConfiguration, this.baseURL, token).createTransaction({ createTransactionRequest: payload }));
   }
 
   async getRecentTransactions(token) {
-    return this.retryRequest(async () => {
-      // The service lists transactions at GET /api/transactions (no /recent).
-      const response = await this.client.get('/api/transactions', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      return response.data;
-    });
+    return this.retryRequest(async () => this.contract(TransactionsApi, TransactionsConfiguration, this.baseURL, token).listTransactions());
   }
 
   async getTransaction(transactionId, token) {
-    // No GET /{id} endpoint on transactions-service; use the list endpoint
-    // and filter client-side. Return null if not found.
     return this.retryRequest(async () => {
-      const response = await this.client.get('/api/transactions', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const txns = Array.isArray(response.data) ? response.data : response.data?.content || [];
-      return txns.find(t => t.id === transactionId) || null;
+      const txns = await this.contract(TransactionsApi, TransactionsConfiguration, this.baseURL, token).listTransactions();
+      const items = Array.isArray(txns) ? txns : txns?.content || [];
+      return items.find(t => t.id === transactionId) || null;
     });
   }
 
   async deposit(transactionData, token) {
     const payload = { currency: 'USD', ...transactionData };
-    return this.retryRequest(async () => {
-      const response = await this.client.post('/api/transactions/deposit', payload, {
-        headers: { Authorization: `Bearer ${token}`, 'Idempotency-Key': randomUUID() }
-      });
-      return response.data;
-    });
+    return this.retryRequest(async () => this.contract(TransactionsApi, TransactionsConfiguration, this.baseURL, token).deposit({ depositRequest: payload }));
   }
 
   async withdraw(transactionData, token) {
     const payload = { currency: 'USD', ...transactionData };
-    return this.retryRequest(async () => {
-      const response = await this.client.post('/api/transactions/withdraw', payload, {
-        headers: { Authorization: `Bearer ${token}`, 'Idempotency-Key': randomUUID() }
-      });
-      return response.data;
-    });
+    return this.retryRequest(async () => this.contract(TransactionsApi, TransactionsConfiguration, this.baseURL, token).withdraw({ withdrawRequest: payload }));
   }
 
   async transfer(transactionData, token) {
     const payload = { currency: 'USD', ...transactionData };
-    return this.retryRequest(async () => {
-      const response = await this.client.post('/api/transactions/transfer', payload, {
-        headers: { Authorization: `Bearer ${token}`, 'Idempotency-Key': randomUUID() }
-      });
-      return response.data;
-    });
+    return this.retryRequest(async () => this.contract(TransactionsApi, TransactionsConfiguration, this.baseURL, token).transfer({ transferRequest: payload }));
   }
 
   async checkUsername(username) {
-    return this.retryRequest(async () => {
-      const response = await this.client.get('/api/users/check-username', {
-        params: { username }
-      });
-      return response.data;
-    });
+    return this.retryRequest(async () => this.contract(UsersApi, UsersConfiguration, this.baseURL).checkUsername({ username }));
   }
 
   async checkEmail(email) {
-    return this.retryRequest(async () => {
-      const response = await this.client.get('/api/users/check-email', {
-        params: { email }
-      });
-      return response.data;
-    });
+    return this.retryRequest(async () => this.contract(UsersApi, UsersConfiguration, this.baseURL).checkEmail({ email }));
   }
 
   async fileDispute(transferId, token) {
-    return this.retryRequest(async () => {
-      const response = await this.client.post('/api/disputes', {
-        transferId,
-        reason: 'Simulation dispute for a completed transfer'
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      return response.data;
-    });
+    return this.retryRequest(async () => this.contract(DisputesApi, DisputesConfiguration, this.baseURL, token).fileDispute({
+      fileDisputeRequest: { transferId, reason: 'Simulation dispute for a completed transfer' },
+    }));
   }
 
   async queueStatementJob(accountId, token) {
-    return this.retryRequest(async () => {
-      const response = await this.client.post(`/api/accounts/${accountId}/statement-jobs`, {}, {
-        headers: { Authorization: `Bearer ${token}`, 'Idempotency-Key': randomUUID() }
-      });
-      return response.data;
-    });
+    return this.retryRequest(async () => this.contract(StatementJobsApi, AccountsConfiguration, this.baseURL, token).createStatementJob({ accountId, idempotencyKey: randomUUID() }));
   }
 
   async submitPayment(accountId, token) {
-    return this.retryRequest(async () => {
-      const response = await this.client.post('/api/payments', {
-        accountId,
-        destination: 'SIMULATE0001',
-        amountMinor: 100
-      }, {
-        headers: { Authorization: `Bearer ${token}`, 'Idempotency-Key': randomUUID() }
-      });
-      return response.data;
-    });
+    return this.retryRequest(async () => this.contract(PaymentsApi, PaymentsConfiguration, this.baseURL, token).initiatePayment({
+      idempotencyKey: randomUUID(),
+      paymentInstruction: { accountId, destination: 'SIMULATE0001', amountMinor: 100 },
+    }));
   }
 
   async exportStatement(accountId, token) {
-    return this.retryRequest(async () => {
-      const response = await this.client.post(`/api/accounts/${accountId}/export-statement`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      return response.data;
-    });
+    return this.retryRequest(async () => this.contract(AccountsApi, AccountsConfiguration, this.baseURL, token).exportStatement({ accountId }));
   }
 
   async askAIChat(message, token, locale = 'en-US', accountContext = '') {
-    const response = await this.client.post('/api/ai/chat', { message, locale, accountContext }, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    return response.data;
+    return this.contract(AiApi, AiConfiguration, this.baseURL, token).chat({ chatRequest: { message, locale, accountContext } });
   }
 
   // Notification service endpoints
   async getNotifications(userId) {
-    return this.retryRequest(async () => {
-      const response = await axios.get(`${config.target.notificationServiceUrl}/notifications/${userId}`, {
-        timeout: this.timeout,
-        headers: { 'User-Agent': 'Banking-Simulation-Client/1.0.0' }
-      });
-      return response.data;
-    });
+    return this.retryRequest(async () => this.contract(NotificationsApi, NotificationsConfiguration, config.target.notificationServiceUrl).listUserNotifications({ userId: String(userId) }));
   }
 
   // Raw request without retry — used for error injection so 5xx responses
@@ -317,10 +226,7 @@ class ApiClient {
 
   // Health check
   async healthCheck() {
-    return this.retryRequest(async () => {
-      const response = await this.client.get('/api/healthz');
-      return response.data;
-    });
+    return this.retryRequest(async () => this.contract(GatewayApi, GatewayConfiguration, this.baseURL).healthz());
   }
 }
 

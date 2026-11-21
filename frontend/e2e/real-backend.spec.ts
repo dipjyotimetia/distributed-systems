@@ -6,7 +6,7 @@ const cookieName = process.env.NEXT_PUBLIC_JWT_COOKIE_NAME || 'auth_token';
 test('uses an HttpOnly session for protected navigation and clears it on logout', async ({ page, context }) => {
   const username = `pw${randomUUID().replaceAll('-', '').slice(0, 16)}`;
   const password = `T3st!${randomUUID()}`;
-  const registration = await page.request.post('/api/users/register', {
+  const registration = await page.request.post('/api/v1/users/register', {
     data: { username, email: `${username}@example.test`, password },
   });
   expect(registration.status()).toBe(201);
@@ -15,7 +15,7 @@ test('uses an HttpOnly session for protected navigation and clears it on logout'
   await expect(page).toHaveURL(/\/login$/);
   await page.getByPlaceholder('Enter your username or email').fill(username);
   await page.getByPlaceholder('Enter your password').fill(password);
-  const loginResponse = page.waitForResponse(response => response.url().endsWith('/api/users/login'));
+  const loginResponse = page.waitForResponse(response => response.url().endsWith('/api/v1/users/login'));
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   const response = await loginResponse;
   expect(response.status()).toBe(200);
@@ -36,7 +36,7 @@ test('uses an HttpOnly session for protected navigation and clears it on logout'
   await page.getByRole('button', { name: 'Logout' }).click();
   await expect(page).toHaveURL(/\/login$/);
   expect((await context.cookies()).some(cookie => cookie.name === cookieName)).toBe(false);
-  expect((await page.request.get('/api/users/profile')).status()).toBe(401);
+  expect((await page.request.get('/api/v1/users/profile')).status()).toBe(401);
   await page.goto('/dashboard');
   await expect(page).toHaveURL(/\/login$/);
 });

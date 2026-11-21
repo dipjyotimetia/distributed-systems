@@ -1,11 +1,9 @@
 package com.banking.accountsservice.integration;
 
-import com.banking.accountsservice.generated.AccountCreateRequest;
-import com.banking.accountsservice.generated.AccountType;
-import com.banking.accountsservice.generated.AccountResponse;
-import com.banking.accountsservice.generated.AccountStatus;
+import com.banking.accountsservice.dto.AccountCreateRequest;
+import com.banking.accountsservice.dto.AccountResponse;
 import com.banking.accountsservice.dto.AccountQuery;
-import com.banking.accountsservice.generated.BalanceResponse;
+import com.banking.accountsservice.dto.BalanceResponse;
 import com.banking.accountsservice.entity.Account;
 import com.banking.accountsservice.repository.AccountRepository;
 import com.banking.accountsservice.service.AccountService;
@@ -47,7 +45,8 @@ class AccountServiceIntegrationTest {
 
     @Test
     void updateAccountTypePreservesBalanceAndOwnership() {
-        var request = new AccountCreateRequest(AccountType.CHECKING);
+        var request = new AccountCreateRequest();
+        request.setAccountType("CHECKING");
         request.setInitialBalance(new BigDecimal("25.00"));
         var account = accountService.createAccount(request, testUserId);
 
@@ -62,7 +61,7 @@ class AccountServiceIntegrationTest {
     @Test
     void testCreateAccount_Success() {
         // Create account
-        AccountCreateRequest request = new AccountCreateRequest(AccountType.CHECKING);
+        AccountCreateRequest request = new AccountCreateRequest("CHECKING");
         AccountResponse response = accountService.createAccount(request, testUserId);
 
         assertNotNull(response);
@@ -83,8 +82,7 @@ class AccountServiceIntegrationTest {
 
     @Test
     void accountQueriesAreScopedAndExposePersistedCurrency() {
-        var request = new AccountCreateRequest(AccountType.INVESTMENT);
-        request.setInitialBalance(new BigDecimal("25.00"));
+        var request = new AccountCreateRequest("INVESTMENT", new BigDecimal("25.00"));
         request.setCurrency("AUD");
         var first = accountService.createAccount(request, testUserId);
         accountService.createAccount(request, testUserId);
@@ -92,23 +90,23 @@ class AccountServiceIntegrationTest {
         accountRepository.flush();
 
         assertEquals("AUD", accountService.getAccountBalance(first.getId(), testUserId).getCurrency());
-        assertEquals(AccountStatus.ACTIVE, first.getStatus());
+        assertEquals(Account.Status.ACTIVE, first.getStatus());
         var query = new AccountQuery("INVESTMENT", Account.Status.ACTIVE, "invest", 0, 1, "balance,asc");
         var page = (Page<?>) accountService.queryAccounts(testUserId, query, true);
         assertEquals(2, page.getTotalElements());
         assertEquals(first.getId(), ((AccountResponse) page.getContent().get(0)).getId());
         var summary = accountService.summarize(testUserId);
-        assertEquals(2L, summary.getTotalAccounts());
-        assertEquals(2L, summary.getActiveAccounts());
-        assertEquals(new BigDecimal("50.00"), summary.getTotalBalance());
-        assertEquals(2L, summary.getAccountsByType().get("INVESTMENT"));
+        assertEquals(2, summary.totalAccounts());
+        assertEquals(2, summary.activeAccounts());
+        assertEquals(new BigDecimal("50.00"), summary.totalBalance());
+        assertEquals(2L, summary.accountsByType().get("INVESTMENT"));
     }
 
     @Test
     void testCreateMultipleAccounts_UniqueAccountNumbers() {
         // Create multiple accounts
-        AccountCreateRequest request1 = new AccountCreateRequest(AccountType.CHECKING);
-        AccountCreateRequest request2 = new AccountCreateRequest(AccountType.SAVINGS);
+        AccountCreateRequest request1 = new AccountCreateRequest("CHECKING");
+        AccountCreateRequest request2 = new AccountCreateRequest("SAVINGS");
         
         AccountResponse response1 = accountService.createAccount(request1, testUserId);
         AccountResponse response2 = accountService.createAccount(request2, testUserId);
@@ -125,14 +123,14 @@ class AccountServiceIntegrationTest {
     @Test
     void testGetUserAccounts() {
         // Create accounts for test user
-        AccountCreateRequest request1 = new AccountCreateRequest(AccountType.CHECKING);
-        AccountCreateRequest request2 = new AccountCreateRequest(AccountType.SAVINGS);
+        AccountCreateRequest request1 = new AccountCreateRequest("CHECKING");
+        AccountCreateRequest request2 = new AccountCreateRequest("SAVINGS");
         
         accountService.createAccount(request1, testUserId);
         accountService.createAccount(request2, testUserId);
 
         // Create account for other user
-        AccountCreateRequest request3 = new AccountCreateRequest(AccountType.CHECKING);
+        AccountCreateRequest request3 = new AccountCreateRequest("CHECKING");
         accountService.createAccount(request3, otherUserId);
 
         // Get accounts for test user
@@ -149,7 +147,7 @@ class AccountServiceIntegrationTest {
     @Test
     void testGetAccountById_Success() {
         // Create account
-        AccountCreateRequest request = new AccountCreateRequest(AccountType.CHECKING);
+        AccountCreateRequest request = new AccountCreateRequest("CHECKING");
         AccountResponse createdAccount = accountService.createAccount(request, testUserId);
 
         // Get account by ID
@@ -175,7 +173,7 @@ class AccountServiceIntegrationTest {
     @Test
     void testGetAccountById_NotOwned() {
         // Create account for other user
-        AccountCreateRequest request = new AccountCreateRequest(AccountType.CHECKING);
+        AccountCreateRequest request = new AccountCreateRequest("CHECKING");
         AccountResponse createdAccount = accountService.createAccount(request, otherUserId);
 
         // Try to get account with different user ID
@@ -189,7 +187,7 @@ class AccountServiceIntegrationTest {
     @Test
     void testGetAccountBalance() {
         // Create account
-        AccountCreateRequest request = new AccountCreateRequest(AccountType.CHECKING);
+        AccountCreateRequest request = new AccountCreateRequest("CHECKING");
         AccountResponse createdAccount = accountService.createAccount(request, testUserId);
 
         // Get account balance
@@ -204,7 +202,7 @@ class AccountServiceIntegrationTest {
     @Test
     void testValidateAccountOwnership_Success() {
         // Create account
-        AccountCreateRequest request = new AccountCreateRequest(AccountType.CHECKING);
+        AccountCreateRequest request = new AccountCreateRequest("CHECKING");
         AccountResponse createdAccount = accountService.createAccount(request, testUserId);
 
         // Validate ownership
@@ -215,7 +213,7 @@ class AccountServiceIntegrationTest {
     @Test
     void testValidateAccountOwnership_NotOwned() {
         // Create account for other user
-        AccountCreateRequest request = new AccountCreateRequest(AccountType.CHECKING);
+        AccountCreateRequest request = new AccountCreateRequest("CHECKING");
         AccountResponse createdAccount = accountService.createAccount(request, otherUserId);
 
         // Validate ownership with different user
@@ -233,7 +231,7 @@ class AccountServiceIntegrationTest {
     @Test
     void testUpdateBalance_Success() {
         // Create account
-        AccountCreateRequest request = new AccountCreateRequest(AccountType.CHECKING);
+        AccountCreateRequest request = new AccountCreateRequest("CHECKING");
         AccountResponse createdAccount = accountService.createAccount(request, testUserId);
 
         // Update balance
@@ -250,7 +248,7 @@ class AccountServiceIntegrationTest {
     @Test
     void testUpdateBalance_NotOwned() {
         // Create account for other user
-        AccountCreateRequest request = new AccountCreateRequest(AccountType.CHECKING);
+        AccountCreateRequest request = new AccountCreateRequest("CHECKING");
         AccountResponse createdAccount = accountService.createAccount(request, otherUserId);
 
         // Try to update balance with different user
@@ -281,7 +279,7 @@ class AccountServiceIntegrationTest {
         String[] accountTypes = {"CHECKING", "SAVINGS", "CREDIT", "INVESTMENT"};
         
         for (String accountType : accountTypes) {
-            AccountCreateRequest request = new AccountCreateRequest(AccountType.fromValue(accountType));
+            AccountCreateRequest request = new AccountCreateRequest(accountType);
             AccountResponse response = accountService.createAccount(request, testUserId);
             
             assertNotNull(response);
@@ -299,7 +297,7 @@ class AccountServiceIntegrationTest {
         int numAccounts = 10;
         
         for (int i = 0; i < numAccounts; i++) {
-            AccountCreateRequest request = new AccountCreateRequest(AccountType.CHECKING);
+            AccountCreateRequest request = new AccountCreateRequest("CHECKING");
             AccountResponse response = accountService.createAccount(request, testUserId);
             assertNotNull(response.getAccountNumber());
         }
@@ -326,7 +324,7 @@ class AccountServiceIntegrationTest {
         for (int i = 0; i < numThreads; i++) {
             final int threadId = i;
             threads[i] = new Thread(() -> {
-                AccountCreateRequest request = new AccountCreateRequest(AccountType.CHECKING);
+                AccountCreateRequest request = new AccountCreateRequest("CHECKING");
                 AccountResponse response = accountService.createAccount(request, testUserId + threadId);
                 assertNotNull(response);
                 assertNotNull(response.getAccountNumber());

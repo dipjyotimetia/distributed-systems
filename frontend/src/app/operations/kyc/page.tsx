@@ -28,7 +28,7 @@ function Queue() {
     setError('');
     setLoading(true);
     try {
-      const response = await fetch('/api/operations/kyc');
+      const response = await fetch('/api/v1/operations/kyc');
       const body = await response.json().catch(() => ({}));
       if (!response.ok) setError(body.message || 'Queue unavailable');
       else setItems(body.cases || []);
@@ -44,7 +44,7 @@ function Queue() {
 
     async function loadQueue() {
       try {
-        const response = await fetch('/api/operations/kyc');
+        const response = await fetch('/api/v1/operations/kyc');
         const body = await response.json().catch(() => ({}));
         if (!active) return;
         if (!response.ok) setError(body.message || 'Queue unavailable');
@@ -66,7 +66,7 @@ function Queue() {
     setDecidingId(caseId);
     setError('');
     try {
-      const response = await fetch('/api/operations/kyc', {
+      const response = await fetch('/api/v1/operations/kyc', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ caseId, approve }),

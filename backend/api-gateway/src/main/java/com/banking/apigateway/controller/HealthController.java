@@ -1,50 +1,45 @@
 package com.banking.apigateway.controller;
 
+import com.banking.apigateway.contract.GatewayApi;
+import com.banking.apigateway.contract.model.HealthReport;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.Map;
 
 @RestController
-@RequestMapping("/health")
-public class HealthController {
+public class HealthController implements GatewayApi {
 
     @Value("${spring.application.name:api-gateway}")
     private String applicationName;
 
-    @GetMapping
-    public ResponseEntity<Map<String, Object>> health() {
-        Map<String, Object> response = new HashMap<>();
-        response.put("status", "UP");
-        response.put("service", applicationName);
-        response.put("timestamp", LocalDateTime.now());
-        response.put("version", "1.0.0");
-        
-        return ResponseEntity.ok(response);
+    @Override
+    public ResponseEntity<HealthReport> health() {
+        return ResponseEntity.ok(report("UP", "1.0.0"));
     }
 
-    @GetMapping("/ready")
-    public ResponseEntity<Map<String, Object>> readiness() {
-        Map<String, Object> response = new HashMap<>();
-        response.put("status", "READY");
-        response.put("service", applicationName);
-        response.put("timestamp", LocalDateTime.now());
-        
-        return ResponseEntity.ok(response);
+    @Override
+    public ResponseEntity<HealthReport> readiness() {
+        return ResponseEntity.ok(report("READY", null));
     }
 
-    @GetMapping("/live")
-    public ResponseEntity<Map<String, Object>> liveness() {
-        Map<String, Object> response = new HashMap<>();
-        response.put("status", "ALIVE");
-        response.put("service", applicationName);
-        response.put("timestamp", LocalDateTime.now());
-        
-        return ResponseEntity.ok(response);
+    @Override
+    public ResponseEntity<HealthReport> liveness() {
+        return ResponseEntity.ok(report("ALIVE", null));
+    }
+
+    @Override
+    public ResponseEntity<HealthReport> healthz() {
+        return health();
+    }
+
+    private HealthReport report(String status, String version) {
+        HealthReport report = new HealthReport();
+        report.setStatus(status);
+        report.setService(applicationName);
+        report.setTimestamp(LocalDateTime.now().toString());
+        report.setVersion(version);
+        return report;
     }
 }

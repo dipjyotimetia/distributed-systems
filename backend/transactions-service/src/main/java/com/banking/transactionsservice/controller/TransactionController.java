@@ -1,13 +1,12 @@
 package com.banking.transactionsservice.controller;
 
+import com.banking.transactionsservice.contract.ContractJson;
+import com.banking.transactionsservice.contract.TransactionsApi;
+import com.banking.transactionsservice.contract.model.TransactionResponse;
+import com.banking.transactionsservice.contract.model.TransactionSummary;
 import com.banking.transactionsservice.dto.TransactionQuery;
-import com.banking.transactionsservice.generated.CreateTransactionRequest;
-import com.banking.transactionsservice.generated.DepositRequest;
-import com.banking.transactionsservice.generated.InsufficientFunds;
-import com.banking.transactionsservice.generated.TransactionResponse;
-import com.banking.transactionsservice.generated.TransactionSummary;
-import com.banking.transactionsservice.generated.TransferRequest;
-import com.banking.transactionsservice.generated.WithdrawRequest;
+import com.banking.transactionsservice.entity.Transaction.TransactionStatus;
+import com.banking.transactionsservice.entity.Transaction.TransactionType;
 import com.banking.transactionsservice.security.UserAuthenticationDetails;
 import com.banking.transactionsservice.service.InsufficientFundsException;
 import com.banking.transactionsservice.service.TransactionService;
@@ -15,86 +14,118 @@ import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.StatusCode;
 import io.opentelemetry.api.trace.Tracer;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.validation.Valid;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.Validator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.lang.Nullable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.math.BigDecimal;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @RestController
-@RequestMapping("/api/transactions")
-public class TransactionController {
-    
+public class TransactionController implements TransactionsApi {
+
     private static final Logger logger = LoggerFactory.getLogger(TransactionController.class);
-    
+
     @Autowired
     private TransactionService transactionService;
-    
+
     @Autowired
     private Tracer tracer;
 
-    @GetMapping
-    public ResponseEntity<?> getUserTransactions(@ModelAttribute TransactionQuery query) {
+    @Autowired
+    private ContractJson contractJson;
+
+    @Autowired
+    private Validator validator;
+
+    @Override
+    public ResponseEntity<Object> listTransactions(@Nullable Long accountId, @Nullable String type, @Nullable String status,
+                                                   @Nullable String startDate, @Nullable String endDate,
+                                                   @Nullable BigDecimal minAmount, @Nullable BigDecimal maxAmount,
+                                                   @Nullable String description, @Nullable Integer page,
+                                                   @Nullable Integer size, @Nullable String sort) {
+        TransactionQuery query = query(accountId, type, status, startDate, endDate, minAmount, maxAmount, description, null, page, size, sort);
         if (query.isUnfiltered()) {
             return ResponseEntity.ok(transactionService.getUserTransactions(getUserIdFromAuthentication()));
         }
-        return ResponseEntity.ok(transactionService.queryTransactions(
-                getUserIdFromAuthentication(), query, false, getCurrentRequest()));
+        return ResponseEntity.ok(transactionService.queryTransactions(getUserIdFromAuthentication(), query, false, getCurrentRequest()));
     }
 
-    @GetMapping("/search")
-    public Object search(@ModelAttribute TransactionQuery query) {
-        return transactionService.queryTransactions(getUserIdFromAuthentication(), query, true, getCurrentRequest());
+    @Override
+    public ResponseEntity<Object> searchTransactions(@Nullable String q, @Nullable Long accountId, @Nullable String type,
+                                                     @Nullable String status, @Nullable String startDate, @Nullable String endDate,
+                                                     @Nullable BigDecimal minAmount, @Nullable BigDecimal maxAmount,
+                                                     @Nullable String description, @Nullable Integer page,
+                                                     @Nullable Integer size, @Nullable String sort) {
+        TransactionQuery query = query(accountId, type, status, startDate, endDate, minAmount, maxAmount, description, q, page, size, sort);
+        return ResponseEntity.ok(transactionService.queryTransactions(getUserIdFromAuthentication(), query, true, getCurrentRequest()));
     }
 
-    @GetMapping("/recent")
-    public List<TransactionResponse> recent(@RequestParam(defaultValue = "10") int limit) {
-        return transactionService.recentTransactions(getUserIdFromAuthentication(), limit);
+    @Override
+    public ResponseEntity<List<TransactionResponse>> recentTransactions(Integer limit) {
+        int requested = limit == null ? 10 : limit;
+        List<TransactionResponse> body = transactionService.recentTransactions(getUserIdFromAuthentication(), requested).stream()
+                .map(item -> contractJson.convert(item, TransactionResponse.class))
+                .toList();
+        return ResponseEntity.ok(body);
     }
 
-    @GetMapping("/summary")
-    public TransactionSummary summary(@RequestParam(required = false) Long accountId) {
-        return transactionService.summarize(getUserIdFromAuthentication(), accountId, getCurrentRequest());
+    @Override
+    public ResponseEntity<TransactionSummary> summarizeTransactions(@Nullable Long accountId) {
+        var summary = transactionService.summarize(getUserIdFromAuthentication(), accountId, getCurrentRequest());
+        return ResponseEntity.ok(contractJson.convert(summary, TransactionSummary.class));
     }
 
-    @GetMapping("/{id}")
-    public TransactionResponse getTransaction(@PathVariable Long id) {
-        return transactionService.getTransaction(id, getUserIdFromAuthentication());
+    @Override
+    public ResponseEntity<TransactionResponse> getTransaction(Long id) {
+        return ResponseEntity.ok(contractJson.convert(
+                transactionService.getTransaction(id, getUserIdFromAuthentication()), TransactionResponse.class));
     }
 
-    @PatchMapping("/{id}/cancel")
-    public TransactionResponse cancelTransaction(@PathVariable Long id) {
-        return transactionService.cancelTransaction(id, getUserIdFromAuthentication());
+    @Override
+    public ResponseEntity<TransactionResponse> cancelTransaction(Long id) {
+        return ResponseEntity.ok(contractJson.convert(
+                transactionService.cancelTransaction(id, getUserIdFromAuthentication()), TransactionResponse.class));
     }
 
-    @PostMapping("/create")
-    public ResponseEntity<?> createTransaction(@Valid @RequestBody CreateTransactionRequest request) {
+    @Override
+    public ResponseEntity<TransactionResponse> createTransaction(
+            com.banking.transactionsservice.contract.model.CreateTransactionRequest createTransactionRequest) {
         Span span = tracer.spanBuilder("create-transaction").startSpan();
         try {
+            var request = contractJson.convert(createTransactionRequest, com.banking.transactionsservice.dto.CreateTransactionRequest.class);
+            Map<String, String> errors = violations(request);
+            if (!errors.isEmpty()) {
+                logger.warn("Validation failed for transaction creation: {}", errors);
+                span.setAttribute("validation.failed", true);
+                return rejected(ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errors));
+            }
             Long userId = getUserIdFromAuthentication();
-            
-            logger.info("Creating transaction for user: {}, account: {}, type: {}, amount: {}", 
-                       userId, request.getAccountId(), request.getType(), request.getAmount());
-            
-            TransactionResponse transaction = transactionService.createTransaction(request, userId, getCurrentRequest());
+            logger.info("Creating transaction for user: {}, account: {}, type: {}, amount: {}",
+                    userId, request.getAccountId(), request.getType(), request.getAmount());
+            var transaction = transactionService.createTransaction(request, userId, getCurrentRequest());
             span.setAttribute("user.id", userId);
             span.setAttribute("account.id", request.getAccountId());
-            span.setAttribute("transaction.type", request.getType().getValue());
+            span.setAttribute("transaction.type", request.getType());
             span.setAttribute("transaction.amount", request.getAmount().toString());
             span.setAttribute("transaction.id", transaction.getId());
-            
-            return ResponseEntity.status(HttpStatus.CREATED).body(transaction);
+            return ResponseEntity.status(HttpStatus.CREATED).body(contractJson.convert(transaction, TransactionResponse.class));
         } catch (InsufficientFundsException e) {
-            return ResponseEntity.badRequest().body(new InsufficientFunds(
-                    InsufficientFunds.CodeEnum.INSUFFICIENT_FUNDS, e.getMessage()));
+            return rejected(ResponseEntity.badRequest().body(Map.of("code", "INSUFFICIENT_FUNDS", "message", e.getMessage())));
         } catch (ResponseStatusException e) {
             throw e;
         } catch (RuntimeException e) {
@@ -109,24 +140,23 @@ public class TransactionController {
             span.end();
         }
     }
-    
-    @PostMapping("/deposit")
-    public ResponseEntity<?> deposit(
-            @Valid @RequestBody DepositRequest request) {
+
+    @Override
+    public ResponseEntity<TransactionResponse> deposit(com.banking.transactionsservice.contract.model.DepositRequest depositRequest) {
         Span span = tracer.spanBuilder("process-deposit").startSpan();
         try {
+            var request = contractJson.convert(depositRequest, com.banking.transactionsservice.dto.DepositRequest.class);
+            if (!violations(request).isEmpty()) {
+                return ResponseEntity.badRequest().build();
+            }
             Long userId = getUserIdFromAuthentication();
-
-            logger.info("Processing deposit for user: {}, account: {}, amount: {}",
-                       userId, request.getAccountId(), request.getAmount());
-
-            TransactionResponse transaction = transactionService.deposit(request, userId, getCurrentRequest());
+            logger.info("Processing deposit for user: {}, account: {}, amount: {}", userId, request.getAccountId(), request.getAmount());
+            var transaction = transactionService.deposit(request, userId, getCurrentRequest());
             span.setAttribute("user.id", userId);
             span.setAttribute("account.id", request.getAccountId());
             span.setAttribute("transaction.amount", request.getAmount().toString());
             span.setAttribute("transaction.id", transaction.getId());
-
-            return ResponseEntity.status(HttpStatus.CREATED).body(transaction);
+            return ResponseEntity.status(HttpStatus.CREATED).body(contractJson.convert(transaction, TransactionResponse.class));
         } catch (NullPointerException e) {
             span.recordException(e);
             span.setStatus(StatusCode.ERROR, e.getClass().getSimpleName());
@@ -146,27 +176,25 @@ public class TransactionController {
             span.end();
         }
     }
-    
-    @PostMapping("/withdraw")
-    public ResponseEntity<?> withdraw(
-            @Valid @RequestBody WithdrawRequest request) {
+
+    @Override
+    public ResponseEntity<TransactionResponse> withdraw(com.banking.transactionsservice.contract.model.WithdrawRequest withdrawRequest) {
         Span span = tracer.spanBuilder("process-withdrawal").startSpan();
         try {
+            var request = contractJson.convert(withdrawRequest, com.banking.transactionsservice.dto.WithdrawRequest.class);
+            if (!violations(request).isEmpty()) {
+                return ResponseEntity.badRequest().build();
+            }
             Long userId = getUserIdFromAuthentication();
-            
-            logger.info("Processing withdrawal for user: {}, account: {}, amount: {}", 
-                       userId, request.getAccountId(), request.getAmount());
-            
-            TransactionResponse transaction = transactionService.withdraw(request, userId, getCurrentRequest());
+            logger.info("Processing withdrawal for user: {}, account: {}, amount: {}", userId, request.getAccountId(), request.getAmount());
+            var transaction = transactionService.withdraw(request, userId, getCurrentRequest());
             span.setAttribute("user.id", userId);
             span.setAttribute("account.id", request.getAccountId());
             span.setAttribute("transaction.amount", request.getAmount().toString());
             span.setAttribute("transaction.id", transaction.getId());
-            
-            return ResponseEntity.status(HttpStatus.CREATED).body(transaction);
+            return ResponseEntity.status(HttpStatus.CREATED).body(contractJson.convert(transaction, TransactionResponse.class));
         } catch (InsufficientFundsException e) {
-            return ResponseEntity.badRequest().body(new InsufficientFunds(
-                    InsufficientFunds.CodeEnum.INSUFFICIENT_FUNDS, e.getMessage()));
+            return rejected(ResponseEntity.badRequest().body(Map.of("code", "INSUFFICIENT_FUNDS", "message", e.getMessage())));
         } catch (ResponseStatusException e) {
             throw e;
         } catch (RuntimeException e) {
@@ -181,34 +209,31 @@ public class TransactionController {
             span.end();
         }
     }
-    
-    @PostMapping("/transfer")
-    public ResponseEntity<?> transfer(
-            @Valid @RequestBody TransferRequest request) {
+
+    @Override
+    public ResponseEntity<TransactionResponse> transfer(com.banking.transactionsservice.contract.model.TransferRequest transferRequest) {
         Span span = tracer.spanBuilder("process-transfer").startSpan();
         try {
-            // Validate same account transfer
+            var request = contractJson.convert(transferRequest, com.banking.transactionsservice.dto.TransferRequest.class);
+            if (!violations(request).isEmpty()) {
+                return ResponseEntity.badRequest().build();
+            }
             if (request.getFromAccountId().equals(request.getToAccountId())) {
                 logger.warn("Transfer rejected: from and to accounts are the same");
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
             }
-            
             Long userId = getUserIdFromAuthentication();
-            
-            logger.info("Processing transfer for user: {}, from: {}, to: {}, amount: {}", 
-                       userId, request.getFromAccountId(), request.getToAccountId(), request.getAmount());
-            
-            TransactionResponse transaction = transactionService.transfer(request, userId, getCurrentRequest());
+            logger.info("Processing transfer for user: {}, from: {}, to: {}, amount: {}",
+                    userId, request.getFromAccountId(), request.getToAccountId(), request.getAmount());
+            var transaction = transactionService.transfer(request, userId, getCurrentRequest());
             span.setAttribute("user.id", userId);
             span.setAttribute("from.account.id", request.getFromAccountId());
             span.setAttribute("to.account.id", request.getToAccountId());
             span.setAttribute("transaction.amount", request.getAmount().toString());
             span.setAttribute("transaction.id", transaction.getId());
-            
-            return ResponseEntity.status(HttpStatus.CREATED).body(transaction);
+            return ResponseEntity.status(HttpStatus.CREATED).body(contractJson.convert(transaction, TransactionResponse.class));
         } catch (InsufficientFundsException e) {
-            return ResponseEntity.badRequest().body(new InsufficientFunds(
-                    InsufficientFunds.CodeEnum.INSUFFICIENT_FUNDS, e.getMessage()));
+            return rejected(ResponseEntity.badRequest().body(Map.of("code", "INSUFFICIENT_FUNDS", "message", e.getMessage())));
         } catch (ResponseStatusException e) {
             throw e;
         } catch (RuntimeException e) {
@@ -223,7 +248,40 @@ public class TransactionController {
             span.end();
         }
     }
-    
+
+    private TransactionQuery query(Long accountId, String type, String status, String startDate, String endDate,
+                                   BigDecimal minAmount, BigDecimal maxAmount, String description, String q,
+                                   Integer page, Integer size, String sort) {
+        return new TransactionQuery(accountId, enumValue(TransactionType.class, type), enumValue(TransactionStatus.class, status),
+                startDate, endDate, minAmount == null ? null : minAmount.doubleValue(),
+                maxAmount == null ? null : maxAmount.doubleValue(), description, q, page, size, sort);
+    }
+
+    private static <E extends Enum<E>> E enumValue(Class<E> type, String value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            return Enum.valueOf(type, value);
+        } catch (IllegalArgumentException invalid) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid " + type.getSimpleName());
+        }
+    }
+
+    private Map<String, String> violations(Object request) {
+        Set<ConstraintViolation<Object>> found = validator.validate(request);
+        Map<String, String> errors = new HashMap<>();
+        for (ConstraintViolation<Object> violation : found) {
+            errors.put(violation.getPropertyPath().toString(), violation.getMessage());
+        }
+        return errors;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <T> ResponseEntity<T> rejected(ResponseEntity<?> response) {
+        return (ResponseEntity<T>) response;
+    }
+
     private Long getUserIdFromAuthentication() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || authentication.getDetails() == null) {

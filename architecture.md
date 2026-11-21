@@ -23,7 +23,7 @@ Browser banking requests flow through the frontend server. The AI chat proxy use
 Client → Frontend Service → API Gateway → Backend Services
 ```
 
-`proto/` is the only protobuf contract. KYC is `proto/kyc/kyc.proto` and cards is `proto/cards/cards.proto`. `scripts/frontend-proto.sh` writes the checked-in TypeScript under `frontend/src/gen` with Buf 1.75.0 and `protoc-gen-es` 2.16.0. Next.js route handlers import those stubs and call the Go servers with the gRPC protocol. The browser uses the HTTP routes. Those routes forward the incoming `Authorization` header as gRPC metadata.
+`contracts/proto/` is the protobuf contract, next to the OpenAPI files in `contracts/openapi/`. KYC is `contracts/proto/kyc/kyc.proto` and cards is `contracts/proto/cards/cards.proto`. `scripts/frontend-proto.sh` writes the checked-in TypeScript under `frontend/src/gen` with Buf 1.75.0 and `protoc-gen-es` 2.16.0. Next.js route handlers import those stubs and call the Go servers with the gRPC protocol. The browser uses the HTTP routes. Those routes forward the incoming `Authorization` header as gRPC metadata.
 
 KYC stores the case and starts a Temporal review on the `kyc-review` task queue. Cards calls `fraud-service` over gRPC and reads the account from `accounts-service` over HTTP before it issues a card. `docker-compose.mtls.yml` is the optional mutual TLS overlay for the frontend, KYC, cards, and fraud clients.
 
@@ -71,7 +71,7 @@ volume across both workers.
 
 - **Frontend as Proxy**: Frontend contains Next.js API routes that proxy requests to the API Gateway
 - **Server-Side Communication**: Backend communication uses internal Kubernetes service URLs (e.g., `http://api-gateway:8080`)
-- **Relative Client URLs**: Frontend client code uses relative URLs (`/api/users/login`) that route to Next.js API handlers
+- **Relative Client URLs**: Frontend client code uses relative URLs (`/api/v1/users/login`) that route to Next.js API handlers
 - **Environment Agnostic**: No hardcoded URLs in client-side code, eliminating `NEXT_PUBLIC_API_URL` configuration issues
 
 ## Benefits

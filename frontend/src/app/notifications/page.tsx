@@ -32,7 +32,7 @@ function Inbox() {
     let active = true;
     async function load() {
       try {
-        const response = await fetch('/api/notifications', { cache: 'no-store' });
+        const response = await fetch('/api/v1/notifications', { cache: 'no-store' });
         const body = await response.json();
         if (!active) return;
         if (!response.ok || !Array.isArray(body)) {

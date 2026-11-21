@@ -2,12 +2,28 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 from typing import Any
 
+import grpc
 import httpx
 from temporalio import activity
+
+from accounts_client import ApiClient as AccountsApiClient
+from accounts_client import Configuration as AccountsConfiguration
+from accounts_client.api.accounts_api import AccountsApi
+from accounts_client.exceptions import ApiException as AccountsApiException
+from disputes_client import ApiClient as DisputesApiClient
+from disputes_client import Configuration as DisputesConfiguration
+from disputes_client.api.disputes_api import DisputesApi
+from disputes_client.exceptions import ApiException as DisputesApiException
+from gen import research_pb2, research_pb2_grpc
+from transactions_client import ApiClient as TransactionsApiClient
+from transactions_client import Configuration as TransactionsConfiguration
+from transactions_client.api.transactions_api import TransactionsApi
+from transactions_client.exceptions import ApiException as TransactionsApiException
 
 from temporal.models import ToolCall, ToolResult
 
@@ -40,19 +56,10 @@ async def get_balance(account_id: str, auth_token: str = "") -> ToolResult:
                 }
             ),
         )
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        resp = await client.get(
-            f"{ACCOUNTS_URL}/api/accounts/{account_id}/balance",
-            headers=_auth_headers(auth_token),
-        )
-        if resp.status_code >= 400:
-            return ToolResult(
-                name="get_balance",
-                call_id="",
-                content="",
-                error=f"accounts-service returned {resp.status_code}",
-            )
-        return ToolResult(name="get_balance", call_id="", content=resp.text)
+    loaded = await asyncio.to_thread(_account_balance, account_id, auth_token)
+    if isinstance(loaded, AccountsApiException):
+        return ToolResult(name="get_balance", call_id="", content="", error=f"accounts-service returned {loaded.status}")
+    return ToolResult(name="get_balance", call_id="", content=loaded)
 
 
 @activity.defn(name="listTransactions")
@@ -80,23 +87,10 @@ async def list_transactions(
                 }
             ),
         )
-    params: dict[str, Any] = {"limit": max(1, min(limit, 50))}
-    if account_id:
-        params["accountId"] = account_id
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        resp = await client.get(
-            f"{TRANSACTIONS_URL}/api/transactions",
-            headers=_auth_headers(auth_token),
-            params=params,
-        )
-        if resp.status_code >= 400:
-            return ToolResult(
-                name="list_transactions",
-                call_id="",
-                content="",
-                error=f"transactions-service returned {resp.status_code}",
-            )
-        return ToolResult(name="list_transactions", call_id="", content=resp.text)
+    loaded = await asyncio.to_thread(_transaction_list, auth_token, account_id, limit)
+    if isinstance(loaded, TransactionsApiException):
+        return ToolResult(name="list_transactions", call_id="", content="", error=f"transactions-service returned {loaded.status}")
+    return ToolResult(name="list_transactions", call_id="", content=loaded)
 
 
 @activity.defn(name="getKycStatus")
@@ -147,19 +141,10 @@ async def get_dispute_status(case_id: int, auth_token: str = "") -> ToolResult:
                 }
             ),
         )
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        resp = await client.get(
-            f"{DISPUTES_URL}/api/disputes/{case_id}",
-            headers=_auth_headers(auth_token),
-        )
-        if resp.status_code >= 400:
-            return ToolResult(
-                name="get_dispute_status",
-                call_id="",
-                content="",
-                error=f"disputes-service returned {resp.status_code}",
-            )
-        return ToolResult(name="get_dispute_status", call_id="", content=resp.text)
+    loaded = await asyncio.to_thread(_dispute_case, case_id, auth_token)
+    if isinstance(loaded, DisputesApiException):
+        return ToolResult(name="get_dispute_status", call_id="", content="", error=f"disputes-service returned {loaded.status}")
+    return ToolResult(name="get_dispute_status", call_id="", content=loaded)
 
 
 @activity.defn(name="executeTool")
@@ -209,17 +194,8 @@ async def load_dispute_context(payload: dict[str, Any]) -> dict[str, Any]:
             "aiDraft": None,
             "source": "fixture",
         }
-    headers = {"Accept": "application/json"}
     token = str(payload.get("internal_token") or os.environ.get("DISPUTES_INTERNAL_TOKEN", ""))
-    if token:
-        headers["X-Internal-Token"] = token
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        resp = await client.get(
-            f"{DISPUTES_URL}/internal/disputes/{case_id}/context",
-            headers=headers,
-        )
-        resp.raise_for_status()
-        return resp.json()
+    return await asyncio.to_thread(_research_context, case_id, token)
 
 
 @activity.defn(name="saveDisputeAiDraft")
@@ -229,15 +205,68 @@ async def save_dispute_ai_draft(payload: dict[str, Any]) -> dict[str, Any]:
     draft = dict(payload.get("draft") or {})
     if os.environ.get("AI_PROVIDER_MODE", "live") == "fixture" and not os.environ.get("AI_TOOLS_LIVE"):
         return {"id": case_id, "aiDraft": draft, "source": "fixture"}
-    headers = {"Content-Type": "application/json", "Accept": "application/json"}
     token = str(payload.get("internal_token") or os.environ.get("DISPUTES_INTERNAL_TOKEN", ""))
-    if token:
-        headers["X-Internal-Token"] = token
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        resp = await client.post(
-            f"{DISPUTES_URL}/internal/disputes/{case_id}/ai-draft",
-            headers=headers,
-            json={"draft": draft},
+    return await asyncio.to_thread(_research_draft, case_id, token, draft)
+
+
+def _dump(value: Any) -> str:
+    if hasattr(value, "to_json"):
+        return value.to_json()
+    return json.dumps(value)
+
+
+def _account_balance(account_id: str, token: str) -> str | AccountsApiException:
+    api = AccountsApi(AccountsApiClient(AccountsConfiguration(host=ACCOUNTS_URL)))
+    try:
+        return _dump(api.get_account_balance(int(account_id), _headers=_auth_headers(token), _request_timeout=10))
+    except AccountsApiException as exc:
+        return exc
+
+
+def _transaction_list(token: str, account_id: str | None, limit: int) -> str | TransactionsApiException:
+    api = TransactionsApi(TransactionsApiClient(TransactionsConfiguration(host=TRANSACTIONS_URL)))
+    try:
+        body = api.list_transactions(
+            account_id=int(account_id) if account_id else None,
+            size=max(1, min(limit, 50)),
+            _headers=_auth_headers(token),
+            _request_timeout=10,
         )
-        resp.raise_for_status()
-        return resp.json()
+        return _dump(body)
+    except TransactionsApiException as exc:
+        return exc
+
+
+def _dispute_case(case_id: int, token: str) -> str | DisputesApiException:
+    api = DisputesApi(DisputesApiClient(DisputesConfiguration(host=DISPUTES_URL)))
+    try:
+        return _dump(api.get_dispute(case_id, _headers=_auth_headers(token), _request_timeout=10))
+    except DisputesApiException as exc:
+        return exc
+
+
+def _research_stub() -> research_pb2_grpc.DisputeResearchStub:
+    address = os.environ.get("DISPUTES_GRPC_ADDRESS", "disputes-service:9096")
+    return research_pb2_grpc.DisputeResearchStub(grpc.insecure_channel(address))
+
+
+def _research_metadata(token: str) -> list[tuple[str, str]]:
+    return [("x-internal-token", token)] if token else []
+
+
+def _research_context(case_id: int, token: str) -> dict[str, Any]:
+    reply = _research_stub().GetContext(
+        research_pb2.GetContextRequest(case_id=case_id),
+        metadata=_research_metadata(token),
+        timeout=10,
+    )
+    return json.loads(reply.json)
+
+
+def _research_draft(case_id: int, token: str, draft: dict[str, Any]) -> dict[str, Any]:
+    reply = _research_stub().SaveDraft(
+        research_pb2.SaveDraftRequest(case_id=case_id, draft_json=json.dumps(draft)),
+        metadata=_research_metadata(token),
+        timeout=10,
+    )
+    return json.loads(reply.json)

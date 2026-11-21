@@ -36,7 +36,7 @@ _client: Client | None = None
 
 class _HealthHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:  # noqa: N802
-        if self.path != "/health":
+        if self.path != "/api/v1/health":
             self.send_response(404)
             self.end_headers()
             return

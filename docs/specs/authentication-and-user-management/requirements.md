@@ -10,7 +10,7 @@ Covers `backend/user-service` (.NET 8, registration/login/profile/token issuance
 ## Requirements
 
 ### 1. Registration
-1. `POST /api/users/register` with username, email, password SHALL create the user and
+1. `POST /api/v1/users/register` with username, email, password SHALL create the user and
    return `201` with the user summary (id, username, email, roles, createdAt, updatedAt).
 2. Duplicate username or email SHALL return `409`; other invalid input SHALL return `400`.
 3. Passwords SHALL be stored only as BCrypt hashes. New users get role `USER`.
@@ -18,24 +18,24 @@ Covers `backend/user-service` (.NET 8, registration/login/profile/token issuance
    failures are logged and SHALL NOT block registration.
 
 ### 2. Login and token issuance
-1. `POST /api/users/login` with valid username-or-email and password SHALL return `200`
+1. `POST /api/v1/users/login` with valid username-or-email and password SHALL return `200`
    with `{ token, type: "Bearer", id, username, email, roles }`.
 2. Invalid credentials SHALL return `401` without revealing which field was wrong.
 3. The JWT SHALL be HMAC-SHA256 signed, carry `sub` (username), `userId` and `roles`, and
    expire after 24 hours.
 
 ### 3. Profile and availability
-1. `GET /api/users/profile` with a valid bearer token SHALL return `200`; a missing,
+1. `GET /api/v1/users/profile` with a valid bearer token SHALL return `200`; a missing,
    malformed or invalid token SHALL return `401`.
-2. `GET /api/users/check-username` and `/check-email` SHALL report availability without
+2. `GET /api/v1/users/check-username` and `/check-email` SHALL report availability without
    authentication.
 
 ### 4. Gateway edge authentication
-1. Public (no token): `/api/users/register`, `/login`, `/check-username`, `/check-email`,
-   `/api/*-service/health`, `/api/healthz`.
+1. Public (no token): `/api/v1/users/register`, `/login`, `/check-username`, `/check-email`,
+   `/api/v1/*-service/health`, `/api/v1/healthz`.
 2. Any other route without a valid, unexpired token SHALL return `401`.
-3. Routes: `/api/users/**` → user-service, `/api/accounts/**` → accounts-service,
-   `/api/transactions/**` → transactions-service.
+3. Routes: `/api/v1/users/**` → user-service, `/api/v1/accounts/**` → accounts-service,
+   `/api/v1/transactions/**` → transactions-service.
 
 ### 5. Cross-service token compatibility
 1. All services SHALL validate JWTs with the same HMAC secret from `JWT_SECRET`. Built-in

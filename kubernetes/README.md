@@ -35,7 +35,7 @@ Speedscale overlay. Argo CD runs its PostSync hook during a sync.
 ## Smoke testing
 
 With the frontend port-forward running, check
-`curl -fsS http://localhost:3000/api/healthz` and exercise sign-in through the
+`curl -fsS http://localhost:3000/api/v1/healthz` and exercise sign-in through the
 frontend. The legacy test Job submitted by `make test-deployment` waits for
 `api-gateway:80`, while the current base exposes `banking-gateway:80`. Use
 the frontend smoke check for the current base.

@@ -2,8 +2,7 @@ package com.banking.transactionsservice.service;
 
 import fraud.v1.Fraud.FraudCheckResponse;
 import com.banking.transactionsservice.client.FraudServiceClient;
-import com.banking.transactionsservice.dto.TransactionQuery;
-import com.banking.transactionsservice.generated.*;
+import com.banking.transactionsservice.dto.*;
 import com.banking.transactionsservice.entity.Transaction;
 import com.banking.transactionsservice.repository.TransactionRepository;
 import io.opentelemetry.api.metrics.DoubleHistogram;
@@ -100,7 +99,7 @@ class TransactionServiceTest {
         assertEquals(1, result.size());
         assertEquals(testTransaction.getId(), result.get(0).getId());
         assertEquals(testTransaction.getAmount(), result.get(0).getAmount());
-        assertEquals(TransactionType.DEPOSIT, result.get(0).getType());
+        assertEquals(testTransaction.getType(), result.get(0).getType());
         
         verify(transactionRepository, times(1)).findByUserIdOrderByCreatedAtDesc(testUserId);
     }
@@ -108,7 +107,7 @@ class TransactionServiceTest {
     @Test
     void testDepositSuccess() {
         // Arrange
-        DepositRequest request = new DepositRequest(testAccountId, 100.00).description("Test deposit");
+        DepositRequest request = new DepositRequest(testAccountId, 100.00, "Test deposit");
         when(movementCoordinator.execute(any(Transaction.class))).thenReturn(testTransaction);
 
         // Act
@@ -118,7 +117,7 @@ class TransactionServiceTest {
         assertNotNull(result);
         assertEquals(testTransaction.getId(), result.getId());
         assertEquals(testTransaction.getAmount(), result.getAmount());
-        assertEquals(TransactionType.DEPOSIT, result.getType());
+        assertEquals(Transaction.TransactionType.DEPOSIT, result.getType());
         
         verify(movementCoordinator).execute(any(Transaction.class));
     }
@@ -126,7 +125,7 @@ class TransactionServiceTest {
     @Test
     void testDepositAccountNotOwned() {
         // Arrange
-        DepositRequest request = new DepositRequest(testAccountId, 100.00).description("Test deposit");
+        DepositRequest request = new DepositRequest(testAccountId, 100.00, "Test deposit");
 
         when(movementCoordinator.execute(any())).thenThrow(new IllegalStateException("Unknown account"));
 
@@ -138,7 +137,7 @@ class TransactionServiceTest {
 
     @Test
     void replaysADepositWithTheSameIdempotencyKey() {
-        DepositRequest request = new DepositRequest(testAccountId, 100.00).description("Test deposit");
+        DepositRequest request = new DepositRequest(testAccountId, 100.00, "Test deposit");
         Transaction existing = new Transaction(testUserId, null, testAccountId, 100.00,
                 Transaction.TransactionType.DEPOSIT, "Test deposit");
         existing.setId(9L);
@@ -155,7 +154,7 @@ class TransactionServiceTest {
 
     @Test
     void rejectsAReusedIdempotencyKeyForADifferentDeposit() {
-        DepositRequest request = new DepositRequest(testAccountId, 100.00).description("Test deposit");
+        DepositRequest request = new DepositRequest(testAccountId, 100.00, "Test deposit");
         Transaction existing = new Transaction(testUserId, null, testAccountId, 50.00,
                 Transaction.TransactionType.DEPOSIT, "Test deposit");
         existing.setId(9L);
@@ -171,7 +170,7 @@ class TransactionServiceTest {
     @Test
     void testWithdrawSuccess() {
         // Arrange
-        WithdrawRequest request = new WithdrawRequest(testAccountId, 100.00).description("Test withdrawal");
+        WithdrawRequest request = new WithdrawRequest(testAccountId, 100.00, "Test withdrawal");
         
         Transaction withdrawalTransaction = new Transaction();
         withdrawalTransaction.setId(2L);
@@ -192,7 +191,7 @@ class TransactionServiceTest {
         assertNotNull(result);
         assertEquals(withdrawalTransaction.getId(), result.getId());
         assertEquals(withdrawalTransaction.getAmount(), result.getAmount());
-        assertEquals(TransactionType.WITHDRAWAL, result.getType());
+        assertEquals(Transaction.TransactionType.WITHDRAWAL, result.getType());
         
         verify(movementCoordinator).execute(any(Transaction.class));
     }
@@ -200,7 +199,7 @@ class TransactionServiceTest {
     @Test
     void testWithdrawInsufficientBalance() {
         // Arrange
-        WithdrawRequest request = new WithdrawRequest(testAccountId, 600.00).description("Test withdrawal");
+        WithdrawRequest request = new WithdrawRequest(testAccountId, 600.00, "Test withdrawal");
 
         when(movementCoordinator.execute(any())).thenThrow(new InsufficientFundsException("Insufficient funds"));
 
@@ -216,7 +215,7 @@ class TransactionServiceTest {
         // Arrange
         Long fromAccountId = 1L;
         Long toAccountId = 2L;
-        TransferRequest request = new TransferRequest(fromAccountId, toAccountId, 100.00).description("Test transfer");
+        TransferRequest request = new TransferRequest(fromAccountId, toAccountId, 100.00, "Test transfer");
         
         
         Transaction transferTransaction = new Transaction();
@@ -239,7 +238,7 @@ class TransactionServiceTest {
         assertNotNull(result);
         assertEquals(transferTransaction.getId(), result.getId());
         assertEquals(transferTransaction.getAmount(), result.getAmount());
-        assertEquals(TransactionType.TRANSFER, result.getType());
+        assertEquals(Transaction.TransactionType.TRANSFER, result.getType());
         
         verify(paymentComplianceService, times(1)).verifyTransferCompliance(fromAccountId, toAccountId);
         verify(movementCoordinator).execute(any(Transaction.class));
@@ -250,7 +249,7 @@ class TransactionServiceTest {
         // Arrange
         Long fromAccountId = 1L;
         Long toAccountId = 2L;
-        TransferRequest request = new TransferRequest(fromAccountId, toAccountId, 600.00).description("Test transfer");
+        TransferRequest request = new TransferRequest(fromAccountId, toAccountId, 600.00, "Test transfer");
         
 
         when(movementCoordinator.execute(any())).thenThrow(new InsufficientFundsException("Insufficient funds"));
@@ -267,7 +266,7 @@ class TransactionServiceTest {
         // Arrange
         Long fromAccountId = 1L;
         Long toAccountId = 2L;
-        TransferRequest request = new TransferRequest(fromAccountId, toAccountId, 100.00).description("Test transfer");
+        TransferRequest request = new TransferRequest(fromAccountId, toAccountId, 100.00, "Test transfer");
 
         doThrow(new RuntimeException("Compliance screening requires review"))
                 .when(paymentComplianceService).verifyTransferCompliance(fromAccountId, toAccountId);
@@ -312,7 +311,7 @@ class TransactionServiceTest {
         try {
             Future<TransactionResponse> slowDeposit = executorService.submit(() ->
                     transactionService.deposit(
-                            new DepositRequest(slowAccountId, 100.00).description("Slow fraud check"),
+                            new DepositRequest(slowAccountId, 100.00, "Slow fraud check"),
                             testUserId,
                             httpServletRequest));
 
@@ -320,7 +319,7 @@ class TransactionServiceTest {
 
             Future<TransactionResponse> fastDeposit = executorService.submit(() ->
                     transactionService.deposit(
-                            new DepositRequest(fastAccountId, 50.00).description("Fast unrelated deposit"),
+                            new DepositRequest(fastAccountId, 50.00, "Fast unrelated deposit"),
                             testUserId,
                             httpServletRequest));
 

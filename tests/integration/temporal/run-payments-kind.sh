@@ -97,7 +97,7 @@ done
 read -r cutoff date < <(python3 - <<'PY'
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
-end = datetime.now(ZoneInfo("Australia/Sydney")) + timedelta(minutes=4)
+end = datetime.now(ZoneInfo("Australia/Sydney")) + timedelta(minutes=6)
 print(end.strftime("%H:%M"), end.date().isoformat())
 PY
 )
