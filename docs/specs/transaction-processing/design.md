@@ -12,7 +12,8 @@ flowchart LR
   svc -->|1 gRPC| fraud[fraud-service]
   svc -->|2 REST| acc[accounts-service]
   svc -->|3 persist| pg[(Postgres)]
-  svc -->|4 publish| k[(Kafka transaction-events)]
+  svc -->|4 outbox| k[(Redpanda transaction-events)]
+  k -.->|Avro| sr[(Schema Registry)]
   svc -->|5 fan-out| pay[Stripe / PayPal / ComplyAdvantage]
 ```
 
@@ -43,8 +44,11 @@ flowchart LR
 - `PaymentComplianceService` — JDK `HttpClient`, 5s timeouts: Stripe
   `POST /v1/payment_intents`, PayPal `POST /v2/checkout/orders`, ComplyAdvantage
   `POST ${payment.comply.base-url}/searches` (parses `total_matches`, `risk_level`).
-- `TransactionEventOutbox` — writes `transaction-events` in the ledger transaction, then publishes to Kafka (`${KAFKA_BROKERS}`)
-  `${kafka.topic.transactions:transaction-events}`, JSON payload keyed by transaction id.
+- `TransactionEventOutbox` — writes outbox rows in the ledger transaction, then publishes to
+  Kafka (`${KAFKA_BROKERS}`) topics `transaction-events` and `movement-lifecycle-v1`.
+  Payloads default to Confluent Avro via `SchemaRegistryAvroEncoder`
+  (`SCHEMA_REGISTRY_URL`, `KAFKA_VALUE_FORMAT=avro`); set `KAFKA_VALUE_FORMAT=json` for UTF-8 JSON.
+  Schemas: [`contracts/avro/`](../../../contracts/avro/README.md).
 
 ## Data
 

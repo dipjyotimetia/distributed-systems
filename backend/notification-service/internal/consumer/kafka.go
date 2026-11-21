@@ -92,15 +92,19 @@ func (r *RingBuffer) ForUser(userID string, n int) []*TransactionEvent {
 // Store atomically persists events and their delivery intents.
 type Store interface {
 	Insert(ctx context.Context, evt *TransactionEvent) (inserted bool, err error)
+	// Quarantine durably records a poison Kafka record before the offset is committed.
+	Quarantine(ctx context.Context, topic string, partition int32, offset int64, key, value []byte, reason string) error
 }
 
 // Consumer reads from Kafka and populates both the ring buffer and a durable store.
 type Consumer struct {
-	client       *kgo.Client
-	topic        string
-	paymentTopic string
-	Buffer       *RingBuffer
-	store        Store
+	client        *kgo.Client
+	topic         string
+	paymentTopic  string
+	Buffer        *RingBuffer
+	store         Store
+	avro          *AvroDecoder
+	commitRecords func(context.Context, ...*kgo.Record) error
 }
 
 type AuthConfig struct {
@@ -110,24 +114,20 @@ type AuthConfig struct {
 }
 
 func New(brokers []string, topic, groupID string, store Store) *Consumer {
-	c, err := NewWithAuth(brokers, topic, groupID, store, AuthConfig{})
+	c, err := NewWithAuth(brokers, topic, groupID, store, AuthConfig{}, "")
 	if err != nil {
 		panic(err)
 	}
 	return c
 }
 
-func NewWithAuth(brokers []string, topic, groupID string, store Store, auth AuthConfig, paymentTopics ...string) (*Consumer, error) {
+func NewWithAuth(brokers []string, topic, groupID string, store Store, auth AuthConfig, paymentTopic string, schemaRegistryURLs ...string) (*Consumer, error) {
 	topics := []string{topic}
-	paymentTopic := ""
-	if len(paymentTopics) > 0 {
-		paymentTopic = paymentTopics[0]
-		if paymentTopic != "" {
-			if paymentTopic == topic {
-				return nil, fmt.Errorf("payment events require a separate Kafka topic")
-			}
-			topics = append(topics, paymentTopic)
+	if paymentTopic != "" {
+		if paymentTopic == topic {
+			return nil, fmt.Errorf("payment events require a separate Kafka topic")
 		}
+		topics = append(topics, paymentTopic)
 	}
 	opts := []kgo.Opt{
 		kgo.SeedBrokers(brokers...),
@@ -151,13 +151,24 @@ func NewWithAuth(brokers []string, topic, groupID string, store Store, auth Auth
 	if err != nil {
 		return nil, fmt.Errorf("configure Kafka consumer: %w", err)
 	}
-	return &Consumer{
+	var decoder *AvroDecoder
+	if len(schemaRegistryURLs) > 0 && schemaRegistryURLs[0] != "" {
+		decoder, err = NewAvroDecoder(schemaRegistryURLs...)
+		if err != nil {
+			client.Close()
+			return nil, err
+		}
+	}
+	c := &Consumer{
 		client:       client,
 		topic:        topic,
 		paymentTopic: paymentTopic,
 		Buffer:       &RingBuffer{},
 		store:        store,
-	}, nil
+		avro:         decoder,
+	}
+	c.commitRecords = client.CommitRecords
+	return c, nil
 }
 
 func saslMechanism(auth AuthConfig) (sasl.Mechanism, error) {
@@ -198,16 +209,22 @@ func (c *Consumer) Run(ctx context.Context) error {
 }
 
 func (c *Consumer) process(ctx context.Context, message *kgo.Record) error {
-	event, err := c.decode(message)
+	event, err := c.decode(ctx, message)
 	if err != nil {
 		metrics.ConsumeErrors.Inc()
-		log.Printf("invalid notification event (partition=%d offset=%d)", message.Partition, message.Offset)
+		log.Printf("invalid notification event (partition=%d offset=%d): %v", message.Partition, message.Offset, err)
+		quarantineCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+		if qerr := c.store.Quarantine(quarantineCtx, message.Topic, message.Partition, message.Offset, message.Key, message.Value, err.Error()); qerr != nil {
+			return fmt.Errorf("quarantine invalid notification event: %w", qerr)
+		}
+		metrics.EventsQuarantined.Inc()
 	} else if event != nil {
 		if err := c.deliver(ctx, event); err != nil {
 			return err
 		}
 	}
-	if err := c.client.CommitRecords(ctx, message); err != nil {
+	if err := c.commitRecords(ctx, message); err != nil {
 		return fmt.Errorf("commit transaction event offset: %w", err)
 	}
 	return nil
@@ -215,8 +232,48 @@ func (c *Consumer) process(ctx context.Context, message *kgo.Record) error {
 
 var paymentIDPattern = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 
-func (c *Consumer) decode(message *kgo.Record) (*TransactionEvent, error) {
+func (c *Consumer) decode(ctx context.Context, message *kgo.Record) (*TransactionEvent, error) {
 	if c.paymentTopic != "" && message.Topic == c.paymentTopic {
+		return c.decodePayment(ctx, message)
+	}
+	if c.avro != nil && isConfluentAvro(message.Value) {
+		return c.avro.DecodeTransaction(ctx, message.Value)
+	}
+	var event TransactionEvent
+	if err := json.Unmarshal(message.Value, &event); err != nil || event.TransactionID == "" || event.Status == "" {
+		return nil, fmt.Errorf("invalid transaction event")
+	}
+	return &event, nil
+}
+
+func (c *Consumer) decodePayment(ctx context.Context, message *kgo.Record) (*TransactionEvent, error) {
+	var (
+		version     int
+		eventID     string
+		paymentID   string
+		customerID  int64
+		amountMinor int64
+		currency    string
+		status      string
+		occurredAt  time.Time
+	)
+	if c.avro != nil && isConfluentAvro(message.Value) {
+		raw, err := c.avro.DecodePayment(ctx, message.Value)
+		if err != nil {
+			return nil, err
+		}
+		occurredAt, err = parseAvroTime(raw.OccurredAt)
+		if err != nil {
+			return nil, err
+		}
+		version = int(raw.Version)
+		eventID = raw.EventID
+		paymentID = raw.PaymentID
+		customerID = raw.CustomerID
+		amountMinor = raw.AmountMinor
+		currency = raw.Currency
+		status = raw.Status
+	} else {
 		var payment struct {
 			Version     int
 			EventID     string
@@ -230,32 +287,34 @@ func (c *Consumer) decode(message *kgo.Record) (*TransactionEvent, error) {
 		if err := json.Unmarshal(message.Value, &payment); err != nil {
 			return nil, err
 		}
-		if payment.Version != 1 || !paymentIDPattern.MatchString(payment.EventID) ||
-			!paymentIDPattern.MatchString(payment.PaymentID) || string(message.Key) != payment.PaymentID ||
-			payment.CustomerID < 1 || payment.AmountMinor < 1 || payment.AmountMinor > 999999999999 ||
-			payment.Currency != "AUD" || payment.OccurredAt.IsZero() {
-			return nil, fmt.Errorf("invalid payment event")
-		}
-		switch payment.Status {
-		case "PENDING", "SUBMITTED", "ACCEPTED", "REJECTED", "REVIEW_REQUIRED":
-			return nil, nil
-		case "SETTLED":
-			return &TransactionEvent{
-				PaymentID: payment.PaymentID, EventID: payment.EventID, Currency: payment.Currency,
-				UserID: json.Number(strconv.FormatInt(payment.CustomerID, 10)), AmountMinor: payment.AmountMinor,
-				Amount: float64(payment.AmountMinor) / 100, TransactionType: "OUTBOUND_PAYMENT",
-				Status: payment.Status, Timestamp: payment.OccurredAt,
-			}, nil
-		default:
-			return nil, fmt.Errorf("unknown payment status")
-		}
+		version = payment.Version
+		eventID = payment.EventID
+		paymentID = payment.PaymentID
+		customerID = payment.CustomerID
+		amountMinor = payment.AmountMinor
+		currency = payment.Currency
+		status = payment.Status
+		occurredAt = payment.OccurredAt
 	}
-
-	var event TransactionEvent
-	if err := json.Unmarshal(message.Value, &event); err != nil || event.TransactionID == "" || event.Status == "" {
-		return nil, fmt.Errorf("invalid transaction event")
+	if version != 1 || !paymentIDPattern.MatchString(eventID) ||
+		!paymentIDPattern.MatchString(paymentID) || string(message.Key) != paymentID ||
+		customerID < 1 || amountMinor < 1 || amountMinor > 999999999999 ||
+		currency != "AUD" || occurredAt.IsZero() {
+		return nil, fmt.Errorf("invalid payment event")
 	}
-	return &event, nil
+	switch status {
+	case "PENDING", "SUBMITTED", "ACCEPTED", "REJECTED", "REVIEW_REQUIRED":
+		return nil, nil
+	case "SETTLED":
+		return &TransactionEvent{
+			PaymentID: paymentID, EventID: eventID, Currency: currency,
+			UserID: json.Number(strconv.FormatInt(customerID, 10)), AmountMinor: amountMinor,
+			Amount: float64(amountMinor) / 100, TransactionType: "OUTBOUND_PAYMENT",
+			Status: status, Timestamp: occurredAt,
+		}, nil
+	default:
+		return nil, fmt.Errorf("unknown payment status")
+	}
 }
 
 func (c *Consumer) deliver(ctx context.Context, event *TransactionEvent) error {

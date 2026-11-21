@@ -44,8 +44,11 @@ event to Kafka `transaction-events` for notification-service.
 
 ### 6. Events
 After completion the service SHALL publish to `transaction-events`, keyed by transaction
-id, with transaction id, account id, user id, amount, type, status and timestamp. Publish
-is fire-and-forget; a broker outage SHALL NOT fail the transaction.
+id, with transaction id, account id, user id, amount, type, status and timestamp. The
+default wire format is Confluent Avro registered with Schema Registry (see
+`contracts/avro/transaction-event.avsc`); UTF-8 JSON remains available via
+`KAFKA_VALUE_FORMAT=json`. Publish is fire-and-forget; a broker outage SHALL NOT fail
+the transaction.
 
 ### 7. Query
 `GET /api/v1/transactions` SHALL return the authenticated user's transactions, filtered by

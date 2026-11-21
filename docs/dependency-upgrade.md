@@ -4,7 +4,7 @@
 
 The upgrade starts from `dipjyotimetia/distributed-systems` `main` at `82bd0f6`. Version checks used official package registries, image registries, and maintainer releases. The application uses Java 25 LTS, Go 1.27.4, .NET 10 LTS, Python 3.15.2, and Node.js 26.13.1 LTS.
 
-Redpanda is the Kafka-compatible broker for Compose, Kubernetes, and the integration stack. The Kubernetes DNS name remains `banking-kafka:9092`. The notification service uses franz-go and commits only after processing a record. MongoDB deduplicates replays using the existing transaction/status unique index. The SASL overlay still accepts PLAIN clients and provisions their bootstrap account through secret references.
+Redpanda is the Kafka-compatible broker for Compose, Kubernetes, and the integration stack. The Kubernetes DNS name remains `banking-kafka:9092`, with Schema Registry on `banking-kafka:8081`. Event topics default to Confluent Avro (`KAFKA_VALUE_FORMAT=avro`); schemas live under `contracts/avro/`. The notification service uses franz-go (plus `twmb/avro` and `franz-go/pkg/sr` for Avro) and commits only after processing a record. MongoDB deduplicates replays using the existing transaction/status unique index. The SASL overlay still accepts PLAIN clients and provisions their bootstrap account through secret references.
 
 ## Versions held below latest
 

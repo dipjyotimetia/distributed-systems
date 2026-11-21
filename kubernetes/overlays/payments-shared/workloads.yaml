@@ -263,6 +263,8 @@ data:
   FRAUD_SERVICE_ADDRESS: banking-fraud:8080
   ACCOUNTS_GRPC_ADDRESS: banking-accounts:9092
   PAYMENTS_KAFKA_BROKERS: banking-kafka:9092
+  SCHEMA_REGISTRY_URL: http://banking-kafka:8081
+  KAFKA_VALUE_FORMAT: avro
   SETTLEMENT_CUTOFF: "17:00"
   SETTLEMENT_ZONE: Australia/Sydney
   AWS_REGION: ap-southeast-2

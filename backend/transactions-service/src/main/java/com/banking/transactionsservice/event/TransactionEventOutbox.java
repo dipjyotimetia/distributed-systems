@@ -1,9 +1,6 @@
 package com.banking.transactionsservice.event;
 
 import com.banking.transactionsservice.entity.Transaction;
-import com.google.protobuf.InvalidProtocolBufferException;
-import com.google.protobuf.util.JsonFormat;
-import transactions.v1.MovementLifecycleEvent;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
@@ -24,16 +21,19 @@ public class TransactionEventOutbox {
     private static final Logger logger = LoggerFactory.getLogger(TransactionEventOutbox.class);
 
     private final JdbcTemplate jdbc;
-    private final KafkaTemplate<String, String> kafka;
+    private final KafkaTemplate<String, byte[]> kafka;
+    private final SchemaRegistryAvroEncoder encoder;
     private final String topic;
     private final boolean publishEnabled;
     private final AtomicReference<Double> oldestSeconds = new AtomicReference<>(0.0);
 
-    public TransactionEventOutbox(JdbcTemplate jdbc, KafkaTemplate<String, String> kafka, MeterRegistry registry,
+    public TransactionEventOutbox(JdbcTemplate jdbc, KafkaTemplate<String, byte[]> kafka,
+                                  SchemaRegistryAvroEncoder encoder, MeterRegistry registry,
                                   @Value("${kafka.topic.transactions:transaction-events}") String topic,
                                   @Value("${transactions.outbox.publish-enabled:true}") boolean publishEnabled) {
         this.jdbc = jdbc;
         this.kafka = kafka;
+        this.encoder = encoder;
         this.topic = topic;
         this.publishEnabled = publishEnabled;
         Gauge.builder("transactions.outbox.oldest.seconds", oldestSeconds, AtomicReference::get).register(registry);
@@ -46,16 +46,12 @@ public class TransactionEventOutbox {
                 """, transaction.getId(), payload(transaction));
     }
 
-    public void enqueueMovement(UUID movementId, MovementLifecycleEvent event) {
-        try {
-            jdbc.update("""
-                    INSERT INTO transactions_service.event_outbox (movement_id, topic, payload, event_key)
-                    VALUES (?, 'movement-lifecycle-v1', ?, ?)
-                    ON CONFLICT (event_key) DO NOTHING
-                    """, movementId, JsonFormat.printer().omittingInsignificantWhitespace().print(event), event.getEventId());
-        } catch (InvalidProtocolBufferException invalid) {
-            throw new IllegalStateException("Unable to serialize movement event", invalid);
-        }
+    public void enqueueMovement(UUID movementId, String eventId, String payloadJson) {
+        jdbc.update("""
+                INSERT INTO transactions_service.event_outbox (movement_id, topic, payload, event_key)
+                VALUES (?, 'movement-lifecycle-v1', ?, ?)
+                ON CONFLICT (event_key) DO NOTHING
+                """, movementId, payloadJson, eventId);
     }
 
     @Scheduled(fixedDelayString = "${transactions.outbox.delay-ms:1000}")
@@ -78,9 +74,12 @@ public class TransactionEventOutbox {
                 """, (rs, row) -> new Pending(rs.getLong("id"),
                 rs.getString("transaction_id"), rs.getString("movement_id"), rs.getString("topic"), rs.getString("payload")));
         for (Pending event : pending) {
+            String destination = event.topic() == null ? topic : event.topic();
             try {
-                kafka.send(event.topic() == null ? topic : event.topic(),
-                        event.movementId() == null ? event.transactionId() : event.movementId(), event.payload()).get(5, TimeUnit.SECONDS);
+                byte[] value = encoder.encode(destination, event.payload());
+                kafka.send(destination,
+                        event.movementId() == null ? event.transactionId() : event.movementId(), value)
+                        .get(5, TimeUnit.SECONDS);
             } catch (Exception failure) {
                 if (failure instanceof InterruptedException) {
                     Thread.currentThread().interrupt();

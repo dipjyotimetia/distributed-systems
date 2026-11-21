@@ -1,6 +1,6 @@
 # Money movement recovery
 
-Customer deposit, withdrawal, and transfer forms use `/api/v1/movements`. The browser retains the submitted intent and idempotency key for that account and customer in its tab session. An accepted movement may remain pending while screening or the ledger is unavailable. A posted movement already has durable ledger entries. The Kafka topic `movement-lifecycle-v1` carries [Protobuf JSON](../contracts/proto/transactions/movement_event.proto). Consumers deduplicate by `eventId`. Existing transaction and payment topics remain available.
+Customer deposit, withdrawal, and transfer forms use `/api/v1/movements`. The browser retains the submitted intent and idempotency key for that account and customer in its tab session. An accepted movement may remain pending while screening or the ledger is unavailable. A posted movement already has durable ledger entries. The Kafka topic `movement-lifecycle-v1` carries Confluent Avro ([`movement-lifecycle-event.avsc`](../contracts/avro/movement-lifecycle-event.avsc)). Transactions-service publishes lifecycle events with a unique `eventId` (outbox `event_key`); there is no in-repo consumer for this topic yet—downstream consumers should deduplicate by `eventId`. Existing transaction and payment topics continue to feed notification-service.
 
 The accounts service journals opening balances, adjustments, internal movements, and outbound debits. The exact balance response includes the database-specific `postingCoverageStart` timestamp. Period statements before that cutoff are rejected. Historical balances form the opening baseline for this journal. Before promoting an upgraded environment, reconcile pending legacy decisions, compare historical transaction amounts to exact movement decisions where available, and investigate any unexplained balance or conversion differences. Keep the legacy rows and clearing evidence for that reconciliation.
 
@@ -17,5 +17,7 @@ For a shared environment, stop new submissions and drain legacy account writers 
 ## Notification retry
 
 The notification service persists a per-channel delivery intent with the event before acknowledging Kafka. HTTP 408, 429, 5xx, and transport failures are retried. Failed attempts that reach their limit or receive a permanent provider response are exposed as `EXHAUSTED` in the `deliveries` fields on MongoDB event documents. The exhaustion metric and log identify the channel and event reference.
+
+Malformed Kafka payloads are written to the MongoDB `events_quarantine` collection (keyed by topic, partition, and offset) before the consumer commits past them. Quarantine failures leave the offset uncommitted so the record is retried.
 
 Operators can inspect those documents using their existing MongoDB access. After checking the provider and confirming that an attempt should be repeated, reset only that channel's exhausted state to `PENDING`, its attempt count to zero, and its due time to the current UTC time. The currently configured SendGrid, Twilio, and Slack requests lack provider-side idempotency. An ambiguous provider acknowledgement can therefore result in duplicate delivery.

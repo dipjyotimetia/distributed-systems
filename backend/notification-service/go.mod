@@ -6,7 +6,9 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/oapi-codegen/runtime v1.1.1
 	github.com/prometheus/client_golang v1.25.0
+	github.com/twmb/avro v1.9.1
 	github.com/twmb/franz-go v1.22.3
+	github.com/twmb/franz-go/pkg/sr v1.8.0
 	go.mongodb.org/mongo-driver/v2 v2.10.0
 )
 

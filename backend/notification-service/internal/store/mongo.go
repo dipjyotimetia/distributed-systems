@@ -17,8 +17,19 @@ import (
 )
 
 type MongoStore struct {
-	coll     *mongo.Collection
-	payments *mongo.Collection
+	coll        *mongo.Collection
+	payments    *mongo.Collection
+	quarantine  *mongo.Collection
+}
+
+type quarantineDocument struct {
+	Topic     string    `bson:"topic"`
+	Partition int32     `bson:"partition"`
+	Offset    int64     `bson:"offset"`
+	Key       string    `bson:"key,omitempty"`
+	Value     string    `bson:"value"`
+	Reason    string    `bson:"reason"`
+	CreatedAt time.Time `bson:"createdAt"`
 }
 
 func NewMongoStore(ctx context.Context, uri, db, collection string) (*MongoStore, error) {
@@ -56,7 +67,15 @@ func NewMongoStore(ctx context.Context, uri, db, collection string) (*MongoStore
 		_ = client.Disconnect(context.Background())
 		return nil, fmt.Errorf("create payment notification index: %w", err)
 	}
-	store := &MongoStore{coll: coll, payments: payments}
+	quarantine := client.Database(db).Collection(collection + "_quarantine")
+	if _, err := quarantine.Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys:    bson.D{{Key: "topic", Value: 1}, {Key: "partition", Value: 1}, {Key: "offset", Value: 1}},
+		Options: options.Index().SetUnique(true),
+	}); err != nil {
+		_ = client.Disconnect(context.Background())
+		return nil, fmt.Errorf("create quarantine index: %w", err)
+	}
+	store := &MongoStore{coll: coll, payments: payments, quarantine: quarantine}
 	for _, collection := range []*mongo.Collection{coll, payments} {
 		if err := createDeliveryIndexes(ctx, collection); err != nil {
 			_ = client.Disconnect(context.Background())
@@ -64,6 +83,24 @@ func NewMongoStore(ctx context.Context, uri, db, collection string) (*MongoStore
 		}
 	}
 	return store, nil
+}
+
+func (s *MongoStore) Quarantine(ctx context.Context, topic string, partition int32, offset int64, key, value []byte, reason string) error {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	_, err := s.quarantine.InsertOne(ctx, quarantineDocument{
+		Topic:     topic,
+		Partition: partition,
+		Offset:    offset,
+		Key:       string(key),
+		Value:     string(value),
+		Reason:    reason,
+		CreatedAt: time.Now().UTC(),
+	})
+	if mongo.IsDuplicateKeyError(err) {
+		return nil
+	}
+	return err
 }
 
 func (s *MongoStore) Insert(ctx context.Context, evt *consumer.TransactionEvent) (bool, error) {

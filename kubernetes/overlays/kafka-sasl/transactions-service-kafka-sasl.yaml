@@ -23,5 +23,3 @@ spec:
           value: "SASL_PLAINTEXT"
         - name: SPRING_KAFKA_PROPERTIES_SASL_MECHANISM
           value: "PLAIN"
-        - name: SPRING_KAFKA_PROPERTIES_SASL_JAAS_CONFIG
-          value: 'org.apache.kafka.common.security.plain.PlainLoginModule required username="$(KAFKA_SASL_USERNAME)" password="$(KAFKA_SASL_PASSWORD)";'
