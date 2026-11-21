@@ -2,12 +2,22 @@ package temporal
 
 import (
 	"context"
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	"os"
 	"testing"
 	"time"
 
 	disputesv1 "github.com/dipjyotimetia/distributed-systems/backend/disputes-service/internal/generated/disputes/v1"
+	"github.com/dipjyotimetia/distributed-systems/backend/disputes-service/internal/postgres"
+	enumspb "go.temporal.io/api/enums/v1"
+	"go.temporal.io/api/serviceerror"
 	"go.temporal.io/sdk/activity"
+	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/testsuite"
+
+	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 func TestInvestigationSignalAndEvidenceDeadline(t *testing.T) {
@@ -41,4 +51,88 @@ func TestInvestigationSignalAndEvidenceDeadline(t *testing.T) {
 	if err := env.GetWorkflowError(); err != nil || calls != 3 || env.Now().Before(deadline) {
 		t.Fatalf("workflow ended at %s after %d activities: %v", env.Now(), calls, err)
 	}
+}
+
+func TestMaybeStartAiResearch(t *testing.T) {
+	dsn := os.Getenv("DISPUTES_TEST_DATABASE_URL")
+	if dsn == "" {
+		t.Skip("DISPUTES_TEST_DATABASE_URL is required for PostgreSQL tests")
+	}
+	db, err := sql.Open("pgx", dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	schema, err := os.ReadFile("../../../../kubernetes/overlays/full/schema.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec("CREATE SCHEMA IF NOT EXISTS disputes;" + string(schema)); err != nil {
+		t.Fatal(err)
+	}
+	store := postgres.New(db)
+	ctx := context.Background()
+	c, created, err := store.Create(ctx, 7, time.Now().UnixNano(), "AI research case", time.Hour)
+	if err != nil || !created {
+		t.Fatalf("create case: %+v %v", c, err)
+	}
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, "DELETE FROM disputes.signal_outbox WHERE case_id=$1", c.ID)
+		_, _ = db.ExecContext(ctx, "DELETE FROM disputes.workflow_outbox WHERE case_id=$1", c.ID)
+		_, _ = db.ExecContext(ctx, "DELETE FROM disputes.cases WHERE id=$1", c.ID)
+	})
+	if err := store.Escalate(ctx, c.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	starts := 0
+	starter := workflowStartFunc(func(_ context.Context, opts client.StartWorkflowOptions, workflow interface{}, args ...interface{}) (client.WorkflowRun, error) {
+		starts++
+		if opts.ID != fmt.Sprintf("dispute-ai-%d", c.ID) || opts.TaskQueue != aiBankingQueue {
+			t.Fatalf("unexpected AI workflow start: %#v %#v", opts, workflow)
+		}
+		if opts.WorkflowIDReusePolicy != enumspb.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE_FAILED_ONLY {
+			t.Fatalf("expected failed-only reuse policy, got %v", opts.WorkflowIDReusePolicy)
+		}
+		if len(args) != 1 {
+			t.Fatalf("expected research input arg, got %#v", args)
+		}
+		input, ok := args[0].(disputeResearchInput)
+		if !ok || input.CaseID != c.ID || input.Locale != "en-US" {
+			t.Fatalf("unexpected research input: %#v", args[0])
+		}
+		return nil, &serviceerror.WorkflowExecutionAlreadyStarted{}
+	})
+	if err := maybeStartAiResearch(ctx, store, starter, c.ID); err != nil {
+		t.Fatal(err)
+	}
+	if starts != 1 {
+		t.Fatalf("expected one start attempt, got %d", starts)
+	}
+
+	draft, _ := json.Marshal(map[string]any{"summary": "fixture"})
+	if _, err := store.SaveAiDraft(ctx, c.ID, draft); err != nil {
+		t.Fatal(err)
+	}
+	if err := maybeStartAiResearch(ctx, store, starter, c.ID); err != nil {
+		t.Fatal(err)
+	}
+	if starts != 1 {
+		t.Fatalf("AI research restarted after draft saved: %d", starts)
+	}
+
+	state, err := advanceWithAI(ctx, store, starter, &disputesv1.CaseRevision{CaseId: c.ID})
+	if err != nil || state.GetResolved() {
+		t.Fatalf("advanceWithAI: %+v %v", state, err)
+	}
+	internal, err := store.ByIDInternal(ctx, c.ID)
+	if err != nil || internal.AiDraft == nil {
+		t.Fatalf("ByIDInternal missing draft: %+v %v", internal, err)
+	}
+}
+
+type workflowStartFunc func(context.Context, client.StartWorkflowOptions, interface{}, ...interface{}) (client.WorkflowRun, error)
+
+func (f workflowStartFunc) ExecuteWorkflow(ctx context.Context, options client.StartWorkflowOptions, workflow interface{}, args ...interface{}) (client.WorkflowRun, error) {
+	return f(ctx, options, workflow, args...)
 }

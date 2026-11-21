@@ -67,18 +67,18 @@ function Queue() {
             <li className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4" key={row.businessDate + '/' + row.recordNumber}>
               <div>
                 <p className="font-medium">{row.outcome.replaceAll('_', ' ')}</p>
-                <p className="text-sm text-gray-600">{row.businessDate}</p>
+                <p className="text-sm text-ink/70">{row.businessDate}</p>
               </div>
               <div>
-                <p className="text-sm text-gray-600">Payment ID</p>
+                <p className="text-sm text-ink/70">Payment ID</p>
                 <p className="break-all">{row.paymentId}</p>
               </div>
               <div>
-                <p className="text-sm text-gray-600">Expected and observed amount</p>
+                <p className="text-sm text-ink/70">Expected and observed amount</p>
                 <p>{amount(row.expectedAmountMinor)} / {amount(row.observedAmountMinor)}</p>
               </div>
               <div>
-                <p className="text-sm text-gray-600">Clearing reference</p>
+                <p className="text-sm text-ink/70">Clearing reference</p>
                 <p>{row.observedReference ?? 'Unavailable'}</p>
               </div>
             </li>

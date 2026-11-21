@@ -10,13 +10,17 @@ import (
 	disputesv1 "github.com/dipjyotimetia/distributed-systems/backend/disputes-service/internal/generated/disputes/v1"
 	"github.com/dipjyotimetia/distributed-systems/backend/disputes-service/internal/postgres"
 	"go.opentelemetry.io/otel"
+	enumspb "go.temporal.io/api/enums/v1"
 	"go.temporal.io/api/serviceerror"
+	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/workflow"
 )
 
 const investigationWorkflow = "investigateDisputeV1"
 const advanceActivity = "advanceInvestigationV1"
 const changedSignal = "caseChangedV1"
+const aiBankingQueue = "ai-banking"
+const disputeResearchWorkflow = "disputeResearchV1"
 
 func investigateDispute(ctx workflow.Context, input *disputesv1.CaseRevision) error {
 	ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{StartToCloseTimeout: 10 * time.Second})
@@ -51,6 +55,10 @@ func investigateDispute(ctx workflow.Context, input *disputesv1.CaseRevision) er
 }
 
 func advance(ctx context.Context, store *postgres.Store, input *disputesv1.CaseRevision) (*disputesv1.InvestigationState, error) {
+	return advanceWithAI(ctx, store, nil, input)
+}
+
+func advanceWithAI(ctx context.Context, store *postgres.Store, temporal WorkflowStarter, input *disputesv1.CaseRevision) (*disputesv1.InvestigationState, error) {
 	ctx, span := otel.Tracer("disputes").Start(ctx, "disputes.advanceInvestigation")
 	defer span.End()
 	resolved, deadline, err := store.Advance(ctx, input.GetCaseId())
@@ -58,11 +66,46 @@ func advance(ctx context.Context, store *postgres.Store, input *disputesv1.CaseR
 		span.RecordError(err)
 		return nil, err
 	}
+	if !resolved && temporal != nil {
+		if err := maybeStartAiResearch(ctx, store, temporal, input.GetCaseId()); err != nil {
+			// Research is best-effort; investigation continues without blocking money paths.
+			span.RecordError(err)
+		}
+	}
 	state := &disputesv1.InvestigationState{Resolved: resolved}
 	if deadline != nil {
 		state.NextDeadlineEpochMillis = deadline.Add(time.Millisecond - time.Nanosecond).UnixMilli()
 	}
 	return state, nil
+}
+
+// disputeResearchInput matches the Python DisputeResearchInput JSON field names.
+type disputeResearchInput struct {
+	CaseID int64  `json:"case_id"`
+	Locale string `json:"locale"`
+}
+
+func maybeStartAiResearch(ctx context.Context, store *postgres.Store, temporal WorkflowStarter, caseID int64) error {
+	needed, err := store.NeedsAiDraft(ctx, caseID)
+	if err != nil || !needed {
+		return err
+	}
+	// ALLOW_DUPLICATE_FAILED_ONLY so a crashed/failed research run can be retried
+	// when NeedsAiDraft is still true; a successful completed run is not restarted.
+	_, err = temporal.ExecuteWorkflow(ctx, client.StartWorkflowOptions{
+		ID:                    fmt.Sprintf("dispute-ai-%d", caseID),
+		TaskQueue:             aiBankingQueue,
+		WorkflowIDReusePolicy: enumspb.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE_FAILED_ONLY,
+		WorkflowExecutionErrorWhenAlreadyStarted: true,
+	}, disputeResearchWorkflow, disputeResearchInput{
+		CaseID: caseID,
+		Locale: "en-US",
+	})
+	var alreadyStarted *serviceerror.WorkflowExecutionAlreadyStarted
+	if errors.As(err, &alreadyStarted) {
+		return nil
+	}
+	return err
 }
 
 type signalClient interface {

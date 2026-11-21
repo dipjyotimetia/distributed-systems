@@ -1,16 +1,22 @@
 import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import CardsPage from '../page';
+import { AccountsAPI } from '@/lib/api/accounts';
 
 jest.mock('@/components/auth/ProtectedRoute', () => ({ children }: { children: ReactNode }) => children);
 jest.mock('@/components/layout/AuthenticatedLayout', () => ({ children }: { children: ReactNode }) => children);
+jest.mock('@/lib/api/accounts', () => ({ AccountsAPI: { getAccounts: jest.fn() } }));
 
 const fetchMock = jest.fn();
 const originalFetch = global.fetch;
 
+const getAccounts = jest.mocked(AccountsAPI.getAccounts);
+
 beforeEach(() => {
   fetchMock.mockReset();
   global.fetch = fetchMock;
+  getAccounts.mockReset();
+  getAccounts.mockResolvedValue({ success: true, data: [] });
 });
 afterAll(() => { global.fetch = originalFetch; });
 

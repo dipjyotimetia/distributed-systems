@@ -19,8 +19,8 @@ const links = [
 ];
 
 const operations = [
-  { href: '/operations/disputes', label: 'Dispute queue' },
-  { href: '/operations/kyc', label: 'KYC queue' },
+  { href: '/operations/kyc', label: 'KYC review' },
+  { href: '/operations/disputes', label: 'Dispute review' },
   { href: '/operations/payments', label: 'Payment reconciliation' },
 ];
 
@@ -112,7 +112,7 @@ const Header: React.FC = () => {
               </Link>
             );
           })}
-          <p className="px-3 pb-2 pt-6 text-xs uppercase tracking-[0.16em] text-[#d7b56a]">Operations</p>
+          <p className="px-3 pb-1 pt-6 text-xs font-medium uppercase tracking-[0.16em] text-[#d7b56a]">Operations</p>
           {operations.map((link) => {
             const current = isCurrent(pathname, link.href);
             return (

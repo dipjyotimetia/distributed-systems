@@ -70,6 +70,7 @@ services:
       JWT_SECRET: banking-app-super-secret-key-change-this-in-production-256-bit
       TRANSACTIONS_SERVICE_URL: http://transactions-service:8080
       DISPUTES_OPERATOR_IDS: ${DISPUTES_OPERATOR_IDS:-}
+      DISPUTES_INTERNAL_TOKEN: local-disputes-internal
       OTEL_SERVICE_NAME: disputes-service
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
     healthcheck:
@@ -393,8 +394,18 @@ services:
   ai-service:
     build: ./backend/ai-service
     container_name: banking-ai
+    depends_on:
+      disputes-temporal:
+        condition: service_healthy
     environment:
       - AI_PROVIDER_MODE=fixture
+      - AI_MODE=api
+      - TEMPORAL_ADDRESS=disputes-temporal:7233
+      - DISPUTES_SERVICE_URL=http://disputes-service:8080
+      - DISPUTES_INTERNAL_TOKEN=local-disputes-internal
+      - ACCOUNTS_SERVICE_URL=http://accounts-service:8080
+      - TRANSACTIONS_SERVICE_URL=http://transactions-service:8080
+      - CLAIM_CHECK_DIR=/tmp/ai-claim-check
       - OTEL_SERVICE_NAME=ai-service
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
       - OTEL_RESOURCE_ATTRIBUTES=service.namespace=banking-app
@@ -403,6 +414,36 @@ services:
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health')"]
       interval: 5s
+      timeout: 3s
+      retries: 12
+    networks:
+      - banking-network
+
+  ai-worker:
+    build: ./backend/ai-service
+    container_name: banking-ai-worker
+    depends_on:
+      ai-service:
+        condition: service_healthy
+      disputes-temporal:
+        condition: service_healthy
+    environment:
+      - AI_PROVIDER_MODE=fixture
+      - AI_MODE=worker
+      - TEMPORAL_ADDRESS=disputes-temporal:7233
+      - DISPUTES_SERVICE_URL=http://disputes-service:8080
+      - DISPUTES_INTERNAL_TOKEN=local-disputes-internal
+      - ACCOUNTS_SERVICE_URL=http://accounts-service:8080
+      - TRANSACTIONS_SERVICE_URL=http://transactions-service:8080
+      - CLAIM_CHECK_DIR=/tmp/ai-claim-check
+      - OTEL_SERVICE_NAME=ai-worker
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
+      - OTEL_RESOURCE_ATTRIBUTES=service.namespace=banking-app
+    ports:
+      - "8085:8080"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health')"]
+      interval: 10s
       timeout: 3s
       retries: 12
     networks:

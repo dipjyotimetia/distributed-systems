@@ -26,7 +26,8 @@ ALTER TABLE disputes.cases
     ADD COLUMN IF NOT EXISTS revision bigint NOT NULL DEFAULT 0,
     ADD COLUMN IF NOT EXISTS evidence jsonb,
     ADD COLUMN IF NOT EXISTS evidence_deadline timestamptz,
-    ADD COLUMN IF NOT EXISTS evidence_closed_at timestamptz;
+    ADD COLUMN IF NOT EXISTS evidence_closed_at timestamptz,
+    ADD COLUMN IF NOT EXISTS ai_draft jsonb;
 
 CREATE TABLE IF NOT EXISTS disputes.signal_outbox (
     case_id bigint PRIMARY KEY REFERENCES disputes.cases (id) ON DELETE CASCADE,

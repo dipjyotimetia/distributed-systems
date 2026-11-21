@@ -68,8 +68,15 @@ const TransferPage: React.FC = () => {
     }
   }, [fromAccountId, isDemoTransfer]);
 
+  const movementLocked = fromAccount != null && fromAccount.status !== 'ACTIVE';
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (movementLocked) {
+      setError(`This account is ${fromAccount?.status.toLowerCase()} and cannot move money.`);
+      return;
+    }
     
     if (!amount || parseFloat(amount) <= 0) {
       setError('Please enter a valid amount');
@@ -242,6 +249,11 @@ const TransferPage: React.FC = () => {
                 <h3 className="text-lg font-medium text-ink">Transfer Details</h3>
               </div>
               <form onSubmit={handleSubmit} className="p-6 space-y-6">
+                {movementLocked && (
+                  <p role="alert" className="rounded-2xl border border-line bg-[#f6f1e6] px-4 py-3 text-sm text-ink">
+                    This account is {fromAccount?.status.toLowerCase()} and cannot send a transfer.
+                  </p>
+                )}
                 {error && (
                   <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                     <div className="flex">
@@ -328,7 +340,7 @@ const TransferPage: React.FC = () => {
                   <Button
                     variant="primary"
                     type="submit"
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || movementLocked}
                     className="min-w-[120px]"
                   >
                     {isSubmitting ? (

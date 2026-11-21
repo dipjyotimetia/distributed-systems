@@ -1,92 +1,149 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
-import Link from 'next/link';
+import React, { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import AuthenticatedLayout from '@/components/layout/AuthenticatedLayout';
-import PageHeader from '@/components/ui/PageHeader';
 import Button from '@/components/ui/Button';
-import { AccountsAPI, type CreateAccountRequest } from '@/lib/api/accounts';
+import Input from '@/components/ui/Input';
+import PageHeader from '@/components/ui/PageHeader';
+import { AccountsAPI } from '@/lib/api/accounts';
+import { createAccountSchema } from '@/lib/utils/validation';
 
 const accountTypes = ['CHECKING', 'SAVINGS', 'CREDIT', 'INVESTMENT'] as const;
-const fieldClass = 'mt-1 w-full rounded-xl border border-line bg-surface p-2.5 text-ink focus:border-brass focus:outline-none focus:ring-2 focus:ring-brass';
 
-export default function NewAccountPage() {
+const CreateAccountPage: React.FC = () => {
+  const router = useRouter();
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm({
+    resolver: zodResolver(createAccountSchema),
+    defaultValues: {
+      accountType: 'CHECKING',
+      currency: 'USD',
+    },
+  });
+
+  const onSubmit = async (data: {
+    accountType: 'CHECKING' | 'SAVINGS' | 'CREDIT' | 'INVESTMENT';
+    currency: string;
+    initialBalance?: number;
+  }) => {
+    setSubmitError(null);
+    const response = await AccountsAPI.createAccount({
+      accountType: data.accountType,
+      currency: data.currency,
+      ...(data.initialBalance === undefined
+        ? {}
+        : { initialBalance: data.initialBalance }),
+    });
+
+    if (response.success && response.data) {
+      router.push(`/accounts/${response.data.id}`);
+      return;
+    }
+
+    setSubmitError(response.message || 'The account could not be created.');
+  };
+
   return (
-    <ProtectedRoute>
+    <ProtectedRoute requireAuth={true}>
       <AuthenticatedLayout>
-        <CreateAccountForm />
+        <div className='mx-auto max-w-lg'>
+          <PageHeader
+            eyebrow='Accounts'
+            title='Open an account'
+            description='Choose a type, an opening balance, and a currency. Use AUD if you plan to send outbound payments.'
+          />
+
+          <form
+            onSubmit={handleSubmit(onSubmit)}
+            className='space-y-5 rounded-3xl border border-line bg-surface p-6'
+            noValidate
+          >
+            {submitError && (
+              <p
+                role='alert'
+                className='rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800'
+              >
+                {submitError}
+              </p>
+            )}
+
+            <div className='space-y-1'>
+              <label
+                htmlFor='accountType'
+                className='block text-sm font-medium text-ink'
+              >
+                Account type
+              </label>
+              <select
+                id='accountType'
+                className='block w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-ink focus:border-brass focus:outline-none focus:ring-2 focus:ring-brass'
+                {...register('accountType')}
+              >
+                {accountTypes.map(type => (
+                  <option key={type} value={type}>
+                    {type.charAt(0) + type.slice(1).toLowerCase()}
+                  </option>
+                ))}
+              </select>
+              {errors.accountType && (
+                <p className='text-sm text-red-600'>
+                  {errors.accountType.message}
+                </p>
+              )}
+            </div>
+
+            <Input
+              id='initialBalance'
+              label='Opening balance'
+              type='number'
+              step='0.01'
+              min='0'
+              placeholder='0.00'
+              helperText='Optional. Leave blank to open the account at zero.'
+              error={errors.initialBalance?.message}
+              {...register('initialBalance', {
+                setValueAs: (value: string) =>
+                  value === '' || value == null ? undefined : Number(value),
+              })}
+            />
+
+            <Input
+              id='currency'
+              label='Currency'
+              maxLength={3}
+              autoCapitalize='characters'
+              helperText='Three-letter code. USD is the default. AUD is used for outbound payments.'
+              error={errors.currency?.message}
+              {...register('currency', {
+                setValueAs: (value: string) => (value ?? '').toUpperCase(),
+              })}
+            />
+
+            <div className='flex flex-wrap gap-3 pt-2'>
+              <Button type='submit' isLoading={isSubmitting}>
+                {isSubmitting ? 'Opening account' : 'Open account'}
+              </Button>
+              <Link
+                href='/accounts'
+                className='inline-flex items-center justify-center rounded-full border border-line bg-surface px-4 py-2 text-base font-medium text-ink hover:bg-[#f6f1e6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brass'
+              >
+                Cancel
+              </Link>
+            </div>
+          </form>
+        </div>
       </AuthenticatedLayout>
     </ProtectedRoute>
   );
-}
+};
 
-function CreateAccountForm() {
-  const router = useRouter();
-  const [error, setError] = useState('');
-  const [pending, setPending] = useState(false);
-
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const data = new FormData(event.currentTarget);
-    const accountType = String(data.get('accountType')) as CreateAccountRequest['accountType'];
-    const balanceText = String(data.get('initialBalance') || '').trim();
-    const currency = String(data.get('currency') || '').trim();
-    const initialBalance = balanceText === '' ? undefined : Number(balanceText);
-    if (initialBalance != null && (!Number.isFinite(initialBalance) || initialBalance < 0)) {
-      setError('Opening balance cannot be negative.');
-      return;
-    }
-    if (currency && !/^[A-Z]{3}$/.test(currency)) {
-      setError('Currency must be a three-letter uppercase code.');
-      return;
-    }
-    setPending(true);
-    setError('');
-    const response = await AccountsAPI.createAccount({
-      accountType,
-      ...(initialBalance != null ? { initialBalance } : {}),
-      ...(currency ? { currency } : {}),
-    });
-    setPending(false);
-    if (!response.success || !response.data) {
-      setError(response.message || 'Account was not created');
-      return;
-    }
-    router.push(`/accounts/${response.data.id}`);
-  }
-
-  return (
-    <div className="mx-auto max-w-xl">
-      <PageHeader
-        eyebrow="Accounts"
-        title="Create an account"
-        description="Open a checking, savings, credit, or investment account."
-      />
-      <form onSubmit={submit} className="space-y-4 rounded-3xl border border-line bg-surface p-5 sm:p-8">
-        {error && <p role="alert" className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p>}
-        <label className="block text-sm font-medium text-ink">
-          Account type
-          <select name="accountType" className={fieldClass} defaultValue="CHECKING" required>
-            {accountTypes.map((type) => <option key={type} value={type}>{type}</option>)}
-          </select>
-        </label>
-        <label className="block text-sm font-medium text-ink">
-          Opening balance
-          <input name="initialBalance" type="number" min="0" step="0.01" className={fieldClass} />
-        </label>
-        <label className="block text-sm font-medium text-ink">
-          Currency
-          <input name="currency" maxLength={3} placeholder="USD" className={fieldClass} />
-        </label>
-        <div className="flex flex-wrap gap-3">
-          <Button type="submit" disabled={pending}>{pending ? 'Creating account' : 'Create account'}</Button>
-          <Link href="/accounts" className="inline-flex items-center rounded-full border border-line px-4 py-2 text-sm font-medium text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brass">
-            Cancel
-          </Link>
-        </div>
-      </form>
-    </div>
-  );
-}
+export default CreateAccountPage;

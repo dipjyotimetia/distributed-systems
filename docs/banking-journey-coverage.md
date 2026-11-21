@@ -21,6 +21,8 @@ cards rows are Next.js HTTP adapters over the Buf clients generated from
 | GET `/api/accounts/summary` | Count owned accounts by type and active status and sum balances | Temporal, service integration | `LedgerJourney.VerifyAccounts` verifies scoped count, type and exact balance |
 | GET `/api/ai/chat` | Discover available providers | Temporal | `AIJourney.VerifyAIProviders` checks discovery of all five providers |
 | POST `/api/ai/chat` | Aggregate five providers, preserve locale, and handle provider failures | Temporal | `AIJourney.VerifyAIChat` checks locale, five successes, one failure and five failures against fixture responses |
+| POST `/api/ai/chat` (`mode=agent`) | Durable Temporal banking agent with read-only tools and guardrails | Unit | `backend/ai-service/tests/test_workflows_fixture.py` covers happy path and blocked transfer tools |
+| POST `/api/disputes/research` (ai-service) | Multi-agent dispute research draft persisted via internal disputes API | Unit | `test_dispute_research_workflow_saves_structured_draft` |
 | GET `/api/healthz` | Return frontend health | Temporal startup | `testJourney` checks HTTP 200 from Next.js |
 | GET `/api/transactions` | Return the owned ledger, with optional filters and paging | Temporal, service integration | `LedgerJourney.VerifyLedger` checks the full list and a filtered page |
 | POST `/api/transactions` | Dispatch a supported generic transaction to its operation | Temporal | `LedgerJourney.MoveFunds` dispatches a deposit and verifies the resulting ledger |
