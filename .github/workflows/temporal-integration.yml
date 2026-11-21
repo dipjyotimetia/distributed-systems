@@ -133,12 +133,23 @@ jobs:
           kubectl -n banking-app wait --for=condition=complete job/banking-workflow-bootstrap-v3 --timeout=5m
           kubectl -n banking-app rollout status deployment/banking-kafka --timeout=5m
           broker() { kubectl -n banking-app exec "$@" ; }
+          # Rollout status can return before the Kafka listener accepts connections.
+          for attempt in $(seq 1 30); do
+            if broker deployment/banking-kafka -- rpk cluster info -X brokers=banking-kafka:9092 >/dev/null 2>&1; then
+              break
+            fi
+            if [ "$attempt" -eq 30 ]; then
+              echo "Kafka broker never became reachable" >&2
+              exit 1
+            fi
+            sleep 2
+          done
           broker deployment/banking-kafka -- rpk topic describe transaction-events -X brokers=banking-kafka:9092 ||
             broker deployment/banking-kafka -- rpk topic create transaction-events --partitions 1 --replicas 1 -X brokers=banking-kafka:9092
           broker deployment/banking-kafka -- rpk topic create ci-round-trip --partitions 1 --replicas 1 -X brokers=banking-kafka:9092
           printf 'ci-fixture\n' | broker -i deployment/banking-kafka -- rpk topic produce ci-round-trip -X brokers=banking-kafka:9092
           timeout 30s kubectl -n banking-app exec deployment/banking-kafka -- rpk topic consume ci-round-trip -n 1 -X brokers=banking-kafka:9092 | grep -q ci-fixture
-          for name in banking-postgres banking-kafka redis mongodb banking-frontend banking-user banking-gateway banking-accounts banking-transactions banking-fraud banking-notification banking-ai banking-temporal banking-disputes banking-disputes-worker banking-statement-worker provider-fixtures; do
+          for name in banking-postgres banking-kafka redis mongodb banking-frontend banking-user banking-gateway banking-accounts banking-transactions banking-fraud banking-notification banking-ai banking-ai-worker banking-temporal banking-disputes banking-disputes-worker banking-statement-worker provider-fixtures; do
             kubectl -n banking-app rollout status "deployment/$name" --timeout=5m
           done
           kubectl -n observability rollout status deployment/jaeger --timeout=3m
