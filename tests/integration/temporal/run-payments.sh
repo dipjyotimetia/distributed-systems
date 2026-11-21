@@ -41,10 +41,13 @@ if ! "${compose[@]}" build "${build_services[@]}"; then
 fi
 "${compose[@]}" up -d --wait payments-postgres clearing-postgres clearing-mq disputes-temporal redpanda
 # Choose a future cutoff only after the infrastructure and images are available.
-read -r BANKING_SETTLEMENT_CUTOFF BANKING_SETTLEMENT_BUSINESS_DATE < <(python3 - <<'PY'
+settlement_minutes="${BANKING_SETTLEMENT_WAIT_MINUTES:-3}"
+read -r BANKING_SETTLEMENT_CUTOFF BANKING_SETTLEMENT_BUSINESS_DATE < <(SETTLEMENT_MINUTES="$settlement_minutes" python3 - <<'PY'
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
-end = datetime.now(ZoneInfo("Australia/Sydney")) + timedelta(minutes=6)
+import os
+minutes = int(os.environ.get("SETTLEMENT_MINUTES", "3"))
+end = datetime.now(ZoneInfo("Australia/Sydney")) + timedelta(minutes=minutes)
 print(end.strftime("%H:%M"), end.date().isoformat())
 PY
 )
@@ -64,9 +67,9 @@ jaeger="http://$("${compose[@]}" port jaeger 16686)"
 python3 tests/integration/verify-payment-trace.py "$jaeger" "$MICROSVC_PAYMENT_EVIDENCE"
 
 file_url="$fixtures/settlements-test/settlement/aud/$BANKING_SETTLEMENT_BUSINESS_DATE.dat"
-for ((attempt = 0; attempt < 100; attempt++)); do
+for ((attempt = 0; attempt < 90; attempt++)); do
   if curl -fsS -o /dev/null "$file_url" 2>/dev/null; then break; fi
-  sleep 3
+  sleep 2
 done
 curl -fsS "$file_url" | python3 tests/integration/verify-payment-settlement.py "$evidence"
 "${compose[@]}" run --rm payments-reconciliation

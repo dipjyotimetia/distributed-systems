@@ -1,0 +1,25 @@
+name: Setup Kind
+description: Install a pinned Kind binary release into PATH
+inputs:
+  version:
+    description: Kind release version (without leading v is accepted)
+    required: false
+    default: '0.33.0'
+runs:
+  using: composite
+  steps:
+    - name: Install Kind
+      shell: bash
+      env:
+        KIND_VERSION: ${{ inputs.version }}
+      run: |
+        version="${KIND_VERSION#v}"
+        case "$(uname -m)" in
+          aarch64|arm64) arch=arm64 ;;
+          *) arch=amd64 ;;
+        esac
+        dest="${RUNNER_TEMP:-/tmp}/kind"
+        curl -fsSL "https://github.com/kubernetes-sigs/kind/releases/download/v${version}/kind-linux-${arch}" -o "$dest"
+        chmod +x "$dest"
+        sudo mv "$dest" /usr/local/bin/kind
+        kind version

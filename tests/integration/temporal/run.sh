@@ -4,6 +4,11 @@ set -euo pipefail
 cd "$(dirname "$0")/../../.."
 suite=tests/integration/temporal
 if [[ -z "${MICROSVC_SCENARIO:-}" ]]; then
+  # Orchestrate scenarios on one project name so Docker layer/image cache is
+  # retained. Volumes are still recreated per scenario for isolation; images are
+  # kept (no --rmi local) via MICROSVC_KEEP_IMAGES.
+  export MICROSVC_SHARED_PROJECT="${MICROSVC_SHARED_PROJECT:-temporal-$(openssl rand -hex 8)}"
+  export MICROSVC_KEEP_IMAGES=1
   status=0
   MICROSVC_SCENARIO=transfer-worker-replacement bash "$suite/run.sh" || status=$?
   if [[ -z "${TEMPORAL_TEST_UI_PORT:-}" ]]; then
@@ -16,6 +21,9 @@ if [[ -z "${MICROSVC_SCENARIO:-}" ]]; then
       MICROSVC_SCENARIO=disputes MICROSVC_REPORT_SUFFIX="${MICROSVC_REPORT:+disputes}" bash "$suite/run.sh" || status=$?
     fi
   fi
+  # Final image sweep once all scenarios finished.
+  docker compose -p "$MICROSVC_SHARED_PROJECT" -f docker-compose.yml -f "$suite/stack/compose.yml" \
+    down --volumes --remove-orphans --rmi local >/dev/null 2>&1 || true
   exit "$status"
 fi
 if [[ "$MICROSVC_SCENARIO" == statement-export ]]; then
@@ -24,7 +32,7 @@ fi
 if [[ "$MICROSVC_SCENARIO" == consumer-recovery ]]; then
   export MICROSVC_FAILED_PROVIDER=slack
 fi
-project="temporal-$(openssl rand -hex 8)"
+project="${MICROSVC_SHARED_PROJECT:-temporal-$(openssl rand -hex 8)}"
 report="${MICROSVC_REPORT:-$PWD/$suite/results/$project.json}"
 if [[ -n "${MICROSVC_REPORT_SUFFIX:-}" ]]; then
   report="${report%.json}-$MICROSVC_REPORT_SUFFIX.json"
@@ -52,7 +60,12 @@ cleanup() {
       "${compose[@]}" logs --tail 40 postgres disputes-schema disputes-service disputes-worker disputes-temporal statement-worker || true
     fi
   fi
-  if ! "${compose[@]}" down --volumes --remove-orphans --rmi local; then
+  # Keep images across orchestrated scenarios; only drop volumes/containers.
+  local -a down_args=(--volumes --remove-orphans)
+  if [[ "${MICROSVC_KEEP_IMAGES:-0}" != 1 ]]; then
+    down_args+=(--rmi local)
+  fi
+  if ! "${compose[@]}" down "${down_args[@]}"; then
     cleanup_passed=false
     if [[ "$status" == 0 ]]; then
       status=1

@@ -7,8 +7,15 @@ generated="$(mktemp -d)"
 trap 'rm -rf "$generated"' EXIT
 version=7.14.0
 artifact="openapi-generator-cli-$version.jar"
-curl -fsS --retry 3 "https://repo.maven.apache.org/maven2/org/openapitools/openapi-generator-cli/$version/$artifact" \
-  -o "$generated/$artifact"
+cache_dir="${OPENAPI_GENERATOR_CACHE:-${XDG_CACHE_HOME:-$HOME/.cache}/openapi-generator}"
+mkdir -p "$cache_dir"
+jar="$cache_dir/$artifact"
+if [[ ! -f "$jar" ]]; then
+  curl -fsS --retry 3 "https://repo.maven.apache.org/maven2/org/openapitools/openapi-generator-cli/$version/$artifact" \
+    -o "$jar.partial"
+  mv "$jar.partial" "$jar"
+fi
+cp "$jar" "$generated/$artifact"
 for spec in transactions accounts payments; do
   java -jar "$generated/$artifact" generate \
     -i "contracts/openapi/$spec.yaml" -g typescript-fetch -o "$generated/$spec" \

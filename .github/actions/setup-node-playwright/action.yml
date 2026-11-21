@@ -1,0 +1,43 @@
+name: Setup Node and Playwright
+description: Install Node.js, npm deps, and Chromium with browser cache
+inputs:
+  working-directory:
+    description: Frontend directory
+    required: false
+    default: frontend
+  install-deps:
+    description: Whether to apt-install Playwright OS deps
+    required: false
+    default: 'true'
+runs:
+  using: composite
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v7.1.0
+      with:
+        node-version: '26.13.1'
+        cache: npm
+        cache-dependency-path: ${{ inputs.working-directory }}/package-lock.json
+    - name: Cache Playwright browsers
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-${{ runner.os }}-${{ hashFiles(format('{0}/package-lock.json', inputs.working-directory)) }}
+        restore-keys: |
+          playwright-${{ runner.os }}-
+    - name: Install npm dependencies
+      working-directory: ${{ inputs.working-directory }}
+      shell: bash
+      run: npm ci
+    - name: Install Playwright Chromium
+      working-directory: ${{ inputs.working-directory }}
+      shell: bash
+      run: |
+        if [[ "${{ inputs.install-deps }}" == "true" ]]; then
+          if [[ -f /etc/apt/sources.list.d/ubuntu.sources ]]; then
+            sudo sed -i 's|http://\(archive\|security\).ubuntu.com/ubuntu|https://\1.ubuntu.com/ubuntu|g' /etc/apt/sources.list.d/ubuntu.sources || true
+          fi
+          npx playwright install --with-deps chromium
+        else
+          npx playwright install chromium
+        fi

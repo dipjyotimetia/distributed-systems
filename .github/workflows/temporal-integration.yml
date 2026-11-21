@@ -1,12 +1,29 @@
 name: Temporal integration
 on:
   pull_request:
+    paths:
+      - '.github/workflows/temporal-integration.yml'
+      - 'backend/**'
+      - 'frontend/**'
+      - 'docker-compose.yml'
+      - 'docker-compose.*.yml'
+      - 'kubernetes/testing/**'
+      - 'kubernetes/observability/**'
+      - 'tests/integration/**'
+      - 'scripts/ci/**'
+      - 'scripts/proxymock/**'
+      - 'Makefile'
   workflow_dispatch:
   schedule:
     - cron: '35 18 * * 2'
 
+concurrency:
+  group: temporal-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: read
+  actions: write
 
 jobs:
   temporal-integration:
@@ -21,25 +38,10 @@ jobs:
       - name: Test harness
         working-directory: tests/integration/temporal
         run: go test ./...
-      - uses: actions/setup-node@v7.1.0
-        with:
-          node-version: '26.13.1'
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-      - name: Install browser test dependencies
-        working-directory: frontend
-        run: |
-          npm ci
-          sudo sed -i 's|http://\(archive\|security\).ubuntu.com/ubuntu|https://\1.ubuntu.com/ubuntu|g' /etc/apt/sources.list.d/ubuntu.sources
-          npx playwright install --with-deps chromium
+      - uses: ./.github/actions/setup-node-playwright
       - name: Run banking journeys and browser session check
         env:
           MICROSVC_BROWSER: '1'
-        run: make test-integration-temporal
-      - name: Run extended consumer recovery
-        if: github.event_name != 'pull_request'
-        env:
-          MICROSVC_SCENARIO: consumer-recovery
         run: make test-integration-temporal
       - uses: actions/upload-artifact@v7.0.2
         if: always()
@@ -70,11 +72,14 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7.0.1
-      - uses: actions/setup-java@v6.3.0
+      - uses: ./.github/actions/setup-java-gradle
+      - name: Cache proxymock binary
+        uses: actions/cache@v4
         with:
-          distribution: temurin
-          java-version: '25'
-      - uses: gradle/actions/setup-gradle@v5
+          path: ~/.speedscale
+          key: proxymock-${{ runner.os }}-v1
+          restore-keys: |
+            proxymock-${{ runner.os }}-
       - name: Run existing gateway replay when authorized
         env:
           PROXYMOCK_API_KEY: ${{ secrets.PROXYMOCK_API_KEY }}
@@ -83,7 +88,11 @@ jobs:
             echo 'Traffic replay skipped because PROXYMOCK_API_KEY is unavailable.' >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
-          curl -Lfs https://downloads.speedscale.com/proxymock/install-proxymock | sh
+          export PATH="${HOME}/.speedscale:${PATH}"
+          if ! command -v proxymock >/dev/null 2>&1; then
+            curl -Lfs https://downloads.speedscale.com/proxymock/install-proxymock | sh
+          fi
+          echo "${HOME}/.speedscale" >> "$GITHUB_PATH"
           PROXYMOCK_REQUIRED=1 make proxymock-replay
 
   kubernetes-smoke:
@@ -91,54 +100,15 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7.0.1
-      - uses: actions/setup-go@v7.1.0
-        with:
-          go-version-file: tests/integration/temporal/go.mod
-          cache: false
-      - name: Build the services used by the smoke test
+      - uses: docker/setup-buildx-action@v4.4.1
+      - uses: ./.github/actions/setup-kind
+      - name: Build and load Kind images
         env:
-          DOCKER_BUILDKIT: "1"
+          DOCKER_BUILDKIT: '1'
+          KIND_CLUSTER_NAME: banking-journeys
         run: |
-          build_with_retry() {
-            image="$1"
-            shift
-            attempt=1
-            while [ "$attempt" -le 5 ]; do
-              echo "::group::docker build $image (attempt $attempt)"
-              # Rotate BuildKit gradle cache id on retry so a poisoned module
-              # metadata cache from a prior Maven miss cannot fail-fast forever.
-              if docker build -t "$image" --build-arg "GRADLE_CACHE_SUFFIX=r${attempt}" "$@"; then
-                echo "::endgroup::"
-                return 0
-              fi
-              echo "::endgroup::"
-              echo "docker build failed for $image on attempt $attempt"
-              if [ "$attempt" -eq 5 ]; then
-                return 1
-              fi
-              sleep $((attempt * 15))
-              attempt=$((attempt + 1))
-            done
-          }
-          for service in api-gateway accounts-service user-service transactions-service fraud-service notification-service ai-service disputes-service; do
-            image="microsvc-journeys/$service:checkout"
-            args=("backend/$service")
-            case "$service" in accounts-service|api-gateway|payments-service|transactions-service) args=(-f "backend/$service/Dockerfile" .) ;; esac
-            build_with_retry "$image" "${args[@]}"
-          done
-          build_with_retry microsvc-journeys/frontend:checkout frontend
-          build_with_retry microsvc-journeys/provider-fixtures:checkout -f tests/integration/temporal/stack/Dockerfile .
-      - name: Create Kind cluster
-        run: |
-          go install sigs.k8s.io/kind@v0.33.0
-          "$(go env GOPATH)/bin/kind" create cluster --name banking-journeys --wait 120s
-          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
-      - name: Load the services used by the smoke test
-        run: |
-          for service in api-gateway accounts-service user-service transactions-service fraud-service notification-service ai-service disputes-service frontend; do
-            kind load docker-image "microsvc-journeys/$service:checkout" --name banking-journeys
-          done
-          kind load docker-image microsvc-journeys/provider-fixtures:checkout --name banking-journeys
+          kind create cluster --name "$KIND_CLUSTER_NAME" --wait 120s
+          bash scripts/ci/build-and-load-kind-images.sh "$KIND_CLUSTER_NAME" smoke
       - name: Deploy and check smoke and trace propagation
         run: |
           kubectl apply -k kubernetes/observability
