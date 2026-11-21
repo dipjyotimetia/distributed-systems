@@ -1,11 +1,11 @@
 package main
 
 import (
+	researchv1 "github.com/dipjyotimetia/distributed-systems/backend/disputes-service/gen/disputes/research/v1"
+	transactionsv1 "github.com/dipjyotimetia/distributed-systems/backend/disputes-service/gen/transactions/v1"
 	"github.com/dipjyotimetia/distributed-systems/backend/disputes-service/internal/httpapi"
 	"github.com/dipjyotimetia/distributed-systems/backend/disputes-service/internal/postgres"
 	"github.com/dipjyotimetia/distributed-systems/backend/disputes-service/internal/temporal"
-	researchv1 "github.com/dipjyotimetia/distributed-systems/backend/disputes-service/gen/disputes/research/v1"
-	transactionsv1 "github.com/dipjyotimetia/distributed-systems/backend/disputes-service/gen/transactions/v1"
 
 	"context"
 	"database/sql"
@@ -32,24 +32,33 @@ import (
 )
 
 func main() {
-	if len(os.Args) == 2 && os.Args[1] == "healthcheck" {
-		probe := &http.Client{Timeout: 2 * time.Second}
-		res, err := probe.Get("http://localhost:8080/api/v1/health")
-		if err != nil {
-			os.Exit(1)
-		}
-		res.Body.Close()
-		if res.StatusCode != 200 {
-			os.Exit(1)
-		}
-		return
+	os.Exit(execute(os.Args[1:]))
+}
+
+func execute(args []string) int {
+	if len(args) == 1 && args[0] == "healthcheck" {
+		return probeHealth()
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	if err := run(ctx, os.Getenv("DISPUTES_MODE")); err != nil {
 		slog.Error("Disputes process stopped", "error", err)
-		os.Exit(1)
+		return 1
 	}
+	return 0
+}
+
+func probeHealth() int {
+	probe := &http.Client{Timeout: 2 * time.Second}
+	res, err := probe.Get("http://localhost:8080/api/v1/health")
+	if err != nil {
+		return 1
+	}
+	res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		return 1
+	}
+	return 0
 }
 
 func run(ctx context.Context, mode string) error {

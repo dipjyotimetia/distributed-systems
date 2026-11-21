@@ -11,8 +11,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -21,9 +23,9 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	enumspb "go.temporal.io/api/enums/v1"
+	"go.temporal.io/api/serviceerror"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"go.temporal.io/api/serviceerror"
 
 	disputesv1 "github.com/dipjyotimetia/distributed-systems/backend/disputes-service/internal/generated/disputes/v1"
 	"go.temporal.io/sdk/client"
@@ -437,6 +439,114 @@ func migrateTestDatabase(t *testing.T, db *sql.DB) {
 		t.Fatal(err)
 	}
 	if _, err := db.Exec("CREATE SCHEMA IF NOT EXISTS disputes;" + string(schema)); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestProcessStartup(t *testing.T) {
+	if execute([]string{"healthcheck"}) != 1 {
+		t.Fatal("healthcheck succeeded while the port was closed")
+	}
+	t.Setenv("DATABASE_URL", "")
+	if execute(nil) != 1 {
+		t.Fatal("process started without DATABASE_URL")
+	}
+
+	down := serveStatus(t, http.StatusServiceUnavailable)
+	if probeHealth() != 1 {
+		t.Fatal("unhealthy probe was accepted")
+	}
+	bindCtx, cancelBind := context.WithTimeout(context.Background(), time.Second)
+	defer cancelBind()
+	if err := serve(bindCtx, http.NewServeMux()); err == nil {
+		t.Fatal("HTTP server bound a port that was already taken")
+	}
+	closeServer(t, down)
+	up := serveStatus(t, http.StatusOK)
+	defer closeServer(t, up)
+	if execute([]string{"healthcheck"}) != 0 {
+		t.Fatal("healthy probe failed")
+	}
+
+	dsn := os.Getenv("DISPUTES_TEST_DATABASE_URL")
+	if dsn == "" {
+		t.Skip("DISPUTES_TEST_DATABASE_URL is required for startup configuration tests")
+	}
+	t.Setenv("OTEL_SDK_DISABLED", "false")
+	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "127.0.0.1:4317")
+	t.Setenv("DATABASE_URL", dsn)
+	t.Setenv("JWT_SECRET", "short")
+	t.Setenv("TRANSACTIONS_GRPC_ADDRESS", "127.0.0.1:9095")
+	t.Setenv("DISPUTES_OPERATOR_IDS", "8")
+	t.Setenv("DISPUTES_TEST_ESCALATION_DELAY", "1s")
+	if err := run(context.Background(), "api"); err == nil || !strings.Contains(err.Error(), "JWT_SECRET") {
+		t.Fatalf("short secret: %v", err)
+	}
+	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
+	t.Setenv("JWT_SECRET", string(testKey))
+	t.Setenv("TRANSACTIONS_GRPC_ADDRESS", "")
+	if err := run(context.Background(), "api"); err == nil {
+		t.Fatal("missing transactions address accepted")
+	}
+	t.Setenv("TRANSACTIONS_GRPC_ADDRESS", "127.0.0.1:9095")
+	t.Setenv("DISPUTES_OPERATOR_IDS", "nope")
+	if err := run(context.Background(), "api"); err == nil {
+		t.Fatal("invalid operator list accepted")
+	}
+	t.Setenv("DISPUTES_OPERATOR_IDS", "8")
+	t.Setenv("DISPUTES_TEST_ESCALATION_DELAY", "-1s")
+	if err := run(context.Background(), "api"); err == nil {
+		t.Fatal("negative escalation delay accepted")
+	}
+	t.Setenv("DISPUTES_TEST_ESCALATION_DELAY", "1s")
+	missing, err := url.Parse(dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	missing.Path = "/disputes_missing"
+	t.Setenv("DATABASE_URL", missing.String())
+	if err := run(context.Background(), "api"); err == nil || !strings.Contains(err.Error(), "check dispute schema") {
+		t.Fatalf("missing schema: %v", err)
+	}
+	db, err := sql.Open("pgx", dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	migrateTestDatabase(t, db)
+	t.Setenv("DATABASE_URL", dsn)
+	t.Setenv("DISPUTES_GRPC_PORT", "70000")
+	if err := run(context.Background(), "api"); err == nil {
+		t.Fatal("invalid research port accepted")
+	}
+	if err := run(context.Background(), "invalid"); err == nil {
+		t.Fatal("invalid mode accepted")
+	}
+}
+
+func serveStatus(t *testing.T, code int) *http.Server {
+	t.Helper()
+	server := &http.Server{Addr: ":8080", Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(code)
+	})}
+	go func() { _ = server.ListenAndServe() }()
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		conn, err := net.Dial("tcp", "127.0.0.1:8080")
+		if err == nil {
+			conn.Close()
+			return server
+		}
+		if time.Now().After(deadline) {
+			t.Fatal(err)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+func closeServer(t *testing.T, server *http.Server) {
+	t.Helper()
+	if err := server.Close(); err != nil {
 		t.Fatal(err)
 	}
 }

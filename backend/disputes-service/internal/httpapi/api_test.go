@@ -9,7 +9,9 @@ import (
 	"testing"
 	"time"
 
+	transactionsv1 "github.com/dipjyotimetia/distributed-systems/backend/disputes-service/gen/transactions/v1"
 	"github.com/golang-jwt/jwt/v5"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -95,6 +97,27 @@ func (s scriptedLookup) Lookup(_ context.Context, authorization string, _ int64)
 		return TransferView{}, s.err
 	}
 	return s.view, s.err
+}
+
+type stubTransactions struct {
+	view *transactionsv1.TransactionView
+	err  error
+}
+
+func (s stubTransactions) GetTransaction(context.Context, *transactionsv1.GetTransactionRequest, ...grpc.CallOption) (*transactionsv1.TransactionView, error) {
+	return s.view, s.err
+}
+
+func TestTransactionLookup(t *testing.T) {
+	query := Query{Client: stubTransactions{err: status.Error(codes.Unavailable, "down")}}
+	if _, err := query.Lookup(context.Background(), "Bearer token", 4); err == nil {
+		t.Fatal("lookup error was ignored")
+	}
+	query.Client = stubTransactions{view: &transactionsv1.TransactionView{Id: 4, UserId: 7, Type: "TRANSFER", Status: "COMPLETED"}}
+	view, err := query.Lookup(context.Background(), "Bearer token", 4)
+	if err != nil || view.ID != 4 || view.UserID != 7 || view.Type != "TRANSFER" || view.Status != "COMPLETED" {
+		t.Fatalf("lookup view %+v, %v", view, err)
+	}
 }
 
 func TestTransferEligibility(t *testing.T) {
