@@ -28,3 +28,9 @@ if count == 0 and new not in text:
     raise SystemExit("transactions client no longer unmarshals HTTP 400 into Rejection")
 path.write_text(text.replace(old, new))
 PY
+
+companion="tests/integration/temporal/openapi/transactions/rejection.go"
+dest="$root/transactions/rejection.go"
+if [[ ! -e "$dest" || ! "$companion" -ef "$dest" ]]; then
+  cp "$companion" "$dest"
+fi
