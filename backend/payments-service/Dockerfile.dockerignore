@@ -8,4 +8,6 @@
 !backend/*/build.gradle.kts
 !backend/*/gradle.properties
 !backend/payments-service/src/**
-!proto/fraud/**
+!contracts/openapi/payments.yaml
+!contracts/proto/fraud/**
+!contracts/proto/ledger/**

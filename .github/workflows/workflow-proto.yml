@@ -59,10 +59,10 @@ jobs:
         run: |
           generated="$(mktemp -d)"
           module=github.com/dipjyotimetia/distributed-systems/backend/fraud-service
-          protoc -I proto/fraud \
+          protoc -I contracts/proto/fraud \
             --go_out="$generated" --go_opt=module="$module" \
             --go-grpc_out="$generated" --go-grpc_opt=module="$module" \
-            proto/fraud/fraud.proto
+            contracts/proto/fraud/fraud.proto
           diff -ru backend/fraud-service/gen "$generated/gen"
       - uses: actions/setup-node@v7.1.0
         with:
@@ -88,7 +88,10 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
-          if git cat-file -e "${BASE_SHA}:proto/workflows/buf.yaml"; then
+          if git cat-file -e "${BASE_SHA}:contracts/proto/workflows/buf.yaml"; then
+            git archive "$BASE_SHA" contracts/proto/workflows | tar -x -C "$RUNNER_TEMP"
+            buf breaking contracts/proto/workflows --against "$RUNNER_TEMP/contracts/proto/workflows"
+          elif git cat-file -e "${BASE_SHA}:proto/workflows/buf.yaml"; then
             git archive "$BASE_SHA" proto/workflows | tar -x -C "$RUNNER_TEMP"
-            buf breaking proto/workflows --against "$RUNNER_TEMP/proto/workflows"
+            buf breaking contracts/proto/workflows --against "$RUNNER_TEMP/proto/workflows"
           fi

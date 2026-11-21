@@ -3,7 +3,7 @@
 This matrix tracks the frontend API contracts and their test evidence.
 Bracketed catch-all route handlers expose multiple operations. The KYC and
 cards rows are Next.js HTTP adapters over the Buf clients generated from
-`proto/kyc/kyc.proto` and `proto/cards/cards.proto`.
+`contracts/proto/kyc/kyc.proto` and `contracts/proto/cards/cards.proto`.
 
 | Method and frontend route | Expected outcome | Test layer | Evidence |
 | --- | --- | --- | --- |

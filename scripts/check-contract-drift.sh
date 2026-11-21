@@ -6,24 +6,24 @@ generated="$(mktemp -d)"
 mkdir -p "$generated/cards" "$generated/disputes" "$generated/ai"
 export PATH="$(go env GOPATH)/bin:$PATH"
 
-protoc -I proto/ledger \
+protoc -I contracts/proto/ledger \
   --go_out="$generated/cards" --go_opt=module=github.com/dipjyotimetia/distributed-systems/backend/cards-service \
   --go-grpc_out="$generated/cards" --go-grpc_opt=module=github.com/dipjyotimetia/distributed-systems/backend/cards-service \
-  proto/ledger/ledger.proto
+  contracts/proto/ledger/ledger.proto
 diff -ru backend/cards-service/gen/ledger "$generated/cards/gen/ledger"
 
-protoc -I proto/transactions \
+protoc -I contracts/proto/transactions \
   --go_out="$generated/disputes" --go_opt=module=github.com/dipjyotimetia/distributed-systems/backend/disputes-service \
   --go-grpc_out="$generated/disputes" --go-grpc_opt=module=github.com/dipjyotimetia/distributed-systems/backend/disputes-service \
-  proto/transactions/query.proto
-protoc -I proto/disputes \
+  contracts/proto/transactions/query.proto
+protoc -I contracts/proto/disputes \
   --go_out="$generated/disputes" --go_opt=module=github.com/dipjyotimetia/distributed-systems/backend/disputes-service \
   --go-grpc_out="$generated/disputes" --go-grpc_opt=module=github.com/dipjyotimetia/distributed-systems/backend/disputes-service \
-  proto/disputes/research.proto
+  contracts/proto/disputes/research.proto
 diff -ru backend/disputes-service/gen "$generated/disputes/gen"
 
-python3 -m grpc_tools.protoc -I proto/disputes \
-  --python_out="$generated/ai" --grpc_python_out="$generated/ai" proto/disputes/research.proto
+python3 -m grpc_tools.protoc -I contracts/proto/disputes \
+  --python_out="$generated/ai" --grpc_python_out="$generated/ai" contracts/proto/disputes/research.proto
 python3 - <<PY
 from pathlib import Path
 path = Path("$generated/ai/research_pb2_grpc.py")

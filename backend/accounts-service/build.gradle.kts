@@ -82,7 +82,7 @@ openApiGenerate {
 
 sourceSets.main {
     java.srcDir(layout.buildDirectory.dir("generated/openapi/src/main/java"))
-    proto.srcDir(rootProject.file("proto/ledger"))
+    proto.srcDir(rootProject.file("contracts/proto/ledger"))
 }
 
 protobuf {

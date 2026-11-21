@@ -86,9 +86,9 @@ openApiGenerate {
 }
 
 sourceSets.main {
-    proto.srcDir(rootProject.file("proto/fraud"))
-    proto.srcDir(rootProject.file("proto/ledger"))
-    proto.srcDir(rootProject.file("proto/transactions"))
+    proto.srcDir(rootProject.file("contracts/proto/fraud"))
+    proto.srcDir(rootProject.file("contracts/proto/ledger"))
+    proto.srcDir(rootProject.file("contracts/proto/transactions"))
     java.srcDir(layout.buildDirectory.dir("generated/openapi/src/main/java"))
 }
 

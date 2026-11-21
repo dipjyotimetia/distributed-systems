@@ -80,8 +80,8 @@ tasks.jar { enabled = false }
 tasks.bootJar { archiveFileName.set("application.jar") }
 
 sourceSets.main {
-    proto.srcDir(rootProject.file("proto/fraud"))
-    proto.srcDir(rootProject.file("proto/ledger"))
+    proto.srcDir(rootProject.file("contracts/proto/fraud"))
+    proto.srcDir(rootProject.file("contracts/proto/ledger"))
 }
 
 protobuf {
