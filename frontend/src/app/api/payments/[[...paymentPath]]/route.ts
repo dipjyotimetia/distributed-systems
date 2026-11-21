@@ -7,8 +7,9 @@ const maxRequestBytes = 2048;
 async function forward(request: NextRequest, { params }: { params: Promise<{ paymentPath?: string[] }> }) {
   const { paymentPath = [] } = await params;
   const write = request.method === 'POST';
-  if (process.env.OUTBOUND_PAYMENTS_ENABLED !== 'true' ||
-      (write ? paymentPath.length !== 0 : paymentPath.length !== 1 || !paymentId.test(paymentPath[0]))) {
+  const readOne = !write && paymentPath.length === 1 && paymentId.test(paymentPath[0]);
+  const readCollection = !write && paymentPath.length === 0;
+  if (process.env.OUTBOUND_PAYMENTS_ENABLED !== 'true' || (write ? paymentPath.length !== 0 : !readOne && !readCollection)) {
     return new NextResponse(null, { status: 404 });
   }
 
@@ -46,7 +47,7 @@ async function forward(request: NextRequest, { params }: { params: Promise<{ pay
 
     const traceparent = request.headers.get('traceparent');
     if (traceparent) headers.set('traceparent', traceparent);
-    const suffix = write ? '' : '/' + paymentPath[0];
+    const suffix = readOne ? '/' + paymentPath[0] : '';
     const response = await fetch(gateway + '/api/payments' + suffix, {
       method: request.method, headers, body, redirect: 'manual', cache: 'no-store',
       signal: AbortSignal.timeout(10000),

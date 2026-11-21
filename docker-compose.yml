@@ -43,6 +43,7 @@ services:
     environment:
       KAFKA_BROKERS: redpanda:9092
       MONGO_URI: mongodb://mongodb:27017
+      JWT_SECRET: banking-app-super-secret-key-change-this-in-production-256-bit
 
   # Backend Services
   disputes-schema:
@@ -463,6 +464,7 @@ services:
       - NEXT_PUBLIC_API_URL=http://localhost:8080
       - API_GATEWAY_URL=http://api-gateway:8080
       - AI_SERVICE_URL=http://ai-service:8080
+      - NOTIFICATION_SERVICE_URL=http://notification-service:8080
       - KYC_GRPC_ADDR=kyc-service:8091
       - CARDS_GRPC_ADDR=cards-service:8092
       - NODE_ENV=development

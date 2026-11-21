@@ -73,6 +73,12 @@ class PaymentsPostgresTest {
 
                 var db = context.getBean(JdbcTemplate.class);
                 UUID id = UUID.fromString(location.substring("/api/payments/".length()));
+                var owned = client.sendAsync(read(server.resolve("/api/payments"), customer), HttpResponse.BodyHandlers.ofString()).join();
+                var other = client.sendAsync(read(server.resolve("/api/payments"), stranger), HttpResponse.BodyHandlers.ofString()).join();
+                assertEquals(200, owned.statusCode());
+                assertTrue(owned.body().contains(id.toString()));
+                assertEquals(200, other.statusCode());
+                assertFalse(other.body().contains(id.toString()));
                 assertTrue(db.queryForObject("SELECT trace_parent FROM payments.payment WHERE id = ?", String.class, id)
                         .startsWith("00-4bf92f3577b34da6a3ce929d0e0e4736-"));
                 var scrape = client.sendAsync(HttpRequest.newBuilder(server.resolve("/actuator/prometheus")).GET().build(),

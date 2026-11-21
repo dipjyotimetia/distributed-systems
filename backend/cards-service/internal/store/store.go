@@ -50,6 +50,23 @@ func (s *Store) InsertCard(ctx context.Context, customer int64, card service.Car
 	return err
 }
 
+func (s *Store) ListCards(ctx context.Context, customer int64) ([]service.Card, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT token, account_id, last_four FROM cards.cards WHERE customer_id=$1 ORDER BY created_at DESC`, customer)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	cards := make([]service.Card, 0)
+	for rows.Next() {
+		var card service.Card
+		if err := rows.Scan(&card.Token, &card.AccountID, &card.LastFour); err != nil {
+			return nil, err
+		}
+		cards = append(cards, card)
+	}
+	return cards, rows.Err()
+}
+
 func (s *Store) FindCard(ctx context.Context, customer int64, token string) (service.Card, error) {
 	var card service.Card
 	err := s.db.QueryRowContext(ctx, `SELECT token, account_id, last_four FROM cards.cards WHERE token=$1 AND customer_id=$2`, token, customer).

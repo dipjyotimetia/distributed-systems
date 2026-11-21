@@ -37,6 +37,8 @@ spec:
         env:
         - name: AI_SERVICE_URL
           value: "http://banking-ai:8080"
+        - name: NOTIFICATION_SERVICE_URL
+          value: "http://banking-notification:80"
         resources:
           requests:
             # Steady state sits near 200Mi, so the old 256Mi ceiling OOMKilled

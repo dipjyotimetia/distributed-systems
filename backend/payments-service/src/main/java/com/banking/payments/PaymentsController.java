@@ -65,6 +65,11 @@ public class PaymentsController {
                 .cacheControl(CacheControl.noStore()).body(payment);
     }
 
+    @GetMapping("/api/payments")
+    public ResponseEntity<List<Payment>> list(@RequestHeader(value = "Authorization", required = false) String auth) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(store.listOwned(customer(auth)));
+    }
+
     @GetMapping("/api/payments/{id}")
     public ResponseEntity<Payment> get(@RequestHeader(value = "Authorization", required = false) String auth,
             @PathVariable UUID id) {
