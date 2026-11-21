@@ -53,7 +53,7 @@ const AIAssistantPage: React.FC = () => {
         headers.Authorization = `Bearer ${token}`;
       }
 
-      const res = await fetch('/api/ai/chat', {
+      const res = await fetch('/api/v1/ai/chat', {
         method: 'POST',
         headers,
         body: JSON.stringify({

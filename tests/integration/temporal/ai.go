@@ -30,7 +30,7 @@ func AIJourney(ctx workflow.Context, input Input) ([]BoundaryEvidence, error) {
 
 func (a *Activities) VerifyAIProviders(ctx context.Context) error {
 	var providers []struct{ Provider, Name, Model string }
-	if err := call(ctx, a.Frontend, "/api/ai/chat", "", nil, 200, &providers); err != nil {
+	if err := call(ctx, a.Frontend, "/api/v1/ai/chat", "", nil, 200, &providers); err != nil {
 		return err
 	}
 	if len(providers) != len(aiProviders) {
@@ -55,7 +55,7 @@ func (a *Activities) VerifyAIChat(ctx context.Context, input Input, mode string)
 	}
 	message := "journey-" + mode + "-" + input.User
 	payload := map[string]string{"message": message, "locale": "fr-CA"}
-	if err := call(ctx, a.Frontend, "/api/ai/chat", "", payload, 200, &response); err != nil {
+	if err := call(ctx, a.Frontend, "/api/v1/ai/chat", "", payload, 200, &response); err != nil {
 		return BoundaryEvidence{}, err
 	}
 	if len(response.Results) != len(aiProviders) {

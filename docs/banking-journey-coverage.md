@@ -19,9 +19,9 @@ cards rows are Next.js HTTP adapters over the Buf clients generated from
 | GET `/api/v1/accounts/[id]/transactions/summary` | Return counts after an account ownership check | Temporal, service integration | `LedgerJourney.VerifyLedger` checks counts and a cross-user 404 |
 | GET `/api/v1/accounts/search` | Page matching owned accounts | Temporal, service integration | `LedgerJourney.VerifyAccounts` verifies a filtered page and ownership |
 | GET `/api/v1/accounts/summary` | Count owned accounts by type and active status and sum balances | Temporal, service integration | `LedgerJourney.VerifyAccounts` verifies scoped count, type and exact balance |
-| GET `/api/ai/chat` | Discover available providers | Temporal | `AIJourney.VerifyAIProviders` checks discovery of all five providers |
-| POST `/api/ai/chat` | Aggregate five providers, preserve locale, and handle provider failures | Temporal | `AIJourney.VerifyAIChat` checks locale, five successes, one failure and five failures against fixture responses |
-| POST `/api/ai/chat` (`mode=agent`) | Durable Temporal banking agent with read-only tools and guardrails | Unit | `backend/ai-service/tests/test_workflows_fixture.py` covers happy path and blocked transfer tools |
+| GET `/api/v1/ai/chat` | Discover available providers | Temporal | `AIJourney.VerifyAIProviders` checks discovery of all five providers |
+| POST `/api/v1/ai/chat` | Aggregate five providers, preserve locale, and handle provider failures | Temporal | `AIJourney.VerifyAIChat` checks locale, five successes, one failure and five failures against fixture responses |
+| POST `/api/v1/ai/chat` (`mode=agent`) | Durable Temporal banking agent with read-only tools and guardrails | Unit | `backend/ai-service/tests/test_workflows_fixture.py` covers happy path and blocked transfer tools |
 | POST `/api/v1/disputes/research` (ai-service) | Multi-agent dispute research draft persisted via internal disputes API | Unit | `test_dispute_research_workflow_saves_structured_draft` |
 | GET `/api/v1/healthz` | Return frontend health | Temporal startup | `testJourney` checks HTTP 200 from Next.js |
 | GET `/api/v1/transactions` | Return the owned ledger, with optional filters and paging | Temporal, service integration | `LedgerJourney.VerifyLedger` checks the full list and a filtered page |

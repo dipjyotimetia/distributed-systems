@@ -30,14 +30,22 @@ class CreateTransactionRequest(BaseModel):
     to_account_id: Optional[StrictInt] = Field(default=None, alias="toAccountId")
     type: StrictStr
     amount: Union[StrictFloat, StrictInt]
+    currency: StrictStr
     description: Optional[StrictStr] = None
-    __properties: ClassVar[List[str]] = ["accountId", "toAccountId", "type", "amount", "description"]
+    __properties: ClassVar[List[str]] = ["accountId", "toAccountId", "type", "amount", "currency", "description"]
 
     @field_validator('type')
     def type_validate_enum(cls, value):
         """Validates the enum"""
         if value not in set(['DEPOSIT', 'WITHDRAWAL', 'TRANSFER']):
             raise ValueError("must be one of enum values ('DEPOSIT', 'WITHDRAWAL', 'TRANSFER')")
+        return value
+
+    @field_validator('currency')
+    def currency_validate_regular_expression(cls, value):
+        """Validates the regular expression"""
+        if not re.match(r"^[A-Z]{3}$", value):
+            raise ValueError(r"must validate the regular expression /^[A-Z]{3}$/")
         return value
 
     model_config = ConfigDict(
@@ -95,6 +103,7 @@ class CreateTransactionRequest(BaseModel):
             "toAccountId": obj.get("toAccountId"),
             "type": obj.get("type"),
             "amount": obj.get("amount"),
+            "currency": obj.get("currency"),
             "description": obj.get("description")
         })
         return _obj

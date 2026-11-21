@@ -160,6 +160,7 @@ paths:
               - accountId
               - type
               - amount
+              - currency
               properties:
                 accountId:
                   type: integer
@@ -175,6 +176,9 @@ paths:
                   - TRANSFER
                 amount:
                   type: number
+                currency:
+                  type: string
+                  pattern: '^[A-Z]{3}$'
                 description:
                   type: string
       responses:

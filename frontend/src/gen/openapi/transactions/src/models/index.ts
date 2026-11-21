@@ -35,6 +35,12 @@ export interface CreateTransactionRequest {
      * @type {string}
      * @memberof CreateTransactionRequest
      */
+    currency: string;
+    /**
+     * 
+     * @type {string}
+     * @memberof CreateTransactionRequest
+     */
     description?: string;
 }
 
