@@ -7,7 +7,10 @@ make test-integration-temporal
 ```
 
 The command requires Docker Compose 2.24.4 or newer, Go 1.26 or newer, and
-Python 3. Each scenario gets a fresh Compose project, a synthetic identity,
+Python 3. Banking journeys call the frontend through the generated client in
+`temporal/gen` (`make openapi-gen`). Provider fixtures, Kafka, Mongo, and
+Postgres reads stay on the small `request` helper. Each scenario gets a fresh
+Compose project, a synthetic identity,
 and a unique Temporal task queue. The harness runs the Temporal workflows,
 replays their histories in memory, and writes one JSON report per scenario
 under `temporal/results/`. The reports record execution, replay and cleanup

@@ -1,44 +1,13 @@
+import type { CreateTransactionRequest as GeneratedCreateTransactionRequest } from '../../gen/http/CreateTransactionRequest';
+import type { TransactionResponse } from '../../gen/http/TransactionResponse';
+import type { TransactionSummary as GeneratedTransactionSummary } from '../../gen/http/TransactionSummary';
 import { apiClient, ApiResponse, PaginatedResponse } from './client';
 import { logTransaction } from '../logger';
+import type { Wire } from './wire';
 
-export interface Transaction {
-  id: number;
-  userId: number;
-  fromAccountId?: number;
-  toAccountId?: number;
-  type: 'DEPOSIT' | 'WITHDRAWAL' | 'TRANSFER';
-  amount: number;
-  description: string;
-  status: 'PENDING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
-  createdAt: string;
-  processedAt?: string;
-}
-
-export interface CreateTransactionRequest {
-  accountId: number;
-  toAccountId?: number;
-  type: 'DEPOSIT' | 'WITHDRAWAL' | 'TRANSFER';
-  amount: number;
-  currency?: string;
-  description: string;
-  metadata?: Record<string, unknown>;
-}
-
-export interface TransactionSummary {
-  totalTransactions: number;
-  totalDeposits: number;
-  totalWithdrawals: number;
-  totalTransfers: number;
-  pendingTransactions: number;
-  completedTransactions: number;
-  failedTransactions: number;
-  transactionsByType: {
-    [key in Transaction['type']]: number;
-  };
-  transactionsByStatus: {
-    [key in Transaction['status']]: number;
-  };
-}
+export type Transaction = Wire<TransactionResponse>;
+export type CreateTransactionRequest = Wire<GeneratedCreateTransactionRequest>;
+export type TransactionSummary = Wire<GeneratedTransactionSummary>;
 
 export interface TransactionFilters {
   accountId?: number;

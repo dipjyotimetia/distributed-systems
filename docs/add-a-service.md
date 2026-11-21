@@ -8,7 +8,7 @@ Put the service in `backend/<name>-service`. Register Java services in `settings
 
 Publish the API before the handlers:
 
-- HTTP: an OpenAPI file next to the service, following `backend/accounts-service/openapi.yml` and `backend/transactions-service/openapi.yml`.
+- HTTP: an OpenAPI file next to the service, following `backend/accounts-service/openapi.yml` and `backend/transactions-service/openapi.yml`. Run `make openapi-gen` in the same change. That refreshes the Java, C#, and Python server models, the TypeScript types in `frontend/src/gen/http`, and the Go client under `tests/integration/temporal/gen`. Wire the new paths through `contracts/frontend-api.openapi.yml` when the browser or a journey calls them.
 - gRPC: one protobuf file under `proto/`. That directory is the only contract. Fraud is `proto/fraud/fraud.proto`, KYC is `proto/kyc/kyc.proto`, and cards is `proto/cards/cards.proto`. `transactions-service` and `payments-service` compile the fraud file, so their image builds use the repository root as the Docker context. The checked-in Go stubs under `backend/fraud-service/gen` come from the same file. The frontend checks in Buf TypeScript under `frontend/src/gen`, produced by `scripts/frontend-proto.sh` (Buf 1.75.0 and `protoc-gen-es` 2.16.0). Regenerate the stubs in the same change as the proto.
 - Kafka: document the JSON fields next to the producer. `transaction-events` is written by `TransactionEventOutbox` and read by `notification-service`.
 

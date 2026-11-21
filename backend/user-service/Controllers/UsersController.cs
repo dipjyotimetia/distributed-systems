@@ -1,6 +1,11 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
 using UserServiceDotnet.Services;
+using ApiMessage = UserServiceDotnet.Generated.Model.ApiMessage;
+using Availability = UserServiceDotnet.Generated.Model.Availability;
+using LoginResponse = UserServiceDotnet.Generated.Model.LoginResponse;
+using ProfileResponse = UserServiceDotnet.Generated.Model.ProfileResponse;
+using UserIdentity = UserServiceDotnet.Generated.Model.UserIdentity;
 
 namespace UserServiceDotnet.Controllers;
 
@@ -29,25 +34,17 @@ public class UsersController : ControllerBase
 
             var user = await _userService.RegisterUser(request.Username, request.Email, request.Password);
 
-            return StatusCode(201, new
-            {
-                id = user.Id,
-                username = user.Username,
-                email = user.Email,
-                roles = user.Roles,
-                createdAt = user.CreatedAt,
-                updatedAt = user.UpdatedAt
-            });
+            return StatusCode(201, Identity(user));
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("already exists"))
         {
             _logger.LogError("Registration failed: {Message}", ex.Message);
-            return Conflict(new { success = false, message = ex.Message });
+            return Conflict(new ApiMessage(false, ex.Message));
         }
         catch (Exception ex)
         {
             _logger.LogError("Registration failed: {Message}", ex.Message);
-            return BadRequest(new { success = false, message = ex.Message });
+            return BadRequest(new ApiMessage(false, ex.Message));
         }
     }
 
@@ -60,25 +57,17 @@ public class UsersController : ControllerBase
 
             var (user, token) = await _userService.Authenticate(request.UsernameOrEmail, request.Password);
 
-            return Ok(new
-            {
-                token,
-                type = "Bearer",
-                id = user.Id,
-                username = user.Username,
-                email = user.Email,
-                roles = user.Roles
-            });
+            return Ok(new LoginResponse(token, "Bearer", user.Id, user.Username, user.Email, user.Roles));
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("Invalid credentials"))
         {
             _logger.LogError("Authentication failed: {Message}", ex.Message);
-            return Unauthorized(new { success = false, message = ex.Message });
+            return Unauthorized(new ApiMessage(false, ex.Message));
         }
         catch (Exception ex)
         {
             _logger.LogError("Authentication failed: {Message}", ex.Message);
-            return BadRequest(new { success = false, message = ex.Message });
+            return BadRequest(new ApiMessage(false, ex.Message));
         }
     }
 
@@ -87,42 +76,29 @@ public class UsersController : ControllerBase
     {
         var authHeader = Request.Headers.Authorization.ToString();
         if (string.IsNullOrEmpty(authHeader) || !authHeader.StartsWith("Bearer "))
-            return Unauthorized(new { success = false, message = "Missing or invalid token" });
+            return Unauthorized(new ApiMessage(false, "Missing or invalid token"));
 
         var token = authHeader["Bearer ".Length..];
         var principal = _userService.ValidateToken(token);
         if (principal == null)
-            return Unauthorized(new { success = false, message = "Invalid token" });
+            return Unauthorized(new ApiMessage(false, "Invalid token"));
 
         var username = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value
                     ?? principal.FindFirst("sub")?.Value;
         if (username == null)
-            return Unauthorized(new { success = false, message = "Invalid token claims" });
+            return Unauthorized(new ApiMessage(false, "Invalid token claims"));
 
         try
         {
             _logger.LogInformation("Profile request for user: {Username}", username);
             var user = await _userService.GetProfile(username);
 
-            return Ok(new
-            {
-                success = true,
-                message = "Profile retrieved successfully",
-                data = new
-                {
-                    id = user.Id,
-                    username = user.Username,
-                    email = user.Email,
-                    roles = user.Roles,
-                    createdAt = user.CreatedAt,
-                    updatedAt = user.UpdatedAt
-                }
-            });
+            return Ok(new ProfileResponse(true, "Profile retrieved successfully", Identity(user)));
         }
         catch (Exception ex)
         {
             _logger.LogError("Profile retrieval failed: {Message}", ex.Message);
-            return BadRequest(new { success = false, message = ex.Message });
+            return BadRequest(new ApiMessage(false, ex.Message));
         }
     }
 
@@ -132,12 +108,7 @@ public class UsersController : ControllerBase
         _logger.LogDebug("Checking username availability: {Username}", username);
         var exists = await _userService.UsernameExists(username);
 
-        return Ok(new
-        {
-            success = true,
-            available = !exists,
-            message = exists ? "Username is not available" : "Username is available"
-        });
+        return Ok(new Availability(true, !exists, exists ? "Username is not available" : "Username is available"));
     }
 
     [HttpGet("check-email")]
@@ -146,11 +117,9 @@ public class UsersController : ControllerBase
         _logger.LogDebug("Checking email availability: {Email}", email);
         var exists = await _userService.EmailExists(email);
 
-        return Ok(new
-        {
-            success = true,
-            available = !exists,
-            message = exists ? "Email is not available" : "Email is available"
-        });
+        return Ok(new Availability(true, !exists, exists ? "Email is not available" : "Email is available"));
     }
+
+    private static UserIdentity Identity(UserServiceDotnet.Models.User user) =>
+        new(user.Id, user.Username, user.Email, user.Roles, user.CreatedAt, user.UpdatedAt);
 }

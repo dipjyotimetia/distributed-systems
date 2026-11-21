@@ -1,10 +1,12 @@
 package com.banking.accountsservice.controller;
 
-import com.banking.accountsservice.dto.AccountCreateRequest;
-import com.banking.accountsservice.dto.AccountResponse;
+import com.banking.accountsservice.generated.AccountCreateRequest;
+import com.banking.accountsservice.generated.AccountType;
+import com.banking.accountsservice.generated.AccountResponse;
+import com.banking.accountsservice.generated.AccountStatus;
 import com.banking.accountsservice.dto.AccountQuery;
 import com.banking.accountsservice.entity.Account;
-import com.banking.accountsservice.dto.BalanceResponse;
+import com.banking.accountsservice.generated.BalanceResponse;
 import com.banking.accountsservice.security.UserAuthenticationDetails;
 import com.banking.accountsservice.service.AccountService;
 import com.banking.accountsservice.service.FinancialDataService;
@@ -87,6 +89,8 @@ class AccountControllerTest {
                 "123456789012",
                 BigDecimal.valueOf(1000.00),
                 "CHECKING",
+                "USD",
+                AccountStatus.ACTIVE,
                 LocalDateTime.now(),
                 LocalDateTime.now()
         );
@@ -94,10 +98,11 @@ class AccountControllerTest {
         testBalanceResponse = new BalanceResponse(
                 testAccountId,
                 "123456789012",
+                "USD",
                 BigDecimal.valueOf(1000.00)
         );
 
-        createRequest = new AccountCreateRequest("SAVINGS");
+        createRequest = new AccountCreateRequest(AccountType.SAVINGS);
 
         // Manually set up the SecurityContext
         HttpServletRequest mockRequest = mock(HttpServletRequest.class);
@@ -110,7 +115,7 @@ class AccountControllerTest {
 
     @Test
     void patchesStatusForAuthenticatedOwner() throws Exception {
-        testAccountResponse.setStatus(Account.Status.FROZEN);
+        testAccountResponse.setStatus(AccountStatus.FROZEN);
         when(accountService.updateAccount(testAccountId, testUserId, null, Account.Status.FROZEN))
                 .thenReturn(testAccountResponse);
 
@@ -145,8 +150,10 @@ class AccountControllerTest {
     @Test
     void searchBindsFiltersAndSerializesPage() throws Exception {
         var query = new AccountQuery("CHECKING", Account.Status.ACTIVE, "checking", 0, 2, "id,asc");
+        var account = new AccountResponse();
+        account.setStatus(AccountStatus.ACTIVE);
         when(accountService.queryAccounts(testUserId, query, true)).thenReturn(
-                new PageImpl<>(List.of(new AccountResponse()), PageRequest.of(0, 2, Sort.by("id")), 1));
+                new PageImpl<>(List.of(account), PageRequest.of(0, 2, Sort.by("id")), 1));
 
         mockMvc.perform(get("/api/accounts/search").param("q", "checking").param("type", "CHECKING")
                 .param("status", "ACTIVE").param("page", "0").param("size", "2").param("sort", "id,asc"))
@@ -198,11 +205,9 @@ class AccountControllerTest {
 
     @Test
     void createAccount_InvalidInput() throws Exception {
-        AccountCreateRequest invalidRequest = new AccountCreateRequest("");
-
         mockMvc.perform(post("/api/accounts")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(invalidRequest)))
+                .content("{\"accountType\":\"\"}"))
                 .andExpect(status().isBadRequest());
 
         verify(accountService, never()).createAccount(any(), anyLong());

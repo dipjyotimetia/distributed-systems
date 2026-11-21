@@ -1,7 +1,13 @@
 package com.banking.transactionsservice.controller;
 
-import com.banking.transactionsservice.dto.CreateTransactionRequest;
-import com.banking.transactionsservice.dto.*;
+import com.banking.transactionsservice.dto.TransactionQuery;
+import com.banking.transactionsservice.generated.CreateTransactionRequest;
+import com.banking.transactionsservice.generated.DepositRequest;
+import com.banking.transactionsservice.generated.InsufficientFunds;
+import com.banking.transactionsservice.generated.TransactionResponse;
+import com.banking.transactionsservice.generated.TransactionSummary;
+import com.banking.transactionsservice.generated.TransferRequest;
+import com.banking.transactionsservice.generated.WithdrawRequest;
 import com.banking.transactionsservice.security.UserAuthenticationDetails;
 import com.banking.transactionsservice.service.InsufficientFundsException;
 import com.banking.transactionsservice.service.TransactionService;
@@ -21,12 +27,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
-import org.springframework.validation.BindingResult;
-import org.springframework.validation.FieldError;
-
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/transactions")
@@ -75,21 +76,9 @@ public class TransactionController {
     }
 
     @PostMapping("/create")
-    public ResponseEntity<?> createTransaction(
-            @Valid @RequestBody CreateTransactionRequest request, BindingResult bindingResult) {
+    public ResponseEntity<?> createTransaction(@Valid @RequestBody CreateTransactionRequest request) {
         Span span = tracer.spanBuilder("create-transaction").startSpan();
         try {
-            // Check for validation errors
-            if (bindingResult.hasErrors()) {
-                Map<String, String> errors = new HashMap<>();
-                for (FieldError error : bindingResult.getFieldErrors()) {
-                    errors.put(error.getField(), error.getDefaultMessage());
-                }
-                logger.warn("Validation failed for transaction creation: {}", errors);
-                span.setAttribute("validation.failed", true);
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errors);
-            }
-            
             Long userId = getUserIdFromAuthentication();
             
             logger.info("Creating transaction for user: {}, account: {}, type: {}, amount: {}", 
@@ -98,13 +87,14 @@ public class TransactionController {
             TransactionResponse transaction = transactionService.createTransaction(request, userId, getCurrentRequest());
             span.setAttribute("user.id", userId);
             span.setAttribute("account.id", request.getAccountId());
-            span.setAttribute("transaction.type", request.getType());
+            span.setAttribute("transaction.type", request.getType().getValue());
             span.setAttribute("transaction.amount", request.getAmount().toString());
             span.setAttribute("transaction.id", transaction.getId());
             
             return ResponseEntity.status(HttpStatus.CREATED).body(transaction);
         } catch (InsufficientFundsException e) {
-            return ResponseEntity.badRequest().body(Map.of("code", "INSUFFICIENT_FUNDS", "message", e.getMessage()));
+            return ResponseEntity.badRequest().body(new InsufficientFunds(
+                    InsufficientFunds.CodeEnum.INSUFFICIENT_FUNDS, e.getMessage()));
         } catch (ResponseStatusException e) {
             throw e;
         } catch (RuntimeException e) {
@@ -175,7 +165,8 @@ public class TransactionController {
             
             return ResponseEntity.status(HttpStatus.CREATED).body(transaction);
         } catch (InsufficientFundsException e) {
-            return ResponseEntity.badRequest().body(Map.of("code", "INSUFFICIENT_FUNDS", "message", e.getMessage()));
+            return ResponseEntity.badRequest().body(new InsufficientFunds(
+                    InsufficientFunds.CodeEnum.INSUFFICIENT_FUNDS, e.getMessage()));
         } catch (ResponseStatusException e) {
             throw e;
         } catch (RuntimeException e) {
@@ -216,7 +207,8 @@ public class TransactionController {
             
             return ResponseEntity.status(HttpStatus.CREATED).body(transaction);
         } catch (InsufficientFundsException e) {
-            return ResponseEntity.badRequest().body(Map.of("code", "INSUFFICIENT_FUNDS", "message", e.getMessage()));
+            return ResponseEntity.badRequest().body(new InsufficientFunds(
+                    InsufficientFunds.CodeEnum.INSUFFICIENT_FUNDS, e.getMessage()));
         } catch (ResponseStatusException e) {
             throw e;
         } catch (RuntimeException e) {

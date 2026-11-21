@@ -1,6 +1,7 @@
 package com.banking.accountsservice.service;
 
 import com.banking.accountsservice.entity.Account;
+import com.banking.accountsservice.generated.StatementDocument;
 import com.banking.accountsservice.repository.AccountRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -21,8 +22,6 @@ import jakarta.annotation.PostConstruct;
 import java.net.URI;
 import java.time.Instant;
 import java.time.LocalDateTime;
-import java.util.LinkedHashMap;
-import java.util.Map;
 
 @Service
 public class StatementExportService {
@@ -77,22 +76,15 @@ public class StatementExportService {
      * Builds the statement document for an account. Does not touch S3, so it is
      * safe (and egress-free) to call even when no object store is configured.
      */
-    public Map<String, Object> generateStatement(Long accountId, Long userId) {
+    public StatementDocument generateStatement(Long accountId, Long userId) {
         Account account = accountRepository.findByIdAndUserId(accountId, userId)
                 .orElseThrow(() -> new RuntimeException("Account not found or access denied"));
-
-        Map<String, Object> statement = new LinkedHashMap<>();
-        statement.put("accountId", account.getId());
-        statement.put("accountNumber", account.getAccountNumber());
-        statement.put("accountType", account.getAccountType());
-        statement.put("balance", account.getBalance());
-        statement.put("exportedAt", LocalDateTime.now().toString());
-        statement.put("userId", userId);
-        return statement;
+        return new StatementDocument(account.getId(), account.getAccountNumber(), account.getAccountType(),
+                account.getBalance(), LocalDateTime.now(), userId);
     }
 
     public String exportStatement(Long accountId, Long userId) {
-        Map<String, Object> statement = generateStatement(accountId, userId);
+        StatementDocument statement = generateStatement(accountId, userId);
 
         String timestamp = Instant.now().toString().replace(":", "-");
         String key = "statements/account-" + accountId + "/" + timestamp + ".json";

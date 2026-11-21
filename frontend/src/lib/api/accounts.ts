@@ -1,36 +1,15 @@
+import type { AccountCreateRequest as GeneratedCreateAccountRequest } from '../../gen/http/AccountCreateRequest';
+import type { AccountResponse } from '../../gen/http/AccountResponse';
+import type { AccountSummary as GeneratedAccountSummary } from '../../gen/http/AccountSummary';
+import type { AccountUpdateRequest as GeneratedUpdateAccountRequest } from '../../gen/http/AccountUpdateRequest';
+import type { BalanceResponse } from '../../gen/http/BalanceResponse';
 import { apiClient, ApiResponse, PaginatedResponse } from './client';
+import type { Wire } from './wire';
 
-export interface Account {
-  id: number;
-  userId: number;
-  accountNumber: string;
-  accountType: 'CHECKING' | 'SAVINGS' | 'CREDIT' | 'INVESTMENT';
-  balance: number;
-  currency: string;
-  status: 'ACTIVE' | 'INACTIVE' | 'FROZEN' | 'CLOSED';
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface CreateAccountRequest {
-  accountType: 'CHECKING' | 'SAVINGS' | 'CREDIT' | 'INVESTMENT';
-  initialBalance?: number;
-  currency?: string;
-}
-
-export interface UpdateAccountRequest {
-  accountType?: 'CHECKING' | 'SAVINGS' | 'CREDIT' | 'INVESTMENT';
-  status?: 'ACTIVE' | 'INACTIVE' | 'FROZEN' | 'CLOSED';
-}
-
-export interface AccountSummary {
-  totalAccounts: number;
-  totalBalance: number;
-  activeAccounts: number;
-  accountsByType: {
-    [key in Account['accountType']]: number;
-  };
-}
+export type Account = Wire<AccountResponse>;
+export type CreateAccountRequest = Wire<GeneratedCreateAccountRequest>;
+export type UpdateAccountRequest = Wire<GeneratedUpdateAccountRequest>;
+export type AccountSummary = Wire<GeneratedAccountSummary>;
 
 export class AccountsAPI {
   // Get all accounts for the current user
@@ -82,8 +61,8 @@ export class AccountsAPI {
   }
 
   // Get account balance
-  static async getAccountBalance(accountId: number): Promise<ApiResponse<{ balance: number; currency: string }>> {
-    return await apiClient.get<{ balance: number; currency: string }>(`/api/accounts/${accountId}/balance`);
+  static async getAccountBalance(accountId: number): Promise<ApiResponse<BalanceResponse>> {
+    return await apiClient.get<BalanceResponse>(`/api/accounts/${accountId}/balance`);
   }
 
   // Update account status

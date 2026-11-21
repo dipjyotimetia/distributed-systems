@@ -1,6 +1,7 @@
 package com.banking.transactionsservice.controller;
 
-import com.banking.transactionsservice.dto.*;
+import com.banking.transactionsservice.dto.TransactionQuery;
+import com.banking.transactionsservice.generated.*;
 import com.banking.transactionsservice.entity.Transaction;
 import com.banking.transactionsservice.security.UserAuthenticationDetails;
 import com.banking.transactionsservice.service.InsufficientFundsException;
@@ -79,15 +80,15 @@ class TransactionControllerTest {
         testTransactionResponse.setUserId(testUserId);
         testTransactionResponse.setToAccountId(testAccountId);
         testTransactionResponse.setAmount(100.00);
-        testTransactionResponse.setType(Transaction.TransactionType.DEPOSIT);
+        testTransactionResponse.setType(TransactionType.DEPOSIT);
         testTransactionResponse.setDescription("Test deposit");
-        testTransactionResponse.setStatus(Transaction.TransactionStatus.COMPLETED);
+        testTransactionResponse.setStatus(TransactionStatus.COMPLETED);
         testTransactionResponse.setCreatedAt(LocalDateTime.now());
         testTransactionResponse.setProcessedAt(LocalDateTime.now());
 
-        depositRequest = new DepositRequest(testAccountId, 100.00, "Test deposit");
-        withdrawRequest = new WithdrawRequest(testAccountId, 50.00, "Test withdrawal");
-        transferRequest = new TransferRequest(testAccountId, 2L, 75.00, "Test transfer");
+        depositRequest = new DepositRequest(testAccountId, 100.00).description("Test deposit");
+        withdrawRequest = new WithdrawRequest(testAccountId, 50.00).description("Test withdrawal");
+        transferRequest = new TransferRequest(testAccountId, 2L, 75.00).description("Test transfer");
         
         // Manually set up the SecurityContext
         HttpServletRequest mockRequest = mock(HttpServletRequest.class);
@@ -213,9 +214,9 @@ class TransactionControllerTest {
         withdrawResponse.setUserId(testUserId);
         withdrawResponse.setFromAccountId(testAccountId);
         withdrawResponse.setAmount(50.00);
-        withdrawResponse.setType(Transaction.TransactionType.WITHDRAWAL);
+        withdrawResponse.setType(TransactionType.WITHDRAWAL);
         withdrawResponse.setDescription("Test withdrawal");
-        withdrawResponse.setStatus(Transaction.TransactionStatus.COMPLETED);
+        withdrawResponse.setStatus(TransactionStatus.COMPLETED);
         withdrawResponse.setCreatedAt(LocalDateTime.now());
         withdrawResponse.setProcessedAt(LocalDateTime.now());
 
@@ -260,9 +261,9 @@ class TransactionControllerTest {
         transferResponse.setFromAccountId(testAccountId);
         transferResponse.setToAccountId(2L);
         transferResponse.setAmount(75.00);
-        transferResponse.setType(Transaction.TransactionType.TRANSFER);
+        transferResponse.setType(TransactionType.TRANSFER);
         transferResponse.setDescription("Test transfer");
-        transferResponse.setStatus(Transaction.TransactionStatus.COMPLETED);
+        transferResponse.setStatus(TransactionStatus.COMPLETED);
         transferResponse.setCreatedAt(LocalDateTime.now());
         transferResponse.setProcessedAt(LocalDateTime.now());
 

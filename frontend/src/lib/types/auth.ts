@@ -1,24 +1,12 @@
-// Authentication types
-export interface User {
-  id: number;
-  username: string;
-  email: string;
-  roles: string;
-  createdAt: string;
-  updatedAt: string;
-}
+import type { LoginRequest as GeneratedLoginRequest } from '../../gen/http/LoginRequest';
+import type { RegisterRequest as GeneratedRegisterRequest } from '../../gen/http/RegisterRequest';
+import type { UserIdentity } from '../../gen/http/UserIdentity';
+import type { Wire } from '../api/wire';
 
-export interface LoginRequest {
-  usernameOrEmail: string;
-  password: string;
-}
-
-export interface RegisterRequest {
-  username: string;
-  email: string;
-  password: string;
-  seedAccountData?: boolean;
-}
+// Authentication types. Request bodies and the profile identity come from the generated HTTP models.
+export type User = Wire<UserIdentity>;
+export type LoginRequest = GeneratedLoginRequest;
+export type RegisterRequest = GeneratedRegisterRequest;
 
 export interface AuthResponse {
   success: boolean;

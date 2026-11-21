@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Transactions Service
-  description: API for managing financial transactions.
+  description: API for deposits, withdrawals, transfers, and the transaction ledger.
   version: 1.0.0
 servers:
   - url: http://localhost:8083/api
@@ -9,53 +9,72 @@ servers:
 paths:
   /transactions:
     get:
-      summary: Get all transactions for the authenticated user
+      operationId: listTransactions
+      summary: List transactions for the authenticated user
+      description: Returns an array when no filter or page parameter is present, and a page otherwise.
       security:
         - bearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/accountId'
-        - $ref: '#/components/parameters/type'
-        - $ref: '#/components/parameters/status'
-        - $ref: '#/components/parameters/startDate'
-        - $ref: '#/components/parameters/endDate'
-        - $ref: '#/components/parameters/minAmount'
-        - $ref: '#/components/parameters/maxAmount'
-        - $ref: '#/components/parameters/description'
-        - $ref: '#/components/parameters/page'
-        - $ref: '#/components/parameters/size'
-        - $ref: '#/components/parameters/sort'
+        - $ref: '#/components/parameters/AccountId'
+        - $ref: '#/components/parameters/Type'
+        - $ref: '#/components/parameters/Status'
+        - $ref: '#/components/parameters/StartDate'
+        - $ref: '#/components/parameters/EndDate'
+        - $ref: '#/components/parameters/MinAmount'
+        - $ref: '#/components/parameters/MaxAmount'
+        - $ref: '#/components/parameters/Description'
+        - $ref: '#/components/parameters/Query'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+        - $ref: '#/components/parameters/Sort'
       responses:
         '200':
-          description: Transaction array or a page when page or size is supplied
+          description: Transaction array, or a page when any query parameter is supplied
           content:
             application/json:
               schema:
                 oneOf:
                   - $ref: '#/components/schemas/TransactionList'
                   - $ref: '#/components/schemas/TransactionPage'
+              examples:
+                list:
+                  summary: Unfiltered list
+                  value:
+                    - id: 10
+                      userId: 7
+                      fromAccountId: 1
+                      toAccountId: 2
+                      amount: 25.0
+                      type: TRANSFER
+                      description: Temporal integration
+                      status: COMPLETED
+                      createdAt: '2026-01-01T00:00:00'
+                      processedAt: '2026-01-01T00:00:01'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '404':
-          description: Account not found
+          $ref: '#/components/responses/NotFound'
   /transactions/search:
     get:
+      operationId: searchTransactions
       summary: Search owned transactions
       security:
         - bearerAuth: []
       parameters:
-        - name: q
-          in: query
-          schema:
-            type: string
-        - $ref: '#/components/parameters/accountId'
-        - $ref: '#/components/parameters/type'
-        - $ref: '#/components/parameters/status'
-        - $ref: '#/components/parameters/startDate'
-        - $ref: '#/components/parameters/endDate'
-        - $ref: '#/components/parameters/minAmount'
-        - $ref: '#/components/parameters/maxAmount'
-        - $ref: '#/components/parameters/description'
-        - $ref: '#/components/parameters/page'
-        - $ref: '#/components/parameters/size'
-        - $ref: '#/components/parameters/sort'
+        - $ref: '#/components/parameters/AccountId'
+        - $ref: '#/components/parameters/Type'
+        - $ref: '#/components/parameters/Status'
+        - $ref: '#/components/parameters/StartDate'
+        - $ref: '#/components/parameters/EndDate'
+        - $ref: '#/components/parameters/MinAmount'
+        - $ref: '#/components/parameters/MaxAmount'
+        - $ref: '#/components/parameters/Description'
+        - $ref: '#/components/parameters/Query'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+        - $ref: '#/components/parameters/Sort'
       responses:
         '200':
           description: Matching transaction page
@@ -63,9 +82,16 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TransactionPage'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
   /transactions/recent:
     get:
-      summary: Read the newest owned transactions
+      operationId: recentTransactions
+      summary: List the newest owned transactions
       security:
         - bearerAuth: []
       parameters:
@@ -83,13 +109,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TransactionList'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
   /transactions/summary:
     get:
-      summary: Count owned transactions by type and status
+      operationId: summarizeTransactions
+      summary: Summarize owned transactions
       security:
         - bearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/accountId'
+        - $ref: '#/components/parameters/AccountId'
       responses:
         '200':
           description: Transaction counts
@@ -97,203 +128,188 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TransactionSummary'
+              example:
+                totalTransactions: 1
+                totalDeposits: 0
+                totalWithdrawals: 0
+                totalTransfers: 1
+                pendingTransactions: 0
+                completedTransactions: 1
+                failedTransactions: 0
+                transactionsByType:
+                  DEPOSIT: 0
+                  WITHDRAWAL: 0
+                  TRANSFER: 1
+                transactionsByStatus:
+                  PENDING: 0
+                  COMPLETED: 1
+                  FAILED: 0
+                  CANCELLED: 0
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '404':
-          description: Account not found
+          $ref: '#/components/responses/NotFound'
   /transactions/{id}:
-    parameters:
-      - $ref: '#/components/parameters/TransactionId'
     get:
-      summary: Read an owned transaction
+      operationId: getTransaction
+      summary: Get an owned transaction
       security:
         - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TransactionId'
       responses:
         '200':
-          $ref: '#/components/responses/TransactionRecord'
+          description: Transaction
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '404':
-          description: Transaction not found
+          $ref: '#/components/responses/NotFound'
   /transactions/{id}/cancel:
-    parameters:
-      - $ref: '#/components/parameters/TransactionId'
     patch:
-      summary: Cancel an owned pending transaction
+      operationId: cancelTransaction
+      summary: Cancel a pending owned transaction
       security:
         - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TransactionId'
       responses:
         '200':
-          $ref: '#/components/responses/TransactionRecord'
+          description: Cancelled transaction
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '404':
-          description: Transaction not found
+          $ref: '#/components/responses/NotFound'
         '409':
           description: Transaction has already settled
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              example:
+                title: Conflict
+                status: 409
+                detail: Only pending transactions can be cancelled
   /transactions/create:
     post:
-      summary: Dispatch a generic transaction by type
+      operationId: createTransaction
+      summary: Dispatch a deposit, withdrawal, or transfer by type
       security:
         - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              required: [accountId, type, amount]
-              properties:
-                accountId:
-                  type: integer
-                  format: int64
-                toAccountId:
-                  type: integer
-                  format: int64
-                type:
-                  type: string
-                  enum: [DEPOSIT, WITHDRAWAL, TRANSFER]
-                amount:
-                  type: number
-                description:
-                  type: string
+              $ref: '#/components/schemas/CreateTransactionRequest'
+            example:
+              accountId: 1
+              type: DEPOSIT
+              amount: 11.0
+              currency: USD
+              description: Synthetic ledger movement
       responses:
         '201':
-          $ref: '#/components/responses/TransactionRecord'
+          $ref: '#/components/responses/CreatedTransaction'
         '400':
-          description: Rejected request. Confirmed insufficient funds include the INSUFFICIENT_FUNDS code.
+          $ref: '#/components/responses/MoneyMovementRejected'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
   /transactions/deposit:
     post:
+      operationId: deposit
       summary: Deposit funds into an account
       security:
         - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/DepositRequest'
+            example:
+              accountId: 1
+              amount: 30.0
+              description: Synthetic ledger movement
       responses:
         '201':
-          description: Deposit successful
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/TransactionResponse'
+          $ref: '#/components/responses/CreatedTransaction'
+        '400':
+          $ref: '#/components/responses/MoneyMovementRejected'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
   /transactions/withdraw:
     post:
+      operationId: withdraw
       summary: Withdraw funds from an account
       security:
         - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/WithdrawRequest'
+            example:
+              accountId: 1
+              amount: 7.0
+              description: Synthetic ledger movement
       responses:
         '201':
-          description: Withdrawal successful
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/TransactionResponse'
+          $ref: '#/components/responses/CreatedTransaction'
         '400':
-          description: Rejected request. Confirmed insufficient funds include the INSUFFICIENT_FUNDS code.
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [code, message]
-                properties:
-                  code:
-                    type: string
-                    enum: [INSUFFICIENT_FUNDS]
-                  message:
-                    type: string
+          $ref: '#/components/responses/MoneyMovementRejected'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
   /transactions/transfer:
     post:
+      operationId: transfer
       summary: Transfer funds between accounts
       security:
         - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/TransferRequest'
+            example:
+              fromAccountId: 1
+              toAccountId: 2
+              amount: 25.0
+              description: Temporal integration
       responses:
         '201':
-          description: Transfer successful
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/TransactionResponse'
+          $ref: '#/components/responses/CreatedTransaction'
         '400':
-          description: Rejected request. Confirmed insufficient funds include the INSUFFICIENT_FUNDS code.
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [code, message]
-                properties:
-                  code:
-                    type: string
-                    enum: [INSUFFICIENT_FUNDS]
-                  message:
-                    type: string
-
+          $ref: '#/components/responses/MoneyMovementRejected'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
 components:
   parameters:
-    accountId:
-      name: accountId
-      in: query
-      schema:
-        type: integer
-    type:
-      name: type
-      in: query
-      schema:
-        type: string
-    status:
-      name: status
-      in: query
-      schema:
-        type: string
-    startDate:
-      name: startDate
-      in: query
-      schema:
-        type: string
-    endDate:
-      name: endDate
-      in: query
-      schema:
-        type: string
-    minAmount:
-      name: minAmount
-      in: query
-      schema:
-        type: number
-    maxAmount:
-      name: maxAmount
-      in: query
-      schema:
-        type: number
-    description:
-      name: description
-      in: query
-      schema:
-        type: string
-    page:
-      name: page
-      in: query
-      schema:
-        type: integer
-    size:
-      name: size
-      in: query
-      schema:
-        type: integer
-    sort:
-      name: sort
-      in: query
-      schema:
-        type: string
     TransactionId:
       name: id
       in: path
@@ -301,19 +317,225 @@ components:
       schema:
         type: integer
         format: int64
+    AccountId:
+      name: accountId
+      in: query
+      schema:
+        type: integer
+        format: int64
+    Type:
+      name: type
+      in: query
+      schema:
+        $ref: '#/components/schemas/TransactionType'
+    Status:
+      name: status
+      in: query
+      schema:
+        $ref: '#/components/schemas/TransactionStatus'
+    StartDate:
+      name: startDate
+      in: query
+      schema:
+        type: string
+    EndDate:
+      name: endDate
+      in: query
+      schema:
+        type: string
+    MinAmount:
+      name: minAmount
+      in: query
+      schema:
+        type: number
+        format: double
+    MaxAmount:
+      name: maxAmount
+      in: query
+      schema:
+        type: number
+        format: double
+    Description:
+      name: description
+      in: query
+      schema:
+        type: string
+    Query:
+      name: q
+      in: query
+      schema:
+        type: string
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 0
+    Size:
+      name: size
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+    Sort:
+      name: sort
+      in: query
+      schema:
+        type: string
+        example: createdAt,desc
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: Optional. The same key and body replay the original 201. A different body returns 409. A key outside the pattern returns 400.
+      schema:
+        type: string
+        pattern: '^[A-Za-z0-9._:-]{1,128}$'
   responses:
-    TransactionRecord:
-      description: Transaction record
+    Unauthorized:
+      description: Missing or invalid bearer token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Unauthorized'
+          example:
+            status: 401
+            error: Unauthorized
+            message: Access denied. Please provide valid authentication credentials.
+            path: /api/transactions
+            timestamp: '2026-01-01T00:00:00'
+    Problem:
+      description: Request rejected
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            title: Bad Request
+            status: 400
+            detail: Invalid limit
+    NotFound:
+      description: Transaction or account not found for this caller
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            title: Not Found
+            status: 404
+            detail: Transaction not found
+    CreatedTransaction:
+      description: Transaction recorded
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/TransactionResponse'
+          example:
+            id: 10
+            userId: 7
+            toAccountId: 1
+            amount: 30.0
+            type: DEPOSIT
+            description: Synthetic ledger movement
+            status: COMPLETED
+            createdAt: '2026-01-01T00:00:00'
+            processedAt: '2026-01-01T00:00:01'
+    MoneyMovementRejected:
+      description: >
+        Insufficient funds return a JSON code. Bean validation returns a field map.
+        An invalid idempotency key returns problem+json. A fraud rejection returns
+        400 with an empty body and no content.
+      content:
+        application/json:
+          schema:
+            oneOf:
+              - $ref: '#/components/schemas/InsufficientFunds'
+              - $ref: '#/components/schemas/ValidationError'
+          examples:
+            insufficientFunds:
+              summary: Confirmed insufficient funds
+              value:
+                code: INSUFFICIENT_FUNDS
+                message: Insufficient balance
+            validation:
+              summary: Invalid request body
+              value:
+                amount: Amount must be positive
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            title: Bad Request
+            status: 400
+            detail: Invalid Idempotency-Key
+    IdempotencyConflict:
+      description: Idempotency key was reused for a different transaction
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            title: Conflict
+            status: 409
+            detail: Idempotency key was reused for a different transaction
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
   schemas:
+    TransactionType:
+      type: string
+      enum: [DEPOSIT, WITHDRAWAL, TRANSFER]
+    TransactionStatus:
+      type: string
+      enum: [PENDING, COMPLETED, FAILED, CANCELLED]
+    Problem:
+      type: object
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
+    ValidationError:
+      type: object
+      additionalProperties:
+        type: string
+      example:
+        amount: Amount must be positive
+    InsufficientFunds:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          enum: [INSUFFICIENT_FUNDS]
+        message:
+          type: string
+      example:
+        code: INSUFFICIENT_FUNDS
+        message: Insufficient balance
+    Unauthorized:
+      type: object
+      required: [status, error, message, path, timestamp]
+      properties:
+        status:
+          type: integer
+        error:
+          type: string
+        message:
+          type: string
+        path:
+          type: string
+        timestamp:
+          type: string
     TransactionList:
       type: array
       items:
@@ -347,6 +569,16 @@ components:
           type: integer
     TransactionSummary:
       type: object
+      required:
+        - totalTransactions
+        - totalDeposits
+        - totalWithdrawals
+        - totalTransfers
+        - pendingTransactions
+        - completedTransactions
+        - failedTransactions
+        - transactionsByType
+        - transactionsByStatus
       properties:
         totalTransactions:
           type: integer
@@ -381,10 +613,14 @@ components:
             format: int64
     TransactionResponse:
       type: object
+      required: [id, userId, amount, type, status, createdAt]
       properties:
         id:
           type: integer
           format: int64
+        userId:
+          type: integer
+          format: int64
         fromAccountId:
           type: integer
           format: int64
@@ -395,39 +631,52 @@ components:
           nullable: true
         amount:
           type: number
+          format: double
         type:
+          $ref: '#/components/schemas/TransactionType'
+        description:
           type: string
-        timestamp:
+          nullable: true
+        status:
+          $ref: '#/components/schemas/TransactionStatus'
+        createdAt:
           type: string
           format: date-time
+        processedAt:
+          type: string
+          format: date-time
+          nullable: true
     DepositRequest:
       type: object
-      required:
-        - accountId
-        - amount
+      required: [accountId, amount]
       properties:
         accountId:
           type: integer
           format: int64
         amount:
           type: number
+          format: double
+          exclusiveMinimum: true
+          minimum: 0
+        description:
+          type: string
     WithdrawRequest:
       type: object
-      required:
-        - accountId
-        - amount
+      required: [accountId, amount]
       properties:
         accountId:
           type: integer
           format: int64
         amount:
           type: number
+          format: double
+          exclusiveMinimum: true
+          minimum: 0
+        description:
+          type: string
     TransferRequest:
       type: object
-      required:
-        - fromAccountId
-        - toAccountId
-        - amount
+      required: [fromAccountId, toAccountId, amount]
       properties:
         fromAccountId:
           type: integer
@@ -437,3 +686,33 @@ components:
           format: int64
         amount:
           type: number
+          format: double
+          exclusiveMinimum: true
+          minimum: 0
+        description:
+          type: string
+    CreateTransactionRequest:
+      type: object
+      required: [accountId, type, amount, currency]
+      properties:
+        accountId:
+          type: integer
+          format: int64
+        toAccountId:
+          type: integer
+          format: int64
+          nullable: true
+        type:
+          $ref: '#/components/schemas/TransactionType'
+        amount:
+          type: number
+          format: double
+          exclusiveMinimum: true
+          minimum: 0
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+          pattern: '^[A-Z]{3}$'
+        description:
+          type: string

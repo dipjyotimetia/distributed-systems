@@ -2,9 +2,10 @@ package integration
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
+
+	banking "microsvc/integration/temporal/gen"
 )
 
 func (a *Activities) VerifyAccountLifecycle(ctx context.Context, input Input, id int64) (BoundaryEvidence, error) {
@@ -12,79 +13,82 @@ func (a *Activities) VerifyAccountLifecycle(ctx context.Context, input Input, id
 	if err != nil {
 		return BoundaryEvidence{}, err
 	}
-	path := fmt.Sprintf("/api/accounts/%d", id)
-	other, err := a.login(ctx, Input{User: input.User + "b"})
+	otherToken, err := a.login(ctx, Input{User: input.User + "b"})
 	if err != nil {
 		return BoundaryEvidence{}, err
 	}
-	foreign, err := request(ctx, http.MethodDelete, a.Frontend, path, other, nil)
-	if err != nil || foreign.Status != 404 {
+	other, err := a.api(otherToken)
+	if err != nil {
+		return BoundaryEvidence{}, err
+	}
+	foreign, err := other.CloseAccountWithResponse(ctx, id)
+	if err != nil || foreign.StatusCode() != http.StatusNotFound {
 		return BoundaryEvidence{}, fmt.Errorf("foreign account closure must return HTTP 404")
 	}
-	change := func(status string, expected int) error {
-		response, err := request(ctx, http.MethodPatch, a.Frontend, path+"/status", token, map[string]string{"status": status})
+	client, err := a.api(token)
+	if err != nil {
+		return BoundaryEvidence{}, err
+	}
+	change := func(status banking.AccountStatusChange, expected int) error {
+		response, err := client.UpdateAccountStatusWithResponse(ctx, id, banking.StatusUpdateRequest{Status: status})
 		if err != nil {
 			return err
 		}
-		if response.Status != expected {
-			return fmt.Errorf("account status %s returned %d, expected %d", status, response.Status, expected)
+		if response.StatusCode() != expected {
+			return fmt.Errorf("account status %s returned %d, expected %d", status, response.StatusCode(), expected)
 		}
-		if expected == 200 {
-			var account accountRecord
-			if json.Unmarshal(response.Body, &account) != nil || account.ID != id || account.Status != status {
-				return fmt.Errorf("account status response did not match %s", status)
-			}
+		if expected == http.StatusOK && (response.JSON200 == nil || response.JSON200.Id != id || string(response.JSON200.Status) != string(status)) {
+			return fmt.Errorf("account status response did not match %s", status)
 		}
 		return nil
 	}
 
-	if err := change("FROZEN", 200); err != nil {
+	if err := change(banking.AccountStatusChangeFROZEN, http.StatusOK); err != nil {
 		return BoundaryEvidence{}, err
 	}
-	payload := map[string]any{"accountId": id, "amount": 8, "description": "Lifecycle movement"}
-	if err := call(ctx, a.Frontend, "/api/transactions/deposit", token, payload, 409, nil); err != nil {
+	movement := banking.DepositRequest{AccountId: id, Amount: 8, Description: strPtr("Lifecycle movement")}
+	frozen, err := client.DepositWithResponse(ctx, nil, movement)
+	if err != nil || frozen.StatusCode() != http.StatusConflict {
+		return BoundaryEvidence{}, fmt.Errorf("frozen deposit must return HTTP 409")
+	}
+	if err := change(banking.AccountStatusChangeACTIVE, http.StatusOK); err != nil {
 		return BoundaryEvidence{}, err
 	}
-	if err := change("ACTIVE", 200); err != nil {
+	deposited, err := client.DepositWithResponse(ctx, nil, movement)
+	if err != nil || deposited.StatusCode() != http.StatusCreated || deposited.JSON201 == nil {
+		return BoundaryEvidence{}, fmt.Errorf("lifecycle deposit did not settle")
+	}
+	deposit := ledgerFrom(*deposited.JSON201)
+	if err := change(banking.AccountStatusChangeCLOSED, http.StatusConflict); err != nil {
 		return BoundaryEvidence{}, err
 	}
-	var deposit, withdrawal ledgerEntry
-	if err := call(ctx, a.Frontend, "/api/transactions/deposit", token, payload, 201, &deposit); err != nil {
-		return BoundaryEvidence{}, err
+	withdrawn, err := client.WithdrawWithResponse(ctx, nil, banking.WithdrawRequest{AccountId: id, Amount: 8, Description: movement.Description})
+	if err != nil || withdrawn.StatusCode() != http.StatusCreated || withdrawn.JSON201 == nil {
+		return BoundaryEvidence{}, fmt.Errorf("lifecycle withdrawal did not settle")
 	}
-	if err := change("CLOSED", 409); err != nil {
-		return BoundaryEvidence{}, err
-	}
-	if err := call(ctx, a.Frontend, "/api/transactions/withdraw", token, payload, 201, &withdrawal); err != nil {
-		return BoundaryEvidence{}, err
-	}
+	withdrawal := ledgerFrom(*withdrawn.JSON201)
 	for range 2 {
-		result, err := request(ctx, http.MethodDelete, a.Frontend, path, token, nil)
+		result, err := client.CloseAccountWithResponse(ctx, id)
 		if err != nil {
 			return BoundaryEvidence{}, err
 		}
-		if result.Status != 204 || len(result.Body) != 0 {
+		if result.StatusCode() != http.StatusNoContent || len(result.Body) != 0 {
 			return BoundaryEvidence{}, fmt.Errorf("closing zero-balance account did not return empty HTTP 204")
 		}
 	}
-	if err := change("ACTIVE", 409); err != nil {
+	if err := change(banking.AccountStatusChangeACTIVE, http.StatusConflict); err != nil {
 		return BoundaryEvidence{}, err
 	}
-	var history []ledgerEntry
-	if err := call(ctx, a.Frontend, path+"/transactions", token, nil, 200, &history); err != nil {
+	historyResponse, err := client.ListAccountTransactionsWithResponse(ctx, id, nil)
+	if err != nil {
 		return BoundaryEvidence{}, err
 	}
-	if len(history) != 2 || history[0].ID != withdrawal.ID || history[1].ID != deposit.ID {
+	history, err := transactionRows(historyResponse.Body)
+	if err != nil || historyResponse.StatusCode() != http.StatusOK || len(history) != 2 || history[0].Id != withdrawal.ID || history[1].Id != deposit.ID {
 		return BoundaryEvidence{}, fmt.Errorf("closed account history did not retain both movements")
 	}
-	var export struct {
-		Status    string
-		Statement accountStatement
-	}
-	if err := call(ctx, a.Frontend, path+"/export-statement", token, struct{}{}, 200, &export); err != nil {
-		return BoundaryEvidence{}, err
-	}
-	if export.Status != "generated" || export.Statement.AccountID != id || export.Statement.Balance != 0 {
+	export, err := client.ExportAccountStatementWithResponse(ctx, id)
+	if err != nil || export.StatusCode() != http.StatusOK || export.JSON200 == nil || export.JSON200.Status != banking.Generated || export.JSON200.Statement == nil || export.JSON200.Statement.AccountId != id || export.JSON200.Statement.Balance != 0 {
 		return BoundaryEvidence{}, fmt.Errorf("closed account statement did not retain the zero balance")
 	}
 	return BoundaryEvidence{"Account lifecycle", "freeze, unfreeze, zero-balance closure and retained history",

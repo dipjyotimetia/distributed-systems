@@ -1,0 +1,277 @@
+openapi: 3.0.3
+info:
+  title: User Service
+  description: Registration, login, profile, and availability checks.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8081/api
+    description: Local development server
+paths:
+  /users/register:
+    post:
+      operationId: registerUser
+      summary: Register a user
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+            example:
+              username: ada
+              email: ada@example.test
+              password: correct-horse
+      responses:
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserIdentity'
+              example:
+                id: 1
+                username: ada
+                email: ada@example.test
+                roles: USER
+                createdAt: '2026-01-01T00:00:00Z'
+        '400':
+          description: Registration rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiMessage'
+              example:
+                success: false
+                message: Registration failed
+        '409':
+          description: Username or email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiMessage'
+              example:
+                success: false
+                message: Username already exists
+  /users/login:
+    post:
+      operationId: loginUser
+      summary: Exchange credentials for a bearer token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            example:
+              usernameOrEmail: ada
+              password: correct-horse
+      responses:
+        '200':
+          description: Authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+              example:
+                token: eyJhbGciOiJIUzI1NiJ9.example
+                type: Bearer
+                id: 1
+                username: ada
+                email: ada@example.test
+                roles: USER
+        '400':
+          description: Login rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiMessage'
+              example:
+                success: false
+                message: Login failed
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiMessage'
+              example:
+                success: false
+                message: Invalid credentials
+  /users/profile:
+    get:
+      operationId: getProfile
+      summary: Read the authenticated profile
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfileResponse'
+              example:
+                success: true
+                message: Profile retrieved successfully
+                data:
+                  id: 1
+                  username: ada
+                  email: ada@example.test
+                  roles: USER
+                  createdAt: '2026-01-01T00:00:00Z'
+        '400':
+          description: Profile could not be loaded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiMessage'
+              example:
+                success: false
+                message: Profile retrieval failed
+        '401':
+          description: Missing or invalid bearer token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiMessage'
+              example:
+                success: false
+                message: Missing or invalid token
+  /users/check-username:
+    get:
+      operationId: checkUsername
+      summary: Check whether a username is available
+      security: []
+      parameters:
+        - name: username
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Availability
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Availability'
+              example:
+                success: true
+                available: true
+                message: Username is available
+  /users/check-email:
+    get:
+      operationId: checkEmail
+      summary: Check whether an email is available
+      security: []
+      parameters:
+        - name: email
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Availability
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Availability'
+              example:
+                success: true
+                available: false
+                message: Email is not available
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    RegisterRequest:
+      type: object
+      required: [username, email, password]
+      properties:
+        username:
+          type: string
+        email:
+          type: string
+        password:
+          type: string
+        seedAccountData:
+          type: boolean
+    LoginRequest:
+      type: object
+      required: [usernameOrEmail, password]
+      properties:
+        usernameOrEmail:
+          type: string
+        password:
+          type: string
+    UserIdentity:
+      type: object
+      required: [id, username, email, roles, createdAt]
+      properties:
+        id:
+          type: integer
+          format: int64
+        username:
+          type: string
+        email:
+          type: string
+        roles:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+          nullable: true
+    LoginResponse:
+      type: object
+      required: [token, type, id, username, email, roles]
+      properties:
+        token:
+          type: string
+        type:
+          type: string
+        id:
+          type: integer
+          format: int64
+        username:
+          type: string
+        email:
+          type: string
+        roles:
+          type: string
+    ProfileResponse:
+      type: object
+      required: [success, message, data]
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/UserIdentity'
+    Availability:
+      type: object
+      required: [success, available, message]
+      properties:
+        success:
+          type: boolean
+        available:
+          type: boolean
+        message:
+          type: string
+    ApiMessage:
+      type: object
+      required: [success, message]
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string

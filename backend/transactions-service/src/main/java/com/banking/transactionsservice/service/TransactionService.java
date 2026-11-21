@@ -2,7 +2,13 @@ package com.banking.transactionsservice.service;
 
 import com.banking.transactionsservice.client.AccountsServiceClient;
 import com.banking.transactionsservice.client.FraudServiceClient;
-import com.banking.transactionsservice.dto.*;
+import com.banking.transactionsservice.dto.TransactionQuery;
+import com.banking.transactionsservice.generated.CreateTransactionRequest;
+import com.banking.transactionsservice.generated.DepositRequest;
+import com.banking.transactionsservice.generated.TransactionResponse;
+import com.banking.transactionsservice.generated.TransactionSummary;
+import com.banking.transactionsservice.generated.TransferRequest;
+import com.banking.transactionsservice.generated.WithdrawRequest;
 import com.banking.transactionsservice.entity.Transaction;
 import com.banking.transactionsservice.entity.Transaction.TransactionStatus;
 import com.banking.transactionsservice.entity.Transaction.TransactionType;
@@ -29,7 +35,9 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.LinkedHashMap;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
@@ -161,10 +169,14 @@ public class TransactionService {
             byStatus.merge(group.getStatus(), group.getTotal(), Long::sum);
             total += group.getTotal();
         }
+        Map<String, Long> typeCounts = new LinkedHashMap<>();
+        byType.forEach((type, count) -> typeCounts.put(type.name(), count));
+        Map<String, Long> statusCounts = new LinkedHashMap<>();
+        byStatus.forEach((status, count) -> statusCounts.put(status.name(), count));
         return new TransactionSummary(total, byType.get(TransactionType.DEPOSIT),
                 byType.get(TransactionType.WITHDRAWAL), byType.get(TransactionType.TRANSFER),
                 byStatus.get(TransactionStatus.PENDING), byStatus.get(TransactionStatus.COMPLETED),
-                byStatus.get(TransactionStatus.FAILED), byType, byStatus);
+                byStatus.get(TransactionStatus.FAILED), typeCounts, statusCounts);
     }
 
     private void requireAccountOwnership(Long accountId, HttpServletRequest request) {
@@ -330,48 +342,36 @@ public class TransactionService {
                    userId, request.getAccountId(), request.getType(), request.getAmount());
         
         switch (request.getType()) {
-            case "DEPOSIT":
-                DepositRequest depositRequest = new DepositRequest();
-                depositRequest.setAccountId(request.getAccountId());
-                depositRequest.setAmount(request.getAmount());
-                depositRequest.setDescription(request.getDescription());
-                return deposit(depositRequest, userId, httpRequest);
-                
-            case "WITHDRAWAL":
-                WithdrawRequest withdrawRequest = new WithdrawRequest();
-                withdrawRequest.setAccountId(request.getAccountId());
-                withdrawRequest.setAmount(request.getAmount());
-                withdrawRequest.setDescription(request.getDescription());
-                return withdraw(withdrawRequest, userId, httpRequest);
-                
-            case "TRANSFER":
+            case DEPOSIT:
+                return deposit(new DepositRequest(request.getAccountId(), request.getAmount())
+                        .description(request.getDescription()), userId, httpRequest);
+            case WITHDRAWAL:
+                return withdraw(new WithdrawRequest(request.getAccountId(), request.getAmount())
+                        .description(request.getDescription()), userId, httpRequest);
+            case TRANSFER:
                 if (request.getToAccountId() == null) {
                     throw new RuntimeException("To account ID is required for transfer transactions");
                 }
-                TransferRequest transferRequest = new TransferRequest();
-                transferRequest.setFromAccountId(request.getAccountId());
-                transferRequest.setToAccountId(request.getToAccountId());
-                transferRequest.setAmount(request.getAmount());
-                transferRequest.setDescription(request.getDescription());
-                return transfer(transferRequest, userId, httpRequest);
-                
+                return transfer(new TransferRequest(request.getAccountId(), request.getToAccountId(), request.getAmount())
+                        .description(request.getDescription()), userId, httpRequest);
             default:
                 throw new RuntimeException("Invalid transaction type: " + request.getType());
         }
     }
 
     private TransactionResponse convertToResponse(Transaction transaction) {
-        return new TransactionResponse(
+        TransactionResponse response = new TransactionResponse(
             transaction.getId(),
             transaction.getUserId(),
-            transaction.getFromAccountId(),
-            transaction.getToAccountId(),
             transaction.getAmount(),
-            transaction.getType(),
-            transaction.getDescription(),
-            transaction.getStatus(),
-            transaction.getCreatedAt(),
-            transaction.getProcessedAt()
+            com.banking.transactionsservice.generated.TransactionType.fromValue(transaction.getType().name()),
+            com.banking.transactionsservice.generated.TransactionStatus.fromValue(transaction.getStatus().name()),
+            transaction.getCreatedAt()
         );
+        response.setFromAccountId(transaction.getFromAccountId());
+        response.setToAccountId(transaction.getToAccountId());
+        response.setDescription(transaction.getDescription());
+        response.setProcessedAt(transaction.getProcessedAt());
+        return response;
     }
 }

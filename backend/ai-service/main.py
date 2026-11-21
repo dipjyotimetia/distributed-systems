@@ -19,6 +19,7 @@ from prometheus_client.platform_collector import PlatformCollector
 from pydantic import BaseModel
 
 from delivery import prepare_for_delivery
+from generated_models import ChatRequest, ChatResponse, ProviderResult
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -122,25 +123,6 @@ PROVIDER_URLS = {
     "xai": os.environ.get("XAI_URL", "https://api.x.ai/v1/chat/completions"),
     "openrouter": os.environ.get("OPENROUTER_URL", "https://openrouter.ai/api/v1/chat/completions"),
 }
-
-class ChatRequest(BaseModel):
-    message: str
-    accountContext: str = ""
-    locale: str = "en-US"
-
-
-class ProviderResult(BaseModel):
-    provider: str
-    name: str
-    model: str
-    message: str = ""
-    error: str | None = None
-    durationMs: int = 0
-
-
-class ChatResponse(BaseModel):
-    results: list[ProviderResult]
-
 
 async def call_anthropic(client: httpx.AsyncClient, message: str, context: str) -> ProviderResult:
     info = PROVIDERS[0]

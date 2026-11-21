@@ -2,9 +2,10 @@ package integration
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
+
+	banking "microsvc/integration/temporal/gen"
 )
 
 func (a *Activities) SeedPendingTransaction(ctx context.Context, userID, accountID int64) (int64, error) {
@@ -22,37 +23,42 @@ func (a *Activities) SeedPendingTransaction(ctx context.Context, userID, account
 }
 
 func (a *Activities) AssertConditionalCancellation(ctx context.Context, input Input, id int64) (BoundaryEvidence, error) {
-	path := fmt.Sprintf("/api/transactions/%d/cancel", id)
 	otherToken, err := a.login(ctx, Input{User: input.User + "b"})
 	if err != nil {
 		return BoundaryEvidence{}, err
 	}
-	foreign, err := request(ctx, http.MethodPatch, a.Frontend, path, otherToken, nil)
-	if err != nil || foreign.Status != 404 {
+	other, err := a.api(otherToken)
+	if err != nil {
+		return BoundaryEvidence{}, err
+	}
+	foreign, err := other.CancelTransactionWithResponse(ctx, id)
+	if err != nil || foreign.StatusCode() != http.StatusNotFound {
 		return BoundaryEvidence{}, fmt.Errorf("foreign transaction cancellation must return HTTP 404")
 	}
 	token, err := a.login(ctx, input)
 	if err != nil {
 		return BoundaryEvidence{}, err
 	}
-	type cancellationResult struct {
-		ID                  int64
-		Status, ProcessedAt string
+	client, err := a.api(token)
+	if err != nil {
+		return BoundaryEvidence{}, err
 	}
-	var first cancellationResult
+	var first banking.TransactionResponse
 	for attempt := 0; attempt < 2; attempt++ {
-		response, err := request(ctx, http.MethodPatch, a.Frontend, path, token, nil)
+		response, err := client.CancelTransactionWithResponse(ctx, id)
 		if err != nil {
 			return BoundaryEvidence{}, err
 		}
-		var result cancellationResult
-		if response.Status != 200 || json.Unmarshal(response.Body, &result) != nil || result.ID != id ||
-			result.Status != "CANCELLED" || result.ProcessedAt == "" {
+		if response.StatusCode() != http.StatusOK || response.JSON200 == nil || response.JSON200.Id != id ||
+			response.JSON200.Status != banking.CANCELLED || response.JSON200.ProcessedAt == nil || response.JSON200.ProcessedAt.Time().IsZero() {
 			return BoundaryEvidence{}, fmt.Errorf("pending transaction cancellation did not return the cancelled row")
 		}
 		if attempt == 0 {
-			first = result
-		} else if result != first {
+			first = *response.JSON200
+			continue
+		}
+		if first.Id != response.JSON200.Id || first.Status != response.JSON200.Status ||
+			!first.ProcessedAt.Time().Equal(response.JSON200.ProcessedAt.Time()) {
 			return BoundaryEvidence{}, fmt.Errorf("repeated cancellation changed the settled row")
 		}
 	}

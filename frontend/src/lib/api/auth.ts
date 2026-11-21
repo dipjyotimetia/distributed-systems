@@ -1,5 +1,12 @@
 import axios from 'axios';
-import { LoginRequest, RegisterRequest, AuthResponse, User } from '../types/auth';
+import type { LoginRequest } from '../../gen/http/LoginRequest';
+import type { ProfileResponse } from '../../gen/http/ProfileResponse';
+import type { RegisterRequest } from '../../gen/http/RegisterRequest';
+import { AuthResponse, User } from '../types/auth';
+import type { Wire } from './wire';
+
+export type { LoginRequest, RegisterRequest };
+export type UserProfile = Wire<ProfileResponse>;
 
 // Always use relative URLs - Next.js will handle API routing
 const API_BASE_URL = '';

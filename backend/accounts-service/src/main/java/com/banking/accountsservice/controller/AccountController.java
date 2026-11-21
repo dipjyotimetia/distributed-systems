@@ -1,10 +1,14 @@
 package com.banking.accountsservice.controller;
 
-import com.banking.accountsservice.dto.AccountCreateRequest;
-import com.banking.accountsservice.dto.AccountResponse;
 import com.banking.accountsservice.dto.AccountQuery;
-import com.banking.accountsservice.dto.AccountSummary;
-import com.banking.accountsservice.dto.BalanceResponse;
+import com.banking.accountsservice.generated.AccountCreateRequest;
+import com.banking.accountsservice.generated.AccountResponse;
+import com.banking.accountsservice.generated.AccountSummary;
+import com.banking.accountsservice.generated.AccountUpdateRequest;
+import com.banking.accountsservice.generated.BalanceResponse;
+import com.banking.accountsservice.generated.BalanceUpdateRequest;
+import com.banking.accountsservice.generated.StatementExportResponse;
+import com.banking.accountsservice.generated.StatusUpdateRequest;
 import com.banking.accountsservice.entity.Account.Status;
 import com.banking.accountsservice.security.UserAuthenticationDetails;
 import com.banking.accountsservice.service.AccountService;
@@ -24,10 +28,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.math.BigDecimal;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/accounts")
@@ -92,7 +93,7 @@ public class AccountController {
             
             AccountResponse account = accountService.createAccount(request, userId);
             span.setAttribute("user.id", userId);
-            span.setAttribute("account.type", request.getAccountType());
+            span.setAttribute("account.type", request.getAccountType().getValue());
             span.setAttribute("account.number", account.getAccountNumber());
             
             return ResponseEntity.status(HttpStatus.CREATED).body(account);
@@ -137,17 +138,17 @@ public class AccountController {
         return ResponseEntity.status(failure.getStatusCode()).body(failure.getBody());
     }
 
-    public record AccountUpdateRequest(String accountType, Status status) {}
-    public record StatusUpdateRequest(@jakarta.validation.constraints.NotNull Status status) {}
-
     @PutMapping("/{accountId}")
-    public AccountResponse updateAccount(@PathVariable Long accountId, @RequestBody AccountUpdateRequest request) {
-        return accountService.updateAccount(accountId, getUserIdFromAuthentication(), request.accountType(), request.status());
+    public AccountResponse updateAccount(@PathVariable Long accountId, @Valid @RequestBody AccountUpdateRequest request) {
+        Status status = request.getStatus() == null ? null : Status.valueOf(request.getStatus().getValue());
+        String accountType = request.getAccountType() == null ? null : request.getAccountType().getValue();
+        return accountService.updateAccount(accountId, getUserIdFromAuthentication(), accountType, status);
     }
 
     @PatchMapping("/{accountId}/status")
     public AccountResponse updateStatus(@PathVariable Long accountId, @Valid @RequestBody StatusUpdateRequest request) {
-        return accountService.updateAccount(accountId, getUserIdFromAuthentication(), null, request.status());
+        return accountService.updateAccount(accountId, getUserIdFromAuthentication(), null,
+                Status.valueOf(request.getStatus().getValue()));
     }
 
     @DeleteMapping("/{accountId}")
@@ -187,19 +188,13 @@ public class AccountController {
     @PutMapping("/{accountId}/balance")
     public ResponseEntity<Void> updateAccountBalance(
             @PathVariable Long accountId,
-            @RequestBody Map<String, Object> requestBody) {
+            @Valid @RequestBody BalanceUpdateRequest request) {
         Span span = tracer.spanBuilder("update-account-balance").startSpan();
         try {
             Long userId = getUserIdFromAuthentication();
             logger.info("Updating balance for account {} for user: {}", accountId, userId);
-            
-            Object balanceObj = requestBody.get("balance");
-            if (!(balanceObj instanceof Number)) {
-                return ResponseEntity.badRequest().build();
-            }
-            
-            BigDecimal newBalance = new BigDecimal(balanceObj.toString());
-            accountService.updateBalance(accountId, newBalance, userId);
+
+            accountService.updateBalance(accountId, request.getBalance(), userId);
             
             span.setAttribute("user.id", userId);
             span.setAttribute("account.id", accountId);
@@ -219,7 +214,7 @@ public class AccountController {
     }
     
     @PostMapping("/{accountId}/export-statement")
-    public ResponseEntity<Map<String, Object>> exportStatement(
+    public ResponseEntity<StatementExportResponse> exportStatement(
             @PathVariable Long accountId) {
         Span span = tracer.spanBuilder("export-statement").startSpan();
         try {
@@ -231,9 +226,8 @@ public class AccountController {
                 // No object store wired in this environment: generate the
                 // statement and return it inline (zero external egress) rather
                 // than failing the request.
-                Map<String, Object> body = new HashMap<>();
-                body.put("status", "generated");
-                body.put("statement", statementExportService.generateStatement(accountId, userId));
+                StatementExportResponse body = new StatementExportResponse(StatementExportResponse.StatusEnum.GENERATED);
+                body.setStatement(statementExportService.generateStatement(accountId, userId));
                 return ResponseEntity.ok(body);
             }
 
@@ -241,9 +235,8 @@ public class AccountController {
             String key = statementExportService.exportStatement(accountId, userId);
             span.setAttribute("s3.key", key);
 
-            Map<String, Object> body = new HashMap<>();
-            body.put("status", "exported");
-            body.put("key", key);
+            StatementExportResponse body = new StatementExportResponse(StatementExportResponse.StatusEnum.EXPORTED);
+            body.setKey(key);
             return ResponseEntity.ok(body);
         } catch (RuntimeException e) {
             span.recordException(e);

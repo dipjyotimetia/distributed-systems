@@ -1,6 +1,7 @@
 package com.banking.accountsservice.integration;
 
-import com.banking.accountsservice.dto.AccountCreateRequest;
+import com.banking.accountsservice.generated.AccountCreateRequest;
+import com.banking.accountsservice.generated.AccountType;
 import com.banking.accountsservice.entity.Account.Status;
 import com.banking.accountsservice.service.AccountService;
 import com.banking.accountsservice.service.MovementReservations;
@@ -192,8 +193,7 @@ class MovementReservationsPostgresTest {
     }
 
     private long account(String balance, String currency) {
-        var request = new AccountCreateRequest();
-        request.setAccountType("CHECKING");
+        var request = new AccountCreateRequest(AccountType.CHECKING);
         request.setCurrency(currency);
         request.setInitialBalance(new BigDecimal(balance));
         return accounts.createAccount(request, OWNER).getId();

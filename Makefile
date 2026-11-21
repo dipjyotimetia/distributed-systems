@@ -254,6 +254,7 @@ help:
 	@echo "  docker-build-push  - Build and push Docker images"
 	@echo "  docker-build-versioned - Build Docker images with current version tag"
 	@echo "  docker-clean-versioned - Remove versioned Docker images"
+	@echo "  openapi-gen        - Regenerate HTTP models and clients from OpenAPI"
 	@echo "  test-backend       - Run backend tests"
 	@echo "  test-frontend      - Run frontend tests"
 	@echo "  test-e2e           - Run Playwright E2E tests (automated user journey)"
@@ -306,6 +307,10 @@ help:
 	@echo "  IMAGE_TAG          - Docker image tag (default: latest)"
 	@echo "  NAMESPACE          - Kubernetes namespace (default: banking-app)"
 	@echo "  KUSTOMIZE_DIR      - Kustomize directory (default: kubernetes/base)"
+.PHONY: openapi-gen
+openapi-gen:
+	bash scripts/openapi-gen.sh
+
 .PHONY: test-integration-temporal test-integration-temporal-ui
 test-integration-temporal:
 	bash tests/integration/temporal/run.sh

@@ -3,16 +3,12 @@ package integration
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"go.temporal.io/sdk/workflow"
+	banking "microsvc/integration/temporal/gen"
 )
-
-type accountStatement struct {
-	AccountID, UserID       int64
-	AccountType, ExportedAt string
-	Balance                 float64
-}
 
 func StatementJourney(ctx workflow.Context, input Input) ([]BoundaryEvidence, error) {
 	var a *Activities
@@ -41,25 +37,35 @@ func (a *Activities) ExportStatement(ctx context.Context, input Input, accountID
 	if err != nil {
 		return "", err
 	}
-	var response struct{ Status, Key string }
-	path := fmt.Sprintf("/api/accounts/%d/export-statement", accountID)
-	if err := call(ctx, a.Frontend, path, token, struct{}{}, 200, &response); err != nil {
+	client, err := a.api(token)
+	if err != nil {
+		return "", err
+	}
+	response, err := client.ExportAccountStatementWithResponse(ctx, accountID)
+	if err != nil {
+		return "", err
+	}
+	if err = expectStatus("POST /accounts/{id}/export-statement", response.StatusCode(), http.StatusOK); err != nil {
 		return "", err
 	}
 	prefix := fmt.Sprintf("statements/account-%d/", accountID)
-	if response.Status != "exported" || !strings.HasPrefix(response.Key, prefix) ||
-		!strings.HasSuffix(response.Key, ".json") || strings.Contains(strings.TrimPrefix(response.Key, prefix), "/") {
+	key := ""
+	if response.JSON200 != nil && response.JSON200.Key != nil {
+		key = *response.JSON200.Key
+	}
+	if response.JSON200 == nil || response.JSON200.Status != banking.Exported || !strings.HasPrefix(key, prefix) ||
+		!strings.HasSuffix(key, ".json") || strings.Contains(strings.TrimPrefix(key, prefix), "/") {
 		return "", fmt.Errorf("statement response did not identify the exported account object")
 	}
-	return response.Key, nil
+	return key, nil
 }
 
 func (a *Activities) VerifyStoredStatement(ctx context.Context, key string, userID, accountID int64) (BoundaryEvidence, error) {
-	var stored accountStatement
+	var stored banking.StatementDocument
 	if err := call(ctx, a.Deliveries, "/statements-test/"+key, "", nil, 200, &stored); err != nil {
 		return BoundaryEvidence{}, err
 	}
-	if stored.AccountID != accountID || stored.UserID != userID || stored.Balance != 40 || stored.AccountType != "SAVINGS" || stored.ExportedAt == "" {
+	if stored.AccountId != accountID || stored.UserId != userID || stored.Balance != 40 || stored.AccountType != "SAVINGS" || stored.ExportedAt.Time().IsZero() {
 		return BoundaryEvidence{}, fmt.Errorf("stored statement did not match the source account")
 	}
 	return BoundaryEvidence{"S3 statement", "one object containing the owned savings account and USD 40",
