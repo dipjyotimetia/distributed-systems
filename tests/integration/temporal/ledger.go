@@ -7,6 +7,8 @@ import (
 	"net/http"
 
 	"go.temporal.io/sdk/workflow"
+	"microsvc/integration/temporal/openapi/accounts"
+	"microsvc/integration/temporal/openapi/transactions"
 )
 
 type ledgerEntry struct {
@@ -101,16 +103,69 @@ func (a *Activities) MoveFunds(ctx context.Context, input Input, accountID int64
 	if err != nil {
 		return ledgerEntry{}, err
 	}
-	payload := map[string]any{"accountId": accountID, "amount": movement.Amount, "type": movement.Type, "description": "Synthetic ledger movement"}
-	if movement.Path == "/api/v1/transactions" || movement.Path == "/api/v1/transactions/create" {
-		payload["currency"] = "USD"
+	client, err := a.transactionsAPI()
+	if err != nil {
+		return ledgerEntry{}, err
 	}
-	var entry ledgerEntry
-	err = call(ctx, a.Frontend, movement.Path, token, payload, 201, &entry)
-	if err == nil && (entry.ID <= 0 || entry.Type != movement.Type || entry.Status != "COMPLETED" || entry.Amount != float64(movement.Amount)) {
-		err = fmt.Errorf("incorrect ledger entry from %s", movement.Path)
+	editor := transactions.RequestEditorFn(bearer(token))
+	description := text("Synthetic ledger movement")
+	var recorded *transactions.TransactionResponse
+	var status int
+	switch movement.Path {
+	case "/api/v1/transactions/deposit":
+		result, err := client.DepositWithResponse(ctx, transactions.DepositRequest{
+			AccountId: accountID, Amount: float32(movement.Amount), Description: description,
+		}, editor)
+		if err != nil {
+			return ledgerEntry{}, fmt.Errorf("POST %s request failed", movement.Path)
+		}
+		status, recorded = result.StatusCode(), result.JSON201
+	case "/api/v1/transactions/withdraw":
+		result, err := client.WithdrawWithResponse(ctx, transactions.WithdrawRequest{
+			AccountId: accountID, Amount: float32(movement.Amount), Description: description,
+		}, editor)
+		if err != nil {
+			return ledgerEntry{}, fmt.Errorf("POST %s request failed", movement.Path)
+		}
+		status, recorded = result.StatusCode(), result.JSON201
+	case "/api/v1/transactions/create":
+		result, err := client.CreateTransactionWithResponse(ctx, transactions.CreateTransactionJSONRequestBody{
+			AccountId: accountID, Amount: float32(movement.Amount), Currency: "USD",
+			Description: description, Type: transactions.CreateTransactionJSONBodyType(movement.Type),
+		}, editor)
+		if err != nil {
+			return ledgerEntry{}, fmt.Errorf("POST %s request failed", movement.Path)
+		}
+		status, recorded = result.StatusCode(), result.JSON201
+	case "/api/v1/transactions":
+		// The frontend accepts the create-transaction model on the collection path and forwards it to /create.
+		body := transactions.CreateTransactionJSONBody{
+			AccountId: accountID, Amount: float32(movement.Amount), Currency: "USD",
+			Description: description, Type: transactions.CreateTransactionJSONBodyType(movement.Type),
+		}
+		response, err := request(ctx, http.MethodPost, a.Frontend, movement.Path, token, body)
+		if err != nil {
+			return ledgerEntry{}, err
+		}
+		status = response.Status
+		if status == http.StatusCreated {
+			var decoded transactions.TransactionResponse
+			if err := json.Unmarshal(response.Body, &decoded); err != nil {
+				return ledgerEntry{}, fmt.Errorf("decode %s response", movement.Path)
+			}
+			recorded = &decoded
+		}
+	default:
+		return ledgerEntry{}, fmt.Errorf("unknown ledger movement %s", movement.Path)
 	}
-	return entry, err
+	if status != http.StatusCreated || recorded == nil {
+		return ledgerEntry{}, unexpectedStatus(http.MethodPost, movement.Path, status, http.StatusCreated)
+	}
+	entry := ledgerFrom(*recorded)
+	if entry.ID <= 0 || entry.Type != movement.Type || entry.Status != "COMPLETED" || entry.Amount != float64(movement.Amount) {
+		return ledgerEntry{}, fmt.Errorf("incorrect ledger entry from %s", movement.Path)
+	}
+	return entry, nil
 }
 
 func (a *Activities) RejectWithdrawal(ctx context.Context, input Input, accountID int64) error {
@@ -118,13 +173,20 @@ func (a *Activities) RejectWithdrawal(ctx context.Context, input Input, accountI
 	if err != nil {
 		return err
 	}
-	var failure struct{ Code string }
-	if err := call(ctx, a.Frontend, "/api/v1/transactions/withdraw", token, map[string]any{
-		"accountId": accountID, "amount": 150, "description": "Synthetic insufficient funds",
-	}, 400, &failure); err != nil {
+	client, err := a.transactionsAPI()
+	if err != nil {
 		return err
 	}
-	if failure.Code != "INSUFFICIENT_FUNDS" {
+	result, err := client.WithdrawWithResponse(ctx, transactions.WithdrawRequest{
+		AccountId: accountID, Amount: 150, Description: text("Synthetic insufficient funds"),
+	}, transactions.RequestEditorFn(bearer(token)))
+	if err != nil {
+		return fmt.Errorf("POST /api/v1/transactions/withdraw request failed")
+	}
+	if result.StatusCode() != http.StatusBadRequest {
+		return unexpectedStatus(http.MethodPost, "/api/v1/transactions/withdraw", result.StatusCode(), http.StatusBadRequest)
+	}
+	if result.JSON400 == nil || result.JSON400.Code != transactions.INSUFFICIENTFUNDS {
 		return fmt.Errorf("withdrawal did not return INSUFFICIENT_FUNDS")
 	}
 	return nil
@@ -136,86 +198,110 @@ type accountRecord struct {
 	Balance                       float64
 }
 
-type page[T any] struct {
-	Content       []T
-	TotalElements int
-	Number        int
-	Size          int
-}
-
 func (a *Activities) VerifyAccounts(ctx context.Context, input Input, userID, accountID, otherAccountID int64) (BoundaryEvidence, error) {
 	token, err := a.login(ctx, input)
 	if err != nil {
 		return BoundaryEvidence{}, err
 	}
-	expected := accountRecord{ID: accountID, UserID: userID, AccountType: "CHECKING", Currency: "USD", Status: "ACTIVE", Balance: 129}
-	for _, path := range []string{"/api/v1/accounts", "/api/v1/accounts?page=0&size=2", "/api/v1/accounts/search?q=checking&page=0&size=2"} {
-		var records []accountRecord
-		if path == "/api/v1/accounts" {
-			err = call(ctx, a.Frontend, path, token, nil, 200, &records)
-		} else {
-			var result page[accountRecord]
-			err = call(ctx, a.Frontend, path, token, nil, 200, &result)
-			records = result.Content
-			if err == nil && (result.TotalElements != 1 || result.Number != 0 || result.Size != 2) {
-				err = fmt.Errorf("incorrect account page metadata")
-			}
-		}
-		if err != nil {
-			return BoundaryEvidence{}, err
-		}
-		if len(records) != 1 || records[0] != expected {
-			return BoundaryEvidence{}, fmt.Errorf("incorrect account scope or balance on %s", path)
-		}
-	}
-	accountPath := fmt.Sprintf("/api/v1/accounts/%d", accountID)
-	var detail accountRecord
-	if err := call(ctx, a.Frontend, accountPath, token, nil, 200, &detail); err != nil {
-		return BoundaryEvidence{}, err
-	}
-	if detail != expected {
-		return BoundaryEvidence{}, fmt.Errorf("account detail did not match owned account")
-	}
-	forbidden, err := request(ctx, http.MethodGet, a.Frontend, fmt.Sprintf("/api/v1/accounts/%d", otherAccountID), token, nil)
+	client, err := a.accountsAPI()
 	if err != nil {
 		return BoundaryEvidence{}, err
 	}
-	if forbidden.Status != 404 || len(forbidden.Body) != 0 {
-		return BoundaryEvidence{}, fmt.Errorf("foreign account detail must return an empty 404")
+	editor := accounts.RequestEditorFn(bearer(token))
+	expected := accountRecord{ID: accountID, UserID: userID, AccountType: "CHECKING", Currency: "USD", Status: "ACTIVE", Balance: 129}
+	pageNumber, pageSize := 0, 2
+	query := "checking"
+	lists := []struct {
+		path  string
+		paged bool
+		load  func() (*accounts.AccountListOrPage, int, error)
+	}{
+		{"/api/v1/accounts", false, func() (*accounts.AccountListOrPage, int, error) {
+			result, err := client.ListAccountsWithResponse(ctx, &accounts.ListAccountsParams{}, editor)
+			if err != nil || result == nil {
+				return nil, 0, err
+			}
+			return result.JSON200, result.StatusCode(), nil
+		}},
+		{"/api/v1/accounts?page=0&size=2", true, func() (*accounts.AccountListOrPage, int, error) {
+			result, err := client.ListAccountsWithResponse(ctx, &accounts.ListAccountsParams{Page: &pageNumber, Size: &pageSize}, editor)
+			if err != nil || result == nil {
+				return nil, 0, err
+			}
+			return result.JSON200, result.StatusCode(), nil
+		}},
+		{"/api/v1/accounts/search?q=checking&page=0&size=2", true, func() (*accounts.AccountListOrPage, int, error) {
+			result, err := client.SearchAccountsWithResponse(ctx, &accounts.SearchAccountsParams{Q: &query, Page: &pageNumber, Size: &pageSize}, editor)
+			if err != nil || result == nil {
+				return nil, 0, err
+			}
+			return result.JSON200, result.StatusCode(), nil
+		}},
 	}
-	var balance struct {
-		Balance  float64
-		Currency string
-	}
-	if err := call(ctx, a.Frontend, accountPath+"/balance", token, nil, 200, &balance); err != nil {
-		return BoundaryEvidence{}, err
-	}
-	if balance.Balance != 129 || balance.Currency != "USD" {
-		return BoundaryEvidence{}, fmt.Errorf("account balance did not match the ledger")
-	}
-	var summary struct {
-		TotalAccounts, ActiveAccounts int
-		TotalBalance                  float64
-		AccountsByType                map[string]int
-	}
-	if err := call(ctx, a.Frontend, "/api/v1/accounts/summary", token, nil, 200, &summary); err != nil {
-		return BoundaryEvidence{}, err
-	}
-	if summary.TotalAccounts != 1 || summary.ActiveAccounts != 1 || summary.TotalBalance != 129 || summary.AccountsByType["CHECKING"] != 1 {
-		return BoundaryEvidence{}, fmt.Errorf("incorrect account summary")
-	}
-	var statement struct {
-		Status    string
-		Statement struct {
-			AccountID, UserID int64
-			Balance           float64
-			ExportedAt        string
+	for _, list := range lists {
+		body, status, err := list.load()
+		if err != nil {
+			return BoundaryEvidence{}, fmt.Errorf("GET %s request failed", list.path)
+		}
+		if status != http.StatusOK || body == nil {
+			return BoundaryEvidence{}, unexpectedStatus(http.MethodGet, list.path, status, http.StatusOK)
+		}
+		var records []accounts.AccountResponse
+		if list.paged {
+			page, err := body.AsAccountPage()
+			if err != nil || page.TotalElements != 1 || page.Number != 0 || page.Size != 2 {
+				return BoundaryEvidence{}, fmt.Errorf("incorrect account page metadata")
+			}
+			records = page.Content
+		} else {
+			records, err = body.AsAccountListOrPage0()
+			if err != nil {
+				return BoundaryEvidence{}, fmt.Errorf("decode %s response", list.path)
+			}
+		}
+		if len(records) != 1 || accountFrom(records[0]) != expected {
+			return BoundaryEvidence{}, fmt.Errorf("incorrect account scope or balance on %s", list.path)
 		}
 	}
-	if err := call(ctx, a.Frontend, accountPath+"/export-statement", token, struct{}{}, 200, &statement); err != nil {
+	detail, err := client.GetAccountWithResponse(ctx, accountID, editor)
+	if err != nil {
+		return BoundaryEvidence{}, fmt.Errorf("GET /api/v1/accounts/%d request failed", accountID)
+	}
+	if detail.StatusCode() != http.StatusOK || detail.JSON200 == nil || accountFrom(*detail.JSON200) != expected {
+		return BoundaryEvidence{}, fmt.Errorf("account detail did not match owned account")
+	}
+	forbidden, err := client.GetAccountWithResponse(ctx, otherAccountID, editor)
+	if err != nil {
 		return BoundaryEvidence{}, err
 	}
-	if statement.Status != "generated" || statement.Statement.AccountID != accountID || statement.Statement.UserID != userID || statement.Statement.Balance != 129 || statement.Statement.ExportedAt == "" {
+	if forbidden.StatusCode() != http.StatusNotFound || len(forbidden.Body) != 0 {
+		return BoundaryEvidence{}, fmt.Errorf("foreign account detail must return an empty 404")
+	}
+	balance, err := client.GetAccountBalanceWithResponse(ctx, accountID, editor)
+	if err != nil {
+		return BoundaryEvidence{}, fmt.Errorf("GET /api/v1/accounts/%d/balance request failed", accountID)
+	}
+	if balance.StatusCode() != http.StatusOK || balance.JSON200 == nil || amountValue(balance.JSON200.Balance) != 129 || textValue(balance.JSON200.Currency) != "USD" {
+		return BoundaryEvidence{}, fmt.Errorf("account balance did not match the ledger")
+	}
+	summary, err := client.SummarizeAccountsWithResponse(ctx, editor)
+	if err != nil {
+		return BoundaryEvidence{}, fmt.Errorf("GET /api/v1/accounts/summary request failed")
+	}
+	if summary.StatusCode() != http.StatusOK || summary.JSON200 == nil || summary.JSON200.TotalAccounts == nil || *summary.JSON200.TotalAccounts != 1 ||
+		summary.JSON200.ActiveAccounts == nil || *summary.JSON200.ActiveAccounts != 1 || amountValue(summary.JSON200.TotalBalance) != 129 ||
+		summary.JSON200.AccountsByType == nil || (*summary.JSON200.AccountsByType)["CHECKING"] != 1 {
+		return BoundaryEvidence{}, fmt.Errorf("incorrect account summary")
+	}
+	exported, err := client.ExportStatementWithResponse(ctx, accountID, editor)
+	if err != nil {
+		return BoundaryEvidence{}, fmt.Errorf("POST /api/v1/accounts/%d/export-statement request failed", accountID)
+	}
+	if exported.StatusCode() != http.StatusOK {
+		return BoundaryEvidence{}, unexpectedStatus(http.MethodPost, fmt.Sprintf("/api/v1/accounts/%d/export-statement", accountID), exported.StatusCode(), http.StatusOK)
+	}
+	status, _, statement, err := statementFrom(exported.JSON200)
+	if err != nil || status != "generated" || statement.AccountID != accountID || statement.UserID != userID || statement.Balance != 129 || statement.ExportedAt == "" {
 		return BoundaryEvidence{}, fmt.Errorf("incorrect inline account statement")
 	}
 	return BoundaryEvidence{"Frontend accounts", "one owned account, USD 129, scoped list/search/summary and inline statement", "scoped account reads and statement matched USD 129; foreign account returned an empty HTTP 404"}, nil
@@ -236,55 +322,120 @@ func (a *Activities) VerifyLedger(ctx context.Context, input Input, userID, acco
 		expected[entry.ID] = entry
 	}
 	accountPath := fmt.Sprintf("/api/v1/accounts/%d/transactions", accountID)
-	for _, path := range []string{"/api/v1/transactions", "/api/v1/transactions/recent?limit=4", accountPath} {
-		var rows []ledgerEntry
-		if err := call(ctx, a.Frontend, path, token, nil, 200, &rows); err != nil {
-			return BoundaryEvidence{}, err
+	lists := []struct {
+		path string
+		rows transactions.TransactionList
+		err  error
+	}{
+		{path: "/api/v1/transactions"},
+		{path: "/api/v1/transactions/recent?limit=4"},
+		{path: accountPath},
+	}
+	lists[0].rows, lists[0].err = a.transactionList(ctx, token, nil)
+	limit := 4
+	recent, err := a.transactionsAPI()
+	if err != nil {
+		return BoundaryEvidence{}, err
+	}
+	recentResult, err := recent.RecentTransactionsWithResponse(ctx, &transactions.RecentTransactionsParams{Limit: &limit}, transactions.RequestEditorFn(bearer(token)))
+	if err != nil {
+		return BoundaryEvidence{}, fmt.Errorf("GET /api/v1/transactions/recent request failed")
+	}
+	if recentResult.StatusCode() != http.StatusOK || recentResult.JSON200 == nil {
+		return BoundaryEvidence{}, unexpectedStatus(http.MethodGet, "/api/v1/transactions/recent", recentResult.StatusCode(), http.StatusOK)
+	}
+	lists[1].rows = *recentResult.JSON200
+	var accountRows transactions.TransactionList
+	if err := call(ctx, a.Frontend, accountPath, token, nil, http.StatusOK, &accountRows); err != nil {
+		return BoundaryEvidence{}, err
+	}
+	lists[2].rows = accountRows
+	for _, list := range lists {
+		if list.err != nil {
+			return BoundaryEvidence{}, list.err
 		}
-		if len(rows) != len(entries) {
-			return BoundaryEvidence{}, fmt.Errorf("wrong ledger count on %s", path)
+		if len(list.rows) != len(entries) {
+			return BoundaryEvidence{}, fmt.Errorf("wrong ledger count on %s", list.path)
 		}
-		for index, row := range rows {
-			if row != entries[len(entries)-1-index] {
-				return BoundaryEvidence{}, fmt.Errorf("wrong ledger entry or sort order on %s", path)
+		for index, row := range list.rows {
+			if ledgerFrom(row) != entries[len(entries)-1-index] {
+				return BoundaryEvidence{}, fmt.Errorf("wrong ledger entry or sort order on %s", list.path)
 			}
 		}
 	}
-	for _, path := range []string{"/api/v1/transactions?page=0&size=2&type=DEPOSIT", "/api/v1/transactions/search?page=0&size=2&type=DEPOSIT"} {
-		var result page[ledgerEntry]
-		if err := call(ctx, a.Frontend, path, token, nil, 200, &result); err != nil {
-			return BoundaryEvidence{}, err
+	pageNumber, pageSize := 0, 2
+	deposit := transactions.Type("DEPOSIT")
+	pages := []struct {
+		path string
+		body *transactions.TransactionListOrPage
+		code int
+		err  error
+	}{
+		{path: "/api/v1/transactions?page=0&size=2&type=DEPOSIT"},
+		{path: "/api/v1/transactions/search?page=0&size=2&type=DEPOSIT"},
+	}
+	filtered, err := recent.ListTransactionsWithResponse(ctx, &transactions.ListTransactionsParams{Page: &pageNumber, Size: &pageSize, Type: &deposit}, transactions.RequestEditorFn(bearer(token)))
+	if err != nil {
+		return BoundaryEvidence{}, fmt.Errorf("GET /api/v1/transactions request failed")
+	}
+	pages[0].body, pages[0].code = filtered.JSON200, filtered.StatusCode()
+	searched, err := recent.SearchTransactionsWithResponse(ctx, &transactions.SearchTransactionsParams{Page: &pageNumber, Size: &pageSize, Type: &deposit}, transactions.RequestEditorFn(bearer(token)))
+	if err != nil {
+		return BoundaryEvidence{}, fmt.Errorf("GET /api/v1/transactions/search request failed")
+	}
+	pages[1].body, pages[1].code = searched.JSON200, searched.StatusCode()
+	for _, page := range pages {
+		if page.code != http.StatusOK || page.body == nil {
+			return BoundaryEvidence{}, unexpectedStatus(http.MethodGet, page.path, page.code, http.StatusOK)
 		}
-		if result.Number != 0 || result.Size != 2 || result.TotalElements != 2 ||
-			len(result.Content) != 2 || result.Content[0] != entries[2] || result.Content[1] != entries[0] {
-			return BoundaryEvidence{}, fmt.Errorf("wrong filtered ledger page on %s", path)
+		result, err := page.body.AsTransactionPage()
+		if err != nil || result.Number != 0 || result.Size != 2 || result.TotalElements != 2 ||
+			len(result.Content) != 2 || ledgerFrom(result.Content[0]) != entries[2] || ledgerFrom(result.Content[1]) != entries[0] {
+			return BoundaryEvidence{}, fmt.Errorf("wrong filtered ledger page on %s", page.path)
 		}
 	}
-	for _, path := range []string{"/api/v1/transactions/summary", accountPath + "/summary"} {
-		var summary struct {
-			TotalTransactions, TotalDeposits, TotalWithdrawals, CompletedTransactions int
-		}
-		if err := call(ctx, a.Frontend, path, token, nil, 200, &summary); err != nil {
-			return BoundaryEvidence{}, err
-		}
-		if summary.TotalTransactions != 4 || summary.TotalDeposits != 2 || summary.TotalWithdrawals != 2 || summary.CompletedTransactions != 4 {
-			return BoundaryEvidence{}, fmt.Errorf("incorrect ledger summary on %s", path)
-		}
+	summaries := []struct {
+		path string
+		body *transactions.TransactionSummary
+		code int
+	}{{path: "/api/v1/transactions/summary"}, {path: accountPath + "/summary"}}
+	ownedSummary, err := recent.SummarizeTransactionsWithResponse(ctx, &transactions.SummarizeTransactionsParams{}, transactions.RequestEditorFn(bearer(token)))
+	if err != nil {
+		return BoundaryEvidence{}, fmt.Errorf("GET /api/v1/transactions/summary request failed")
 	}
-	detailPath := fmt.Sprintf("/api/v1/transactions/%d", entries[0].ID)
-	var detail ledgerEntry
-	if err := call(ctx, a.Frontend, detailPath, token, nil, 200, &detail); err != nil {
+	summaries[0].body, summaries[0].code = ownedSummary.JSON200, ownedSummary.StatusCode()
+	var accountSummary transactions.TransactionSummary
+	if err := call(ctx, a.Frontend, accountPath+"/summary", token, nil, http.StatusOK, &accountSummary); err != nil {
 		return BoundaryEvidence{}, err
 	}
-	if detail != entries[0] {
+	summaries[1].body, summaries[1].code = &accountSummary, http.StatusOK
+	for _, summary := range summaries {
+		if summary.code != http.StatusOK || summary.body == nil || summary.body.TotalTransactions == nil || *summary.body.TotalTransactions != 4 ||
+			summary.body.TotalDeposits == nil || *summary.body.TotalDeposits != 2 || summary.body.TotalWithdrawals == nil || *summary.body.TotalWithdrawals != 2 ||
+			summary.body.CompletedTransactions == nil || *summary.body.CompletedTransactions != 4 {
+			return BoundaryEvidence{}, fmt.Errorf("incorrect ledger summary on %s", summary.path)
+		}
+	}
+	detail, err := recent.GetTransactionWithResponse(ctx, entries[0].ID, transactions.RequestEditorFn(bearer(token)))
+	if err != nil {
+		return BoundaryEvidence{}, fmt.Errorf("GET /api/v1/transactions/%d request failed", entries[0].ID)
+	}
+	if detail.StatusCode() != http.StatusOK || detail.JSON200 == nil || ledgerFrom(*detail.JSON200) != entries[0] {
 		return BoundaryEvidence{}, fmt.Errorf("ledger detail did not match original response")
 	}
 	otherToken, err := a.login(ctx, Input{User: input.User + "b"})
 	if err != nil {
 		return BoundaryEvidence{}, err
 	}
-	for _, path := range []string{detailPath, accountPath, accountPath + "/summary"} {
-		if err := call(ctx, a.Frontend, path, otherToken, nil, 404, nil); err != nil {
+	foreignDetail, err := recent.GetTransactionWithResponse(ctx, entries[0].ID, transactions.RequestEditorFn(bearer(otherToken)))
+	if err != nil {
+		return BoundaryEvidence{}, err
+	}
+	if foreignDetail.StatusCode() != http.StatusNotFound {
+		return BoundaryEvidence{}, unexpectedStatus(http.MethodGet, fmt.Sprintf("/api/v1/transactions/%d", entries[0].ID), foreignDetail.StatusCode(), http.StatusNotFound)
+	}
+	for _, path := range []string{accountPath, accountPath + "/summary"} {
+		if err := call(ctx, a.Frontend, path, otherToken, nil, http.StatusNotFound, nil); err != nil {
 			return BoundaryEvidence{}, err
 		}
 	}
@@ -297,13 +448,16 @@ func (a *Activities) AssertSettledConflict(ctx context.Context, input Input, ent
 	if err != nil {
 		return err
 	}
-	path := fmt.Sprintf("/api/v1/transactions/%d/cancel", entry.ID)
-	response, err := request(ctx, http.MethodPatch, a.Frontend, path, token, nil)
+	client, err := a.transactionsAPI()
 	if err != nil {
 		return err
 	}
-	if response.Status != 409 {
-		return fmt.Errorf("settled transaction cancellation returned %d, expected 409", response.Status)
+	response, err := client.CancelTransactionWithResponse(ctx, entry.ID, transactions.RequestEditorFn(bearer(token)))
+	if err != nil {
+		return fmt.Errorf("PATCH /api/v1/transactions/%d/cancel request failed", entry.ID)
+	}
+	if response.StatusCode() != http.StatusConflict {
+		return fmt.Errorf("settled transaction cancellation returned %d, expected 409", response.StatusCode())
 	}
 	return nil
 }
@@ -332,33 +486,35 @@ func (a *Activities) VerifyPayments(ctx context.Context, entries []ledgerEntry) 
 }
 
 func (a *Activities) VerifyAccountTypeUpdate(ctx context.Context, input Input, userID, accountID int64) (BoundaryEvidence, error) {
-	path := fmt.Sprintf("/api/v1/accounts/%d", accountID)
-	payload := map[string]string{"accountType": "SAVINGS"}
 	other, err := a.login(ctx, Input{User: input.User + "b"})
 	if err != nil {
 		return BoundaryEvidence{}, err
 	}
-	forbidden, err := request(ctx, http.MethodPut, a.Frontend, path, other, payload)
-	if err != nil || forbidden.Status != 404 {
+	client, err := a.accountsAPI()
+	if err != nil {
+		return BoundaryEvidence{}, err
+	}
+	kind := accounts.AccountUpdateRequestAccountTypeSAVINGS
+	body := accounts.AccountUpdateRequest{AccountType: &kind}
+	forbidden, err := client.UpdateAccountWithResponse(ctx, accountID, body, accounts.RequestEditorFn(bearer(other)))
+	if err != nil || forbidden.StatusCode() != http.StatusNotFound {
 		return BoundaryEvidence{}, fmt.Errorf("foreign account update must return HTTP 404")
 	}
 	token, err := a.login(ctx, input)
 	if err != nil {
 		return BoundaryEvidence{}, err
 	}
-	updated, err := request(ctx, http.MethodPut, a.Frontend, path, token, payload)
+	editor := accounts.RequestEditorFn(bearer(token))
+	updated, err := client.UpdateAccountWithResponse(ctx, accountID, body, editor)
 	if err != nil {
-		return BoundaryEvidence{}, err
+		return BoundaryEvidence{}, fmt.Errorf("PUT /api/v1/accounts/%d request failed", accountID)
 	}
 	expected := accountRecord{ID: accountID, UserID: userID, AccountType: "SAVINGS", Currency: "USD", Status: "ACTIVE", Balance: 129}
-	var result accountRecord
-	if updated.Status != 200 || json.Unmarshal(updated.Body, &result) != nil || result != expected {
+	if updated.StatusCode() != http.StatusOK || updated.JSON200 == nil || accountFrom(*updated.JSON200) != expected {
 		return BoundaryEvidence{}, fmt.Errorf("account update did not preserve ownership or balance")
 	}
-	if err := call(ctx, a.Frontend, path, token, nil, 200, &result); err != nil {
-		return BoundaryEvidence{}, err
-	}
-	if result != expected {
+	persisted, err := client.GetAccountWithResponse(ctx, accountID, editor)
+	if err != nil || persisted.StatusCode() != http.StatusOK || persisted.JSON200 == nil || accountFrom(*persisted.JSON200) != expected {
 		return BoundaryEvidence{}, fmt.Errorf("account type update did not persist")
 	}
 	return BoundaryEvidence{"Account metadata", "owned account type changes with balance preserved",

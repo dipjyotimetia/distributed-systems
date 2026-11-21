@@ -26,13 +26,11 @@ paths:
       - $ref: '#/components/parameters/sort'
       responses:
         '200':
-          description: Transaction array or a page when page or size is supplied
+          description: Transaction array, or a transaction page when page or size is supplied
           content:
             application/json:
               schema:
-                description: Transaction array or a page when page or size is supplied
-                nullable: true
-                x-java-type: java.lang.Object
+                $ref: '#/components/schemas/TransactionListOrPage'
         '404':
           description: Account not found
       tags:
@@ -61,13 +59,11 @@ paths:
       - $ref: '#/components/parameters/sort'
       responses:
         '200':
-          description: Matching transaction page
+          description: Transaction array, or a transaction page when page or size is supplied
           content:
             application/json:
               schema:
-                description: Matching transaction page
-                nullable: true
-                x-java-type: java.lang.Object
+                $ref: '#/components/schemas/TransactionListOrPage'
       tags:
       - transactions
       operationId: searchTransactions
@@ -185,7 +181,7 @@ paths:
         '201':
           $ref: '#/components/responses/TransactionRecord'
         '400':
-          description: Rejected request. Confirmed insufficient funds include the INSUFFICIENT_FUNDS code.
+          description: Insufficient funds return an INSUFFICIENT_FUNDS body. Validation failures return a field map or an empty body.
       tags:
       - transactions
       operationId: createTransaction
@@ -229,21 +225,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/TransactionResponse'
         '400':
-          description: Rejected request. Confirmed insufficient funds include the INSUFFICIENT_FUNDS code.
+          description: Insufficient funds return an INSUFFICIENT_FUNDS body. Fraud and validation failures use this status with an empty body.
           content:
             application/json:
               schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: string
-                    enum:
-                    - INSUFFICIENT_FUNDS
-                  message:
-                    type: string
+                $ref: '#/components/schemas/InsufficientFunds'
       tags:
       - transactions
       operationId: withdraw
@@ -266,21 +252,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/TransactionResponse'
         '400':
-          description: Rejected request. Confirmed insufficient funds include the INSUFFICIENT_FUNDS code.
+          description: Insufficient funds return an INSUFFICIENT_FUNDS body. Fraud and validation failures use this status with an empty body.
           content:
             application/json:
               schema:
-                type: object
-                required:
-                - code
-                - message
-                properties:
-                  code:
-                    type: string
-                    enum:
-                    - INSUFFICIENT_FUNDS
-                  message:
-                    type: string
+                $ref: '#/components/schemas/InsufficientFunds'
       tags:
       - transactions
       operationId: transfer
@@ -362,6 +338,13 @@ components:
       scheme: bearer
       bearerFormat: JWT
   schemas:
+    TransactionListOrPage:
+      description: Transaction array, or a transaction page when page or size is supplied
+      nullable: true
+      x-java-type: java.lang.Object
+      oneOf:
+      - $ref: '#/components/schemas/TransactionList'
+      - $ref: '#/components/schemas/TransactionPage'
     TransactionList:
       type: array
       items:
@@ -477,6 +460,8 @@ components:
           format: int64
         amount:
           type: number
+        description:
+          type: string
     WithdrawRequest:
       type: object
       required:
@@ -488,6 +473,8 @@ components:
           format: int64
         amount:
           type: number
+        description:
+          type: string
     TransferRequest:
       type: object
       required:
@@ -503,3 +490,18 @@ components:
           format: int64
         amount:
           type: number
+        description:
+          type: string
+    InsufficientFunds:
+      type: object
+      description: Present when the ledger rejects a confirmed insufficient balance. Fraud and validation failures use HTTP 400 with an empty body.
+      required:
+      - code
+      - message
+      properties:
+        code:
+          type: string
+          enum:
+          - INSUFFICIENT_FUNDS
+        message:
+          type: string

@@ -273,6 +273,7 @@ help:
 	@echo "  k8s-status         - Check deployment status"
 	@echo ""
 	@echo "Testing & Debugging:"
+	@echo "  generate-openapi-temporal - Regenerate Temporal OpenAPI clients"
 	@echo "  logs               - Fetch logs from all services"
 	@echo "  port-forward       - Port forward API Gateway to localhost:8080"
 	@echo "  test-deployment    - Run E2E test against deployment"
@@ -306,6 +307,10 @@ help:
 	@echo "  IMAGE_TAG          - Docker image tag (default: latest)"
 	@echo "  NAMESPACE          - Kubernetes namespace (default: banking-app)"
 	@echo "  KUSTOMIZE_DIR      - Kustomize directory (default: kubernetes/base)"
+.PHONY: generate-openapi-temporal
+generate-openapi-temporal:
+	bash scripts/generate-openapi-temporal-clients.sh
+
 .PHONY: test-integration-temporal test-integration-temporal-ui
 test-integration-temporal:
 	bash tests/integration/temporal/run.sh

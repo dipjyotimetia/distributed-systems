@@ -7,7 +7,7 @@ export interface User {
   firstName?: string;
   lastName?: string;
   phone?: string;
-  roles: string;
+  roles: string[];
   status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED' | 'PENDING_VERIFICATION';
   emailVerified: boolean;
   phoneVerified: boolean;
@@ -36,7 +36,7 @@ export interface UserProfile {
   firstName?: string;
   lastName?: string;
   phone?: string;
-  roles: string;
+  roles: string[];
   status: string;
   emailVerified: boolean;
   phoneVerified: boolean;

@@ -74,7 +74,7 @@ describe('AuthContext', () => {
       id: 1,
       username: 'testuser',
       email: 'test@example.com',
-      roles: 'USER',
+      roles: ['USER'],
       createdAt: '2023-01-01T00:00:00Z',
       updatedAt: '2023-01-01T00:00:00Z',
     }
@@ -144,7 +144,7 @@ describe('AuthContext', () => {
         id: 1,
         username: 'testuser',
         email: 'test@example.com',
-        roles: 'USER',
+        roles: ['USER'],
       },
     })
     
@@ -231,7 +231,7 @@ describe('AuthContext', () => {
       id: 1,
       username: 'testuser',
       email: 'test@example.com',
-      roles: 'USER',
+      roles: ['USER'],
       createdAt: '2023-01-01T00:00:00Z',
       updatedAt: '2023-01-01T00:00:00Z',
     }
@@ -265,7 +265,7 @@ describe('AuthContext', () => {
       id: 1,
       username: 'testuser',
       email: 'test@example.com',
-      roles: 'USER',
+      roles: ['USER'],
       createdAt: '2023-01-01T00:00:00Z',
       updatedAt: '2023-01-01T00:00:00Z',
     }
