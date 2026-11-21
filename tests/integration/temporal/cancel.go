@@ -11,8 +11,8 @@ func (a *Activities) SeedPendingTransaction(ctx context.Context, userID, account
 	// The public mutations settle immediately. Seed only the pending state the
 	// conditional cancellation contract needs, in this scenario's database.
 	sql := fmt.Sprintf(`INSERT INTO transactions_service.transactions
-		(user_id, to_account_id, amount, type, description)
-		VALUES (%d, %d, 3, 'DEPOSIT', 'Synthetic pending transaction') RETURNING id;`, userID, accountID)
+		(user_id, to_account_id, amount, amount_minor, type, description)
+		VALUES (%d, %d, 3, 300, 'DEPOSIT', 'Synthetic pending transaction') RETURNING id;`, userID, accountID)
 	var id int64
 	err := probeContainer(ctx, a.PostgresContainer, &id, "psql", "-U", "postgres", "-d", "banking_app", "-XqtA", "-v", "ON_ERROR_STOP=1", "-c", sql)
 	if err == nil && id <= 0 {

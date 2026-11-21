@@ -105,6 +105,7 @@ test('outbound payment settles through ActiveMQ Artemis and delivers one notific
   await expect.poll(async () => (await getPayment(page.request, initial.id)).status, { timeout: 50000 }).toBe('ACCEPTED');
   expect(await balance(page.request, account)).toBe(10000);
   const blockedDebit = await page.request.post('/api/transactions/withdraw', {
+    headers: { 'Idempotency-Key': randomUUID() },
     data: { accountId: account, amount: 1, description: 'Check that clearing acceptance retains the hold' },
   });
   expect(blockedDebit.ok()).toBe(false);
@@ -128,7 +129,9 @@ test('outbound payment settles through ActiveMQ Artemis and delivers one notific
   await expect(page.getByRole('status')).toContainText(settlement.clearingReference!);
 
   await expect.poll(async () => {
-    const notifications = await request.get(notificationBase + '/notifications/' + customer);
+    const notifications = await request.get(notificationBase + '/notifications/' + customer, {
+      headers: { 'X-Notification-Token': process.env.NOTIFICATION_READ_TOKEN ?? 'banking-notification-read-dev' },
+    });
     expect(notifications.status()).toBe(200);
     const rows = await notifications.json() ?? [];
     return rows.filter((row: { payment_id?: string }) => row.payment_id === initial.id);
@@ -166,6 +169,7 @@ test('outbound payment rejection and missing-reply scenarios preserve booked bal
 
     // Another debit is the externally visible difference between a released hold and a retained hold.
     const withdrawal = await request.post('/api/transactions/withdraw', {
+      headers: { 'Idempotency-Key': randomUUID() },
       data: { accountId: account, amount: 1, description: 'Payment hold acceptance check' },
     });
     if (scenario.status === 'REVIEW_REQUIRED') {

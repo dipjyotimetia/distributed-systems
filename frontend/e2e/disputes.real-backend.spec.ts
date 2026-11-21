@@ -63,6 +63,7 @@ test('transfer dispute survives replacement of the application worker', async ({
     const from = await createAccount('CHECKING', 100);
     const to = await createAccount('SAVINGS', 20);
     const transfer = await page.request.post('/api/transactions/transfer', {
+      headers: { 'Idempotency-Key': randomUUID() },
       data: { fromAccountId: from, toAccountId: to, amount: 25, description: 'Disputed transfer' },
     });
     expect(transfer.status()).toBe(201);
