@@ -1,21 +1,33 @@
 @import 'tailwindcss';
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f3efe6;
+  --foreground: #14211c;
+  --canvas: #f3efe6;
+  --ink: #14211c;
+  --brass: #7a5424;
+  --surface: #fffcf7;
+  --line: #e4dccb;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-canvas: var(--canvas);
+  --color-ink: var(--ink);
+  --color-brass: var(--brass);
+  --color-surface: var(--surface);
+  --color-line: var(--line);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }
-
-/* Dark mode disabled — app is light-theme only */
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+}
+
+.money {
+  font-variant-numeric: tabular-nums;
 }

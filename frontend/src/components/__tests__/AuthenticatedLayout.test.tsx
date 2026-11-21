@@ -43,10 +43,10 @@ describe('AuthenticatedLayout', () => {
     );
 
     const layoutDiv = container.firstChild as HTMLElement;
-    expect(layoutDiv).toHaveClass('min-h-screen', 'bg-gray-50');
+    expect(layoutDiv).toHaveClass('min-h-screen', 'bg-canvas', 'text-ink');
 
     const mainElement = layoutDiv.querySelector('main');
-    expect(mainElement).toHaveClass('pt-0');
+    expect(mainElement).toHaveClass('pt-20', 'lg:pt-8');
   });
 
   it('renders complex nested content', () => {

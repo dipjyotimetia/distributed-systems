@@ -128,16 +128,16 @@ const TransactionsPage: React.FC = () => {
   return (
     <ProtectedRoute requireAuth={true}>
       <AuthenticatedLayout>
-        <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-          <div className="px-4 py-6 sm:px-0">
-            <div className="mb-6">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h1 className="text-3xl font-bold text-gray-900">Your Transactions</h1>
-                  <p className="mt-1 text-sm text-gray-600">
-                    View and manage your transaction history
-                  </p>
-                </div>
+        <div className="mx-auto max-w-6xl">
+          <div>
+            <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="text-xs font-medium uppercase tracking-[0.18em] text-brass">Ledger</p>
+                <h1 className="mt-1 text-3xl font-semibold tracking-tight text-ink">Your Transactions</h1>
+                <p className="mt-2 text-sm text-ink/70">
+                  View and manage your transaction history
+                </p>
+              </div>
                 <div className="flex space-x-3">
                   <Button
                     variant="primary"
@@ -147,19 +147,18 @@ const TransactionsPage: React.FC = () => {
                   </Button>
                 </div>
               </div>
-            </div>
 
             {/* Filters */}
-            <div className="mb-6 bg-white shadow rounded-lg p-4">
+            <div className="mb-6 rounded-3xl border border-line bg-surface p-4">
               <div className="flex flex-wrap gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="mb-1 block text-sm font-medium text-ink">
                     Transaction Type
                   </label>
                   <select
                     value={filterType}
                     onChange={(e) => setFilterType(e.target.value)}
-                    className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    className="block w-full rounded-xl border border-line bg-surface px-3 py-2 text-ink focus:border-brass focus:outline-none focus:ring-2 focus:ring-brass"
                   >
                     <option value="ALL">All Types</option>
                     <option value="DEPOSIT">Deposits</option>
@@ -168,13 +167,13 @@ const TransactionsPage: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="mb-1 block text-sm font-medium text-ink">
                     Status
                   </label>
                   <select
                     value={filterStatus}
                     onChange={(e) => setFilterStatus(e.target.value)}
-                    className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    className="block w-full rounded-xl border border-line bg-surface px-3 py-2 text-ink focus:border-brass focus:outline-none focus:ring-2 focus:ring-brass"
                   >
                     <option value="ALL">All Status</option>
                     <option value="COMPLETED">Completed</option>
@@ -189,7 +188,7 @@ const TransactionsPage: React.FC = () => {
             {isLoading && (
               <div className="flex justify-center items-center py-12">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-                <span className="ml-4 text-gray-600">Loading transactions...</span>
+                <span className="ml-4 text-ink/70">Loading transactions...</span>
               </div>
             )}
 
@@ -211,8 +210,8 @@ const TransactionsPage: React.FC = () => {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
                 </div>
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No transactions found</h3>
-                <p className="text-gray-600 mb-4">
+                <h3 className="text-lg font-medium text-ink mb-2">No transactions found</h3>
+                <p className="text-ink/70 mb-4">
                   {filterType !== 'ALL' || filterStatus !== 'ALL' 
                     ? 'No transactions match your current filters' 
                     : 'Create your first transaction to get started'
@@ -227,13 +226,13 @@ const TransactionsPage: React.FC = () => {
               </div>
             )}
 
-            <Link className="mb-4 inline-block text-sm font-medium text-blue-700 underline" href="/disputes">
+            <Link className="mb-4 inline-block text-sm font-medium text-brass underline" href="/disputes">
               View transfer disputes
             </Link>
 
             {!isLoading && !error && filteredTransactions.length > 0 && (
-              <div className="bg-white shadow overflow-hidden sm:rounded-md">
-                <ul className="divide-y divide-gray-200">
+              <div className="overflow-hidden rounded-3xl border border-line bg-surface">
+                <ul className="divide-y divide-line">
                   {filteredTransactions.map((transaction) => (
                     <li key={transaction.id} className="px-4 py-4 sm:px-6">
                       <div className="flex items-center justify-between">
@@ -241,14 +240,14 @@ const TransactionsPage: React.FC = () => {
                           {getTransactionIcon(transaction.type)}
                           <div className="ml-4">
                             <div className="flex items-center">
-                              <p className="text-sm font-medium text-gray-900">
+                              <p className="text-sm font-medium text-ink">
                                 {transaction.description}
                               </p>
                               <div className="ml-2">
                                 {getStatusBadge(transaction.status)}
                               </div>
                             </div>
-                            <div className="mt-1 text-sm text-gray-500">
+                            <div className="mt-1 text-sm text-ink/60">
                               <span className="capitalize">{transaction.type.toLowerCase()}</span>
                               {' • '}
                               Account: {transaction.accountNumber}
@@ -258,16 +257,16 @@ const TransactionsPage: React.FC = () => {
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className={`text-lg font-semibold ${
-                            transaction.type === 'DEPOSIT' ? 'text-green-600' : 
-                            transaction.type === 'WITHDRAWAL' ? 'text-red-600' : 
-                            'text-blue-600'
+                          <p className={`money text-lg font-semibold ${
+                            transaction.type === 'DEPOSIT' ? 'text-emerald-700' : 
+                            transaction.type === 'WITHDRAWAL' ? 'text-red-700' : 
+                            'text-ink'
                           }`}>
                             {transaction.type === 'DEPOSIT' ? '+' : '-'}
                             {formatCurrency(transaction.amount)}
                           </p>
                           {transaction.type === 'TRANSFER' && transaction.status === 'COMPLETED' && (
-                            <Link className="text-sm font-medium text-blue-700 underline" href={`/disputes?transferId=${transaction.id}`}>
+                            <Link className="text-sm font-medium text-brass underline" href={`/disputes?transferId=${transaction.id}`}>
                               Dispute transfer
                             </Link>
                           )}
@@ -280,8 +279,8 @@ const TransactionsPage: React.FC = () => {
             )}
 
             {!isLoading && !error && filteredTransactions.length > 0 && (
-              <div className="mt-6 bg-white shadow rounded-lg p-6">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">Transaction Summary</h3>
+              <div className="mt-6 rounded-3xl border border-line bg-surface p-6">
+                <h3 className="mb-4 text-lg font-medium text-ink">Transaction Summary</h3>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <div className="bg-blue-50 rounded-lg p-4">
                     <p className="text-sm font-medium text-blue-600">Total Transactions</p>

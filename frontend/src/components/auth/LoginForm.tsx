@@ -65,27 +65,37 @@ const LoginForm: React.FC = () => {
     <>
       <ToastContainer toasts={toasts} onRemoveToast={removeToast} />
       
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-md w-full space-y-8">
+      <div className="grid min-h-screen bg-canvas lg:grid-cols-[0.9fr_1.1fr]">
+        <aside className="hidden flex-col justify-between bg-ink px-10 py-12 text-canvas lg:flex">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#d7b56a] font-semibold text-ink">A</div>
           <div>
-            <div className="flex justify-center mb-4">
-              <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center">
-                <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                </svg>
+            <p className="text-xs font-medium uppercase tracking-[0.2em] text-[#d7b56a]">Private client</p>
+            <p className="mt-4 max-w-sm text-4xl font-semibold tracking-tight">A quieter way to hold and move money.</p>
+          </div>
+          <p className="text-sm text-canvas/60">Secure Digital Banking Platform</p>
+        </aside>
+        <div className="flex items-center justify-center px-4 py-12 sm:px-6">
+        <div className="w-full max-w-md space-y-8">
+          <div>
+            <div className="mb-4 flex justify-center lg:justify-start">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-ink lg:hidden">
+                <span className="text-lg font-semibold text-canvas">A</span>
               </div>
             </div>
-            <h2 className="text-center text-3xl font-extrabold text-gray-900">
+            <p className="text-center text-xs font-medium uppercase tracking-[0.18em] text-brass lg:text-left">
               Apex Banking
+            </p>
+            <h2 className="mt-3 text-center text-3xl font-semibold tracking-tight text-ink lg:text-left">
+              Sign in to your account
             </h2>
-            <p className="mt-1 text-center text-sm text-gray-500">
+            <p className="mt-1 text-center text-sm text-ink/60 lg:text-left">
               Secure Digital Banking Platform
             </p>
-            <p className="mt-4 text-center text-sm text-gray-600">
+            <p className="mt-4 text-center text-sm text-ink/70 lg:text-left">
               Or{' '}
               <Link
                 href="/register"
-                className="font-medium text-blue-600 hover:text-blue-500"
+                className="font-medium text-brass hover:text-ink"
               >
                 create a new account
               </Link>
@@ -119,15 +129,15 @@ const LoginForm: React.FC = () => {
                   id="remember-me"
                   name="remember-me"
                   type="checkbox"
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  className="h-4 w-4 rounded border-line text-ink focus:ring-brass"
                 />
-                <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900">
+                <label htmlFor="remember-me" className="ml-2 block text-sm text-ink">
                   Remember me
                 </label>
               </div>
 
               <div className="text-sm">
-                <a href="#" className="font-medium text-blue-600 hover:text-blue-500">
+                <a href="#" className="font-medium text-brass hover:text-ink">
                   Forgot your password?
                 </a>
               </div>
@@ -144,18 +154,19 @@ const LoginForm: React.FC = () => {
             </Button>
           </form>
 
-          <div className="mt-4 p-3 bg-gray-100 rounded-md border border-gray-200">
-            <p className="text-xs text-gray-500 text-center">
+          <div className="mt-4 rounded-2xl border border-line bg-surface p-3">
+            <p className="text-center text-xs text-ink/60">
               Demo customer:{' '}
-              <span className="font-mono font-medium text-gray-700">
+              <span className="font-mono font-medium text-ink">
                 {demoUser.username}
               </span>{' '}
               /{' '}
-              <span className="font-mono font-medium text-gray-700">
+              <span className="font-mono font-medium text-ink">
                 {demoUser.password}
               </span>
             </p>
           </div>
+        </div>
         </div>
       </div>
     </>

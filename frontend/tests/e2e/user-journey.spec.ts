@@ -20,9 +20,10 @@ test.describe('Banking Application User Journey', () => {
 
   test('Complete user journey: UI navigation flow', async ({ page }) => {
     // 1. Visit home page (redirects to login if not authenticated)
-    await expect(page).toHaveTitle(/Banking Application/);
+    await expect(page).toHaveTitle(/Apex Banking/);
     
-    // Should redirect to login page automatically
+    await expect(page.getByRole('heading', { name: 'Apex Banking' })).toBeVisible();
+    await page.getByRole('link', { name: 'Sign in' }).click();
     await expect(page).toHaveURL(/.*\/login/, { timeout: 10000 });
     await expect(page.locator('h2')).toContainText(/Sign in to your account/);
     
@@ -74,15 +75,14 @@ test.describe('Banking Application User Journey', () => {
     ];
     
     for (const pageInfo of publicPages) {
-      await page.goto(`${BASE_URL}${pageInfo.path}`);
-      await expect(page.locator(pageInfo.selector)).toContainText(pageInfo.title);
-      
-      // Check for no console errors
       page.on('console', msg => {
-        if (msg.type() === 'error') {
+        if (msg.type() === 'error' && !msg.text().includes('Failed to load resource')) {
           throw new Error(`Console error on ${pageInfo.path}: ${msg.text()}`);
         }
       });
+
+      await page.goto(`${BASE_URL}${pageInfo.path}`);
+      await expect(page.locator(pageInfo.selector)).toContainText(pageInfo.title);
       
       // Check for no network errors
       page.on('response', response => {

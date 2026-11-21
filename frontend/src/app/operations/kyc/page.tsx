@@ -31,8 +31,8 @@ function Queue() {
   }
 
   return (
-    <section className="mx-auto max-w-lg space-y-4 p-6">
-      <h1 className="text-2xl font-semibold">KYC review queue</h1>
+    <section className="mx-auto max-w-lg space-y-4 rounded-3xl border border-line bg-surface p-6">
+      <h1 className="text-3xl font-semibold tracking-tight text-ink">KYC review queue</h1>
       {error && <p role="alert">{error}</p>}
       <button className="rounded border px-4 py-2" type="button" onClick={load}>Load queue</button>
       <ul className="space-y-3">
@@ -40,8 +40,8 @@ function Queue() {
           <li key={item.id} className="rounded border p-3">
             <p>{item.fullName} · {item.documentReference}</p>
             <div className="mt-2 flex gap-2">
-              <button className="rounded bg-blue-700 px-3 py-1 text-white" type="button" onClick={() => decide(item.id, true)}>Approve</button>
-              <button className="rounded border px-3 py-1" type="button" onClick={() => decide(item.id, false)}>Reject</button>
+              <button className="rounded-full bg-ink px-3 py-1 text-sm text-canvas" type="button" onClick={() => decide(item.id, true)}>Approve</button>
+              <button className="rounded-full border border-line px-3 py-1 text-sm" type="button" onClick={() => decide(item.id, false)}>Reject</button>
             </div>
           </li>
         ))}

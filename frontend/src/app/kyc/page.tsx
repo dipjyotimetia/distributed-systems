@@ -3,6 +3,7 @@
 import { FormEvent, useState } from 'react';
 import AuthenticatedLayout from '@/components/layout/AuthenticatedLayout';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
+import PageHeader from '@/components/ui/PageHeader';
 
 export default function KycPage() {
   return <ProtectedRoute><AuthenticatedLayout><Form /></AuthenticatedLayout></ProtectedRoute>;
@@ -33,16 +34,20 @@ function Form() {
     else setStatus(body.status);
   }
 
+  const fieldClass = 'mt-1 w-full rounded-xl border border-line bg-canvas p-2.5 text-ink focus:border-brass focus:outline-none focus:ring-2 focus:ring-brass';
+
   return (
-    <form onSubmit={submit} className="mx-auto max-w-lg space-y-4 p-6">
-      <h1 className="text-2xl font-semibold">Identity review</h1>
-      <p>Status: {status || 'not loaded'}</p>
-      {error && <p role="alert">{error}</p>}
-      <label className="block">Full name<input name="fullName" className="mt-1 w-full rounded border p-2" required /></label>
-      <label className="block">Document reference<input name="documentReference" className="mt-1 w-full rounded border p-2" required /></label>
+    <form onSubmit={submit} className="mx-auto max-w-lg space-y-4">
+      <PageHeader eyebrow="Identity" title="Identity review" description="Submit the name and document reference used for review." />
+      <p className="rounded-2xl border border-line bg-surface px-4 py-3 text-sm text-ink">
+        Status: {status || 'not loaded'}
+      </p>
+      {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
+      <label className="block text-sm font-medium text-ink">Full name<input name="fullName" className={fieldClass} required /></label>
+      <label className="block text-sm font-medium text-ink">Document reference<input name="documentReference" className={fieldClass} required /></label>
       <div className="flex gap-3">
-        <button className="rounded bg-blue-700 px-4 py-2 text-white" type="submit">Submit</button>
-        <button className="rounded border px-4 py-2" type="button" onClick={refresh}>Refresh status</button>
+        <button className="rounded-full bg-ink px-4 py-2 text-sm font-medium text-canvas" type="submit">Submit</button>
+        <button className="rounded-full border border-line bg-surface px-4 py-2 text-sm font-medium text-ink" type="button" onClick={refresh}>Refresh status</button>
       </div>
     </form>
   );

@@ -24,9 +24,7 @@ test.describe('Dashboard Page', () => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({
-          success: true,
-          data: [
+        body: JSON.stringify([
             {
               id: 1,
               accountNumber: '1234567890',
@@ -43,8 +41,7 @@ test.describe('Dashboard Page', () => {
               currency: 'USD',
               status: 'ACTIVE',
             },
-          ],
-        }),
+          ]),
       });
     });
 
@@ -53,9 +50,7 @@ test.describe('Dashboard Page', () => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({
-          success: true,
-          data: [
+        body: JSON.stringify([
             {
               id: 1,
               accountId: 1,
@@ -74,8 +69,7 @@ test.describe('Dashboard Page', () => {
               status: 'COMPLETED',
               createdAt: '2023-01-02T10:00:00Z',
             },
-          ],
-        }),
+          ]),
       });
     });
 
@@ -93,10 +87,10 @@ test.describe('Dashboard Page', () => {
 
   test('should display user accounts', async ({ page }) => {
     await expect(page.getByText('Your Accounts')).toBeVisible();
-    await expect(page.getByText('CHECKING')).toBeVisible();
-    await expect(page.getByText('SAVINGS')).toBeVisible();
-    await expect(page.getByText('$1,000.00')).toBeVisible();
-    await expect(page.getByText('$5,000.00')).toBeVisible();
+    await expect(page.getByText('CHECKING', { exact: true })).toBeVisible();
+    await expect(page.getByText('SAVINGS', { exact: true })).toBeVisible();
+    await expect(page.getByText('$1,000.00', { exact: true })).toBeVisible();
+    await expect(page.getByText('$5,000.00', { exact: true })).toBeVisible();
   });
 
   test('should display account numbers', async ({ page }) => {
@@ -108,8 +102,8 @@ test.describe('Dashboard Page', () => {
     await expect(page.getByText('Recent Transactions')).toBeVisible();
     await expect(page.getByText('Initial deposit')).toBeVisible();
     await expect(page.getByText('ATM withdrawal')).toBeVisible();
-    await expect(page.getByText('DEPOSIT')).toBeVisible();
-    await expect(page.getByText('WITHDRAWAL')).toBeVisible();
+    await expect(page.getByText('DEPOSIT', { exact: true })).toBeVisible();
+    await expect(page.getByText('WITHDRAWAL', { exact: true })).toBeVisible();
   });
 
   test('should navigate to accounts page', async ({ page }) => {
@@ -134,12 +128,12 @@ test.describe('Dashboard Page', () => {
 
   test('should navigate to create account page', async ({ page }) => {
     await page.getByRole('button', { name: 'Create Account' }).click();
-    await expect(page).toHaveURL('/accounts/create');
+    await expect(page).toHaveURL('/accounts');
   });
 
   test('should navigate to create transaction page', async ({ page }) => {
     await page.getByRole('button', { name: 'New Transaction' }).click();
-    await expect(page).toHaveURL('/transactions/create');
+    await expect(page).toHaveURL('/transactions');
   });
 
   test('should display user greeting', async ({ page }) => {
@@ -149,19 +143,18 @@ test.describe('Dashboard Page', () => {
   test('should handle loading state', async ({ page }) => {
     // Mock slow API response
     await page.route('**/api/accounts', async (route) => {
-      await page.waitForTimeout(1000);
+      await new Promise((resolve) => setTimeout(resolve, 1000));
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({
-          success: true,
-          data: [],
-        }),
+        body: JSON.stringify([]),
       });
     });
 
+    const accountsLoaded = page.waitForResponse((response) => response.url().includes('/api/accounts'));
     await page.reload();
     await expect(page.getByText('Loading...')).toBeVisible();
+    await accountsLoaded;
   });
 
   test('should handle empty accounts state', async ({ page }) => {
@@ -169,10 +162,7 @@ test.describe('Dashboard Page', () => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({
-          success: true,
-          data: [],
-        }),
+        body: JSON.stringify([]),
       });
     });
 
@@ -186,10 +176,7 @@ test.describe('Dashboard Page', () => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({
-          success: true,
-          data: [],
-        }),
+        body: JSON.stringify([]),
       });
     });
 

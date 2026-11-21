@@ -13,10 +13,11 @@ test.describe('Simple Authentication Tests', () => {
     await expect(page.getByPlaceholder('Confirm your password')).toBeVisible();
     
     // Try to submit empty form
+    await page.getByRole('checkbox', { name: /I agree to the/ }).check();
     await page.getByRole('button', { name: 'Create account' }).click();
     
     // Should show validation errors (check for any validation error)
-    await expect(page.locator('p.text-red-600')).toBeVisible();
+    await expect(page.locator('p.text-red-600').first()).toBeVisible();
   });
 
   test('should show login form and handle form validation', async ({ page }) => {
@@ -29,10 +30,12 @@ test.describe('Simple Authentication Tests', () => {
     await expect(page.getByPlaceholder('Enter your password')).toBeVisible();
     
     // Try to submit empty form
+    await page.getByPlaceholder('Enter your username or email').fill('');
+    await page.getByPlaceholder('Enter your password').fill('');
     await page.getByRole('button', { name: 'Sign in' }).click();
     
     // Should show validation errors (check for any validation error)
-    await expect(page.locator('p.text-red-600')).toBeVisible();
+    await expect(page.locator('p.text-red-600').first()).toBeVisible();
   });
 
   test('should navigate between login and register pages', async ({ page }) => {
