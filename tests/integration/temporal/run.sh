@@ -80,14 +80,21 @@ trap 'exit 143' TERM
 
 docker info --format '{{.ServerVersion}}' >/dev/null
 stage=startup
-# Gradle classpath resolves inside Docker can flake on Maven Central; retry builds.
-compose_build() {
+# `up --build` builds the full dependency graph. Retry on Maven Central flakes;
+# tear down between attempts so partial creates do not leave missing images.
+compose_up_build() {
   local attempt=1
+  local no_deps=()
+  if [[ "${1:-}" == --no-deps ]]; then
+    no_deps=(--no-deps)
+    shift
+  fi
   while (( attempt <= 5 )); do
-    if "${compose[@]}" build "$@"; then
+    if "${compose[@]}" up -d "${no_deps[@]}" --build "$@"; then
       return 0
     fi
-    echo "compose build failed (attempt $attempt); retrying..." >&2
+    echo "compose up --build failed (attempt $attempt); retrying..." >&2
+    "${compose[@]}" down --volumes --remove-orphans || true
     if (( attempt == 5 )); then
       return 1
     fi
@@ -96,14 +103,11 @@ compose_build() {
   done
 }
 if [[ "$MICROSVC_SCENARIO" == ai ]]; then
-  compose_build frontend ai-service provider-fixtures
-  "${compose[@]}" up -d --no-deps --no-build frontend ai-service provider-fixtures
+  compose_up_build --no-deps frontend ai-service provider-fixtures
 elif [[ "$MICROSVC_SCENARIO" == disputes ]]; then
-  compose_build frontend disputes-worker statement-worker notification-service
-  "${compose[@]}" up -d --no-build frontend disputes-worker statement-worker notification-service
+  compose_up_build frontend disputes-worker statement-worker notification-service
 else
-  compose_build frontend notification-service
-  "${compose[@]}" up -d --no-build frontend notification-service
+  compose_up_build frontend notification-service
   export MICROSVC_GATEWAY="http://$("${compose[@]}" port api-gateway 8080)"
   export MICROSVC_NOTIFICATIONS="http://$("${compose[@]}" port notification-service 8080)"
   export MICROSVC_BROKER_CONTAINER="$("${compose[@]}" ps -q redpanda)"
