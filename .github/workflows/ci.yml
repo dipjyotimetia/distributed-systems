@@ -39,8 +39,10 @@ jobs:
       uses: ./.github/actions/setup-java-gradle
     
     - name: Setup test databases
+      env:
+        PGPASSWORD: password
       run: |
-        PGPASSWORD=password psql -h localhost -U postgres -d banking_test -c "
+        psql -h localhost -U postgres -d banking_test -c "
           CREATE SCHEMA IF NOT EXISTS user_service;
           CREATE SCHEMA IF NOT EXISTS accounts_service;
           CREATE SCHEMA IF NOT EXISTS transactions_service;
