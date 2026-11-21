@@ -9,6 +9,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.util.concurrent.TimeUnit;
+
 @Component
 public class FraudServiceClient {
 
@@ -33,7 +35,7 @@ public class FraudServiceClient {
                     .setMerchantCategory(merchantCategory == null ? "" : merchantCategory)
                     .build();
 
-            FraudCheckResponse response = fraudCheckerStub.checkTransaction(request);
+            FraudCheckResponse response = fraudCheckerStub.withDeadlineAfter(4, TimeUnit.SECONDS).checkTransaction(request);
             logger.info("Fraud check for account={} user={} type={} amount={}: approved={} risk={} reason={}",
                     accountId, userId, transactionType, amount,
                     response.getApproved(), response.getRiskScore(), response.getReason());

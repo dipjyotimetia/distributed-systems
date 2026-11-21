@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
+	"slices"
 	"time"
 )
 
@@ -94,17 +95,17 @@ func (a *Activities) VerifyDeliveries(ctx context.Context, transfer Transfer) (B
 	}
 	for _, provider := range []string{"slack", "sendgrid", "twilio"} {
 		attempts := received[provider]
-		status := 202
+		expectedAttempts := []deliveryAttempt{{Message: expected[provider], Status: 202}}
 		if provider == a.FailedProvider {
-			status = 503
+			expectedAttempts = append([]deliveryAttempt{{Message: expected[provider], Status: 503}}, expectedAttempts...)
 		}
-		if len(attempts) != 1 || attempts[0] != (deliveryAttempt{Message: expected[provider], Status: status}) {
+		if !slices.Equal(attempts, expectedAttempts) {
 			return BoundaryEvidence{}, fmt.Errorf("%s evidence does not match transfer %d (received %d attempts)", provider, transfer.ID, len(attempts))
 		}
 	}
 	if a.FailedProvider != "" {
-		return BoundaryEvidence{"Delivery providers", "one failed attempt and two successful attempts",
-			a.FailedProvider + " returned HTTP 503 and the other two providers returned HTTP 202, one attempt each"}, nil
+		return BoundaryEvidence{"Delivery providers", "one transient failure retried and one successful delivery per channel",
+			a.FailedProvider + " returned HTTP 503, then HTTP 202. The other channels each returned HTTP 202 once."}, nil
 	}
 	return BoundaryEvidence{"Delivery providers", "one successful request per provider", "Slack, SendGrid and Twilio each received one matching request and returned HTTP 202"}, nil
 }

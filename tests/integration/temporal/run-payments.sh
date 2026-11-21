@@ -90,3 +90,11 @@ PAYMENTS_TEST_MQ_ADDRESS="tcp://127.0.0.1:${mq_port##*:}"
 inbox="$("${compose[@]}" exec -T payments-postgres psql -At -U payments -d payments \
   -v ON_ERROR_STOP=1 -c "SELECT count(*) FROM payments.clearing_inbox WHERE payment_id = '$payment_id' AND kind = 'SETTLED'")"
 [[ "$inbox" == 1 ]]
+
+# Quiesce both databases before taking the paired backup. The project is disposable.
+"${compose[@]}" stop frontend api-gateway payments-service payments-worker clearing-simulator transactions-service accounts-service
+restore_report="tests/integration/temporal/results/$project-restore.json"
+mkdir -p "$(dirname "$restore_report")"
+bash tests/integration/temporal/verify-financial-restore.sh \
+  "$("${compose[@]}" ps -q postgres)" "$("${compose[@]}" ps -q payments-postgres)" "$restore_report" \
+  "$("${compose[@]}" ps -q redpanda)"

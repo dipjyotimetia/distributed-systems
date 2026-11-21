@@ -67,11 +67,11 @@ func registerDeliveryEndpoints(mux *http.ServeMux) {
 			http.Error(w, "missing notification message", http.StatusBadRequest)
 			return
 		}
+		mu.Lock()
 		status := http.StatusAccepted
-		if provider == failedProvider {
+		if provider == failedProvider && len(evidence[provider]) == 0 {
 			status = http.StatusServiceUnavailable
 		}
-		mu.Lock()
 		evidence[provider] = append(evidence[provider], attempt{Message: message, Status: status})
 		mu.Unlock()
 		w.WriteHeader(status)

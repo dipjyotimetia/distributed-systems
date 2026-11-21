@@ -10,8 +10,10 @@ import (
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/mongo/writeconcern"
 
 	"github.com/dipjyotimetia/distributed-systems/backend/notification-service/internal/consumer"
+	"github.com/dipjyotimetia/distributed-systems/backend/notification-service/internal/notify"
 )
 
 type MongoStore struct {
@@ -23,7 +25,7 @@ func NewMongoStore(ctx context.Context, uri, db, collection string) (*MongoStore
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	client, err := mongo.Connect(options.Client().ApplyURI(uri))
+	client, err := mongo.Connect(options.Client().ApplyURI(uri).SetWriteConcern(writeconcern.Journaled()))
 	if err != nil {
 		return nil, err
 	}
@@ -54,7 +56,14 @@ func NewMongoStore(ctx context.Context, uri, db, collection string) (*MongoStore
 		_ = client.Disconnect(context.Background())
 		return nil, fmt.Errorf("create payment notification index: %w", err)
 	}
-	return &MongoStore{coll: coll, payments: payments}, nil
+	store := &MongoStore{coll: coll, payments: payments}
+	for _, collection := range []*mongo.Collection{coll, payments} {
+		if err := createDeliveryIndexes(ctx, collection); err != nil {
+			_ = client.Disconnect(context.Background())
+			return nil, fmt.Errorf("create delivery indexes: %w", err)
+		}
+	}
+	return store, nil
 }
 
 func (s *MongoStore) Insert(ctx context.Context, evt *consumer.TransactionEvent) (bool, error) {
@@ -62,7 +71,11 @@ func (s *MongoStore) Insert(ctx context.Context, evt *consumer.TransactionEvent)
 	if evt.PaymentID != "" {
 		collection = s.payments
 	}
-	_, err := collection.InsertOne(ctx, evt)
+	deliveries := make(map[string]delivery, len(notify.Channels))
+	for _, channel := range notify.Channels {
+		deliveries[channel] = delivery{State: "PENDING", DueAt: time.Now().UTC()}
+	}
+	_, err := collection.InsertOne(ctx, eventDocument{TransactionEvent: *evt, Deliveries: deliveries})
 	if mongo.IsDuplicateKeyError(err) {
 		return false, nil
 	}

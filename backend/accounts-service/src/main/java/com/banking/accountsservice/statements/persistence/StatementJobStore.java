@@ -27,7 +27,8 @@ public class StatementJobStore {
     }
 
     public record Job(UUID id, String status, Instant createdAt, Instant expiresAt) {}
-    public record Work(long accountId, long customerId, String status, Instant expiresAt) {}
+    public record Work(long accountId, long customerId, String status, Instant expiresAt,
+                       OffsetDateTime periodStart, OffsetDateTime periodEnd) {}
 
     public Job create(long accountId, long customer, String key) {
         jdbc.update("""
@@ -43,9 +44,29 @@ public class StatementJobStore {
                 StatementJobStore::view, accountId, customer, key);
     }
 
+    public Job createPeriod(long accountId, long customer, OffsetDateTime start, OffsetDateTime end) {
+        UUID id = UUID.randomUUID();
+        jdbc.update("""
+            WITH inserted AS (
+                INSERT INTO accounts_service.statement_jobs
+                    (id, account_id, customer_id, idempotency_key, period_start, period_end)
+                VALUES (?, ?, ?, ?, ?, ?) RETURNING id
+            )
+            INSERT INTO accounts_service.statement_job_outbox (job_id) SELECT id FROM inserted
+            """, id, accountId, customer, id.toString(), start, end);
+        return find(accountId, customer, id).orElseThrow();
+    }
+
+    public boolean isPeriodJob(long accountId, long customer, UUID id) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("""
+                SELECT EXISTS (SELECT 1 FROM accounts_service.statement_jobs
+                    WHERE id = ? AND account_id = ? AND customer_id = ? AND period_start IS NOT NULL)
+                """, Boolean.class, id, accountId, customer));
+    }
+
     public List<Job> list(long accountId, long customer, long offset) {
         return jdbc.query("SELECT " + VIEW + " FROM " + JOBS
-                + " WHERE account_id=? AND customer_id=? ORDER BY created_at DESC,id DESC LIMIT 21 OFFSET ?",
+                + " WHERE account_id=? AND customer_id=? AND period_start IS NULL ORDER BY created_at DESC,id DESC LIMIT 21 OFFSET ?",
                 StatementJobStore::view, accountId, customer, offset);
     }
 
@@ -61,8 +82,10 @@ public class StatementJobStore {
     }
 
     public Work work(UUID id) {
-        return jdbc.queryForObject("SELECT account_id,customer_id,status,expires_at FROM " + JOBS + " WHERE id=?",
-                (row, n) -> new Work(row.getLong(1), row.getLong(2), row.getString(3), instant(row, "expires_at")), id);
+        return jdbc.queryForObject("SELECT account_id,customer_id,status,expires_at,period_start,period_end FROM " + JOBS + " WHERE id=?",
+                (row, n) -> new Work(row.getLong(1), row.getLong(2), row.getString(3), instant(row, "expires_at"),
+                        row.getObject("period_start", OffsetDateTime.class),
+                        row.getObject("period_end", OffsetDateTime.class)), id);
     }
 
     public void ready(UUID id, byte[] document, Duration retention) {

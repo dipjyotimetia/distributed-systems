@@ -5,7 +5,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -37,7 +36,7 @@ final class Idempotency {
         String material = transaction.getType()
                 + "|" + transaction.getFromAccountId()
                 + "|" + transaction.getToAccountId()
-                + "|" + BigDecimal.valueOf(transaction.getAmount()).setScale(2, RoundingMode.HALF_UP).toPlainString()
+                + "|" + transaction.getAmount().setScale(2, RoundingMode.HALF_UP).toPlainString()
                 + "|" + (transaction.getDescription() == null ? "" : transaction.getDescription());
         try {
             byte[] digest = MessageDigest.getInstance("SHA-256").digest(material.getBytes(StandardCharsets.UTF_8));

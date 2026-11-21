@@ -1,6 +1,7 @@
 'use client';
 
 import StatementJobs from '@/components/accounts/StatementJobs';
+import PeriodStatements from '@/components/accounts/PeriodStatements';
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
@@ -256,6 +257,7 @@ const AccountDetailsPage: React.FC = () => {
             )}
           </div>
 
+          <PeriodStatements key={`period-${account.id}`} accountId={account.id} />
           <StatementJobs key={account.id} accountId={account.id} />
 
           <div className='mb-6 rounded-3xl border border-line bg-surface p-6'>

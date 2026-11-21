@@ -7,7 +7,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
+import java.nio.charset.StandardCharsets;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.stereotype.Component;
@@ -30,14 +32,15 @@ public class AuthenticationFilter implements GatewayFilter {
 
         // Check if the request requires authentication
         if (routerValidator.requiresAuthentication.test(request)) {
-            if (this.isAuthMissing(request)) {
-                return this.onError(exchange, "Authorization header is missing in request", HttpStatus.UNAUTHORIZED);
+            String authorization = request.getHeaders().getFirst("Authorization");
+            if (authorization == null || !authorization.regionMatches(true, 0, "Bearer ", 0, 7)
+                    || authorization.length() <= 7) {
+                return unauthorized(exchange);
             }
 
-            final String token = this.getAuthHeader(request);
-
+            String token = authorization.substring(7);
             if (jwtUtil.isInvalid(token)) {
-                return this.onError(exchange, "Authorization header is invalid", HttpStatus.UNAUTHORIZED);
+                return unauthorized(exchange);
             }
 
             return chain.filter(withUserIdHeader(exchange, token));
@@ -45,18 +48,16 @@ public class AuthenticationFilter implements GatewayFilter {
         return chain.filter(exchange);
     }
 
-    private Mono<Void> onError(ServerWebExchange exchange, String err, HttpStatus httpStatus) {
+    private Mono<Void> unauthorized(ServerWebExchange exchange) {
         ServerHttpResponse response = exchange.getResponse();
-        response.setStatusCode(httpStatus);
+        response.setStatusCode(HttpStatus.UNAUTHORIZED);
+        String path = exchange.getRequest().getPath().value();
+        if (path.equals("/api/v1/movements") || path.startsWith("/api/v1/movements/")) {
+            response.getHeaders().setContentType(MediaType.APPLICATION_JSON);
+            byte[] error = "{\"code\":\"UNAUTHENTICATED\"}".getBytes(StandardCharsets.UTF_8);
+            return response.writeWith(Mono.just(response.bufferFactory().wrap(error)));
+        }
         return response.setComplete();
-    }
-
-    private String getAuthHeader(ServerHttpRequest request) {
-        return request.getHeaders().getOrEmpty("Authorization").get(0).substring(7);
-    }
-
-    private boolean isAuthMissing(ServerHttpRequest request) {
-        return !request.getHeaders().containsHeader("Authorization");
     }
 
     // Forward the validated user id so the per-user rate limiter has a key. Any

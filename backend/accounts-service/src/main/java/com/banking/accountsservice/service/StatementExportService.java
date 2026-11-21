@@ -21,6 +21,15 @@ import jakarta.annotation.PostConstruct;
 import java.net.URI;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.math.BigDecimal;
+import java.util.UUID;
+import java.util.List;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -31,6 +40,9 @@ public class StatementExportService {
 
     @Autowired
     private AccountRepository accountRepository;
+
+    @Autowired
+    private JdbcTemplate jdbc;
 
     private S3Client s3Client;
     private String bucketName;
@@ -89,6 +101,39 @@ public class StatementExportService {
         statement.put("exportedAt", LocalDateTime.now().toString());
         statement.put("userId", userId);
         return statement;
+    }
+
+    public record Period(OffsetDateTime start, OffsetDateTime end) {}
+    public record PostedEntry(long id, UUID operationId, String amount, OffsetDateTime postedAt, String source) {}
+    public record PeriodDocument(int schemaVersion, long accountId, Period period, String currency,
+                                 String openingBalance, List<PostedEntry> entries, String closingBalance,
+                                 OffsetDateTime generatedAt) {}
+
+    public OffsetDateTime coverageStart() {
+        return jdbc.queryForObject("SELECT starts_at FROM accounts_service.posting_coverage",
+                OffsetDateTime.class);
+    }
+
+    @Transactional
+    public PeriodDocument generatePeriod(long accountId, long userId, OffsetDateTime start, OffsetDateTime end) {
+        // Account posting writers hold the same lock until the balance and entries commit.
+        Account account = accountRepository.findOwnedForUpdate(accountId, userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        BigDecimal sinceOpening = jdbc.queryForObject("""
+                SELECT COALESCE(SUM(amount), 0) FROM accounts_service.account_postings
+                WHERE account_id = ? AND posted_at >= ?
+                """, BigDecimal.class, accountId, start);
+        BigDecimal opening = account.getBalance().subtract(sinceOpening);
+        var entries = jdbc.query("""
+                SELECT id, operation_id, amount, posted_at, source FROM accounts_service.account_postings
+                WHERE account_id = ? AND posted_at >= ? AND posted_at < ?
+                ORDER BY posted_at, id
+                """, (row, index) -> new PostedEntry(row.getLong("id"), row.getObject("operation_id", UUID.class),
+                row.getBigDecimal("amount").toPlainString(), row.getObject("posted_at", OffsetDateTime.class),
+                row.getString("source")), accountId, start, end);
+        BigDecimal closing = entries.stream().map(entry -> new BigDecimal(entry.amount())).reduce(opening, BigDecimal::add);
+        return new PeriodDocument(2, accountId, new Period(start, end), account.getCurrency(),
+                opening.toPlainString(), entries, closing.toPlainString(), OffsetDateTime.now(ZoneOffset.UTC));
     }
 
     public String exportStatement(Long accountId, Long userId) {

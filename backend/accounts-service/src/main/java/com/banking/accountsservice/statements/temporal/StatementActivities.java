@@ -34,7 +34,10 @@ public class StatementActivities implements StatementExportWorkflow.Activities {
             UUID id = UUID.fromString(job.getJobId());
             Work work = jobs.work(id);
             if ("QUEUED".equals(work.status())) {
-                byte[] document = mapper.writeValueAsBytes(statements.generateStatement(work.accountId(), work.customerId()));
+                Object statement = work.periodStart() == null
+                        ? statements.generateStatement(work.accountId(), work.customerId())
+                        : statements.generatePeriod(work.accountId(), work.customerId(), work.periodStart(), work.periodEnd());
+                byte[] document = mapper.writeValueAsBytes(statement);
                 jobs.ready(id, document, retention);
                 work = jobs.work(id);
             }

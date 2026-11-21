@@ -9,6 +9,7 @@ if [[ -z "${MICROSVC_SCENARIO:-}" ]]; then
   if [[ -z "${TEMPORAL_TEST_UI_PORT:-}" ]]; then
     MICROSVC_SCENARIO=identity MICROSVC_REPORT_SUFFIX="${MICROSVC_REPORT:+identity}" bash "$suite/run.sh" || status=$?
     MICROSVC_SCENARIO=ledger MICROSVC_REPORT_SUFFIX="${MICROSVC_REPORT:+ledger}" bash "$suite/run.sh" || status=$?
+    MICROSVC_SCENARIO=consumer-recovery MICROSVC_REPORT_SUFFIX="${MICROSVC_REPORT:+consumer-recovery}" bash "$suite/run.sh" || status=$?
     MICROSVC_SCENARIO=statement-export MICROSVC_REPORT_SUFFIX="${MICROSVC_REPORT:+statement-export}" bash "$suite/run.sh" || status=$?
     MICROSVC_SCENARIO=ai MICROSVC_REPORT_SUFFIX="${MICROSVC_REPORT:+ai}" bash "$suite/run.sh" || status=$?
     if [[ "${MICROSVC_BROWSER:-0}" == 1 ]]; then
@@ -90,7 +91,7 @@ compose_up_build() {
     shift
   fi
   while (( attempt <= 5 )); do
-    if "${compose[@]}" up -d "${no_deps[@]}" --build "$@"; then
+    if "${compose[@]}" up -d ${no_deps[@]+"${no_deps[@]}"} --build "$@"; then
       return 0
     fi
     echo "compose up --build failed (attempt $attempt); retrying..." >&2
@@ -113,6 +114,8 @@ else
   export MICROSVC_BROKER_CONTAINER="$("${compose[@]}" ps -q redpanda)"
   export MICROSVC_POSTGRES_CONTAINER="$("${compose[@]}" ps -q postgres)"
   export MICROSVC_MONGO_CONTAINER="$("${compose[@]}" ps -q mongodb)"
+  export MICROSVC_FRAUD_CONTAINER="$("${compose[@]}" ps -q fraud-service)"
+  export MICROSVC_TRANSACTIONS_CONTAINER="$("${compose[@]}" ps -q transactions-service)"
   export MICROSVC_CONSUMER_CONTAINER="$("${compose[@]}" ps -q notification-service)"
 fi
 export MICROSVC_FRONTEND="http://$("${compose[@]}" port frontend 3000)"
@@ -131,7 +134,7 @@ if [[ "$MICROSVC_SCENARIO" == disputes ]]; then
   exit 0
 fi
 export MICROSVC_DELIVERIES="http://$("${compose[@]}" port provider-fixtures 8081)"
-test_timeout=4m
+test_timeout=5m
 if [[ -n "${TEMPORAL_TEST_UI_PORT:-}" ]]; then
   test_timeout=15m
 fi
@@ -139,7 +142,14 @@ stage=workflow
 (
   cd "$suite"
   go test -count=1 -timeout="$test_timeout" -run '^TestBankingIntegration$' -v .
+  if [[ "$MICROSVC_SCENARIO" == ledger ]]; then
+    go test -count=1 -timeout=3m -run '^TestVersionedMovements$' -v .
+  fi
 )
+if [[ "$MICROSVC_SCENARIO" == ledger && "${MICROSVC_BROWSER:-0}" == 1 ]]; then
+  stage=browser
+  MICROSVC_MOVEMENTS=1 bash -c 'cd frontend && npm run test:e2e:real-backend -- movements.real-backend.spec.ts --workers=1'
+fi
 if [[ "$MICROSVC_SCENARIO" == identity && "${MICROSVC_BROWSER:-0}" == 1 ]]; then
   stage=browser
   browser_verdict=failed

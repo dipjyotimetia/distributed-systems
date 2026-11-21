@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "eventId": "62dd94c1-d619-4f49-b136-555b2df6395f",
+  "movementId": "521155ce-1234-4e81-b47e-93579acc4859",
+  "type": "TRANSFER",
+  "fromAccountId": "12",
+  "toAccountId": "34",
+  "money": {"currency": "AUD", "amount": "25.50"},
+  "status": "POSTED",
+  "occurredAt": "2026-11-21T01:00:01Z"
+}

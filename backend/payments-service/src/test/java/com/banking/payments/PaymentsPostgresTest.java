@@ -145,6 +145,75 @@ class PaymentsPostgresTest {
     }
 
     @Test
+    void paymentReviewRequiresMatchingEvidenceAndAppliesOneAuditedDecision() throws Exception {
+        try (var context = (ServletWebServerApplicationContext) new SpringApplicationBuilder(PaymentsApplication.class)
+                .web(WebApplicationType.SERVLET)
+                .properties("JWT_SECRET=" + SECRET, "server.port=0", "PAYMENTS_OPERATOR_IDS=71").run();
+             var client = HttpClient.newHttpClient()) {
+            var db = context.getBean(JdbcTemplate.class);
+            var store = context.getBean(PaymentStore.class);
+            UUID id = store.initiate(73, UUID.randomUUID().toString(),
+                    new PaymentStore.Instruction(10, "DEST00000001", 25)).id();
+            var lifecycle = context.getBean(PaymentLifecycle.class);
+            var transaction = context.getBean(TransactionTemplate.class);
+            transaction.executeWithoutResult(tx -> {
+                db.update("UPDATE payments.payment SET reserved_at=now(), screened_at=now() WHERE id=?", id);
+                lifecycle.transition(id, "PENDING", "REVIEW_REQUIRED", null, "CLEARING_EVIDENCE_CONFLICT");
+            });
+            UUID evidence = db.queryForObject("""
+                    INSERT INTO payments.clearing_inbox (payment_id,kind,amount_minor,reference,business_date)
+                    VALUES (?, 'SETTLED', 25, 'C00000000001', DATE '2026-11-20') RETURNING evidence_id
+                    """, UUID.class, id);
+            long revision = db.queryForObject("SELECT review_revision FROM payments.payment WHERE id = ?", Long.class, id);
+            String path = "/api/v1/operations/payments/" + id + "/resolutions";
+            URI uri = URI.create("http://127.0.0.1:" + context.getWebServer().getPort() + path);
+            String operator = token(71, Instant.now().plusSeconds(120));
+            String stranger = token(72, Instant.now().plusSeconds(120));
+            String key = UUID.randomUUID().toString();
+            String body = """
+                    {"expectedRevision":%d,"evidenceId":"%s","action":"CONFIRM_SETTLEMENT","reason":"Verified"}
+                    """.formatted(revision, evidence);
+
+            assertEquals(403, status(client, resolution(uri, stranger, key, body)));
+            var stale = client.send(resolution(uri, operator, key,
+                    body.replaceFirst(Long.toString(revision), Long.toString(revision - 1))),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(409, stale.statusCode());
+            assertTrue(stale.body().contains("STALE_REVISION"));
+            assertEquals(422, status(client, resolution(uri, operator, key, body.replace("SETTLEMENT", "REJECTION"))));
+            var first = client.send(resolution(uri, operator, key, body), HttpResponse.BodyHandlers.ofString());
+            var retry = client.send(resolution(uri, operator, key, body), HttpResponse.BodyHandlers.ofString());
+            assertEquals(202, first.statusCode());
+            assertEquals(first.body(), retry.body());
+            assertTrue(first.body().contains("PENDING"));
+            assertEquals(409, status(client, resolution(uri, operator, key, body.replace("Verified", "Changed"))));
+
+            var checks = mock(PaymentChecks.class);
+            when(checks.move(id, PaymentChecks.Movement.COMMIT, 73, 10, 25)).thenReturn(true);
+            var steps = new PaymentSteps(db, transaction, lifecycle, checks, context.getBean(PaymentTracing.class), Duration.ofMinutes(2));
+            assertTrue(steps.advance(id));
+            assertTrue(steps.advance(id));
+            verify(checks).move(id, PaymentChecks.Movement.COMMIT, 73, 10, 25);
+            assertEquals("SETTLED", store.findOwned(73, id).status());
+            assertTrue(client.send(resolution(uri, operator, key, body), HttpResponse.BodyHandlers.ofString())
+                    .body().contains("APPLIED"));
+
+            db.update("""
+                    INSERT INTO payments.clearing_inbox (payment_id,kind,amount_minor,reference)
+                    VALUES (?, 'REJECTED', 25, 'C00000000001')
+                    """, id);
+            assertTrue(Boolean.TRUE.equals(db.queryForObject(
+                    "SELECT late_exception_at IS NOT NULL FROM payments.payment WHERE id = ?", Boolean.class, id)));
+        }
+    }
+
+    private static HttpRequest resolution(URI uri, String token, String key, String body) {
+        return HttpRequest.newBuilder(uri).header("Authorization", "Bearer " + token)
+                .header("Idempotency-Key", key).header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(body)).build();
+    }
+
+    @Test
     void reconcilesOneResultPerRecordAndRetainsDiscrepanciesOnReplay() {
         try (var context = new SpringApplicationBuilder(PaymentsApplication.class)
                 .web(WebApplicationType.SERVLET)

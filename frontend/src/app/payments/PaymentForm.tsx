@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useRef, useState } from 'react';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import AuthenticatedLayout from '@/components/layout/AuthenticatedLayout';
 import Button from '@/components/ui/Button';
+import { useAuth } from '@/lib/auth/context';
 import { AccountsAPI, type Account } from '@/lib/api/accounts';
 
 type Payment = {
@@ -16,6 +17,10 @@ type Payment = {
 const inputClass = 'mt-1 block w-full rounded-xl border border-line bg-surface p-2.5 text-ink focus:border-brass focus:outline-none focus:ring-2 focus:ring-brass';
 
 function Form() {
+  const { user } = useAuth();
+  const storageKey = user ? `banking.payment.${user.id}` : undefined;
+  const [loadedKey, setLoadedKey] = useState<string>();
+  const [hasSavedRequest, setHasSavedRequest] = useState(false);
   const retry = useRef<{ body: string; key: string } | null>(null);
   const recordedPayment = useRef(false);
   const [payment, setPayment] = useState<Payment>();
@@ -25,6 +30,27 @@ function Form() {
   const [error, setError] = useState('');
   const [accounts, setAccounts] = useState<Account[]>();
   const [accountsError, setAccountsError] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      retry.current = null;
+      setHasSavedRequest(false);
+      if (!storageKey) return;
+      try {
+        const saved = sessionStorage.getItem(storageKey);
+        if (saved) {
+          retry.current = JSON.parse(saved) as { body: string; key: string };
+          setHasSavedRequest(true);
+        }
+        setLoadedKey(storageKey);
+      } catch {
+        setError('The browser could not recover the saved payment.');
+      }
+    });
+    return () => { cancelled = true; };
+  }, [storageKey]);
 
   useEffect(() => {
     let active = true;
@@ -76,12 +102,21 @@ function Form() {
           headers: { 'Content-Type': 'application/json', 'Idempotency-Key': submission.key },
         }),
       });
+      if (submission && storageKey && (response.status === 400 || response.status === 422)) {
+        sessionStorage.removeItem(storageKey);
+        retry.current = null;
+        setHasSavedRequest(false);
+      }
       if (!response.ok) throw new Error(response.status === 409 ? 'This request conflicts with a previous payment.' : 'Could not access the payment.');
       const saved = await response.json() as Payment;
       recordedPayment.current = true;
       setPayment(saved);
       setPayments((current) => [saved, ...(current ?? []).filter((item) => item.id !== saved.id)]);
-      if (submission) retry.current = null;
+      if (submission && storageKey) {
+        sessionStorage.removeItem(storageKey);
+        retry.current = null;
+        setHasSavedRequest(false);
+      }
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : 'Could not access the payment.');
     } finally {
@@ -91,6 +126,7 @@ function Form() {
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!storageKey || storageKey !== loadedKey || retry.current || pending) return;
     const fields = new FormData(event.currentTarget);
     const accountId = Number(fields.get('account'));
     if (!Number.isSafeInteger(accountId) || accountId <= 0) {
@@ -100,8 +136,15 @@ function Form() {
     const body = JSON.stringify({
       accountId, destination: fields.get('destination'), amountMinor: Number(fields.get('amount')),
     });
-    if (retry.current?.body !== body) retry.current = { body, key: crypto.randomUUID() };
-    void request(undefined, retry.current);
+    const submission = { body, key: crypto.randomUUID() };
+    try {
+      sessionStorage.setItem(storageKey, JSON.stringify(submission));
+      retry.current = submission;
+      setHasSavedRequest(true);
+      void request(undefined, submission);
+    } catch {
+      setError('The browser could not save this payment. The request was not submitted.');
+    }
   }
 
   return (
@@ -128,8 +171,13 @@ function Form() {
         <label className="block">Amount in AUD cents
           <input className={inputClass} name="amount" type="number" min="1" max="999999999999" step="1" required />
         </label>
-        <Button type="submit" disabled={pending || !accounts?.length}>Submit payment</Button>
+        <Button type="submit" disabled={pending || hasSavedRequest || !storageKey || storageKey !== loadedKey || !accounts?.length}>Submit payment</Button>
       </form>
+      {hasSavedRequest && (
+        <Button variant="outline" disabled={pending} onClick={() => {
+          if (retry.current) void request(undefined, retry.current);
+        }}>Retry saved payment</Button>
+      )}
       {error && <p role="alert" className="text-red-700">{error}</p>}
       {payment && (
         <div className="space-y-2">

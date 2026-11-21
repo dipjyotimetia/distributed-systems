@@ -69,7 +69,7 @@ class AccountServiceIntegrationTest {
         assertEquals(testUserId, response.getUserId());
         assertEquals("CHECKING", response.getAccountType());
         assertNotNull(response.getAccountNumber());
-        assertEquals(BigDecimal.ZERO, response.getBalance());
+        assertEquals(0, response.getBalance().signum());
         assertNotNull(response.getCreatedAt());
         assertNotNull(response.getUpdatedAt());
 
@@ -196,7 +196,7 @@ class AccountServiceIntegrationTest {
         assertNotNull(balanceResponse);
         assertEquals(createdAccount.getId(), balanceResponse.getAccountId());
         assertEquals(createdAccount.getAccountNumber(), balanceResponse.getAccountNumber());
-        assertEquals(BigDecimal.ZERO, balanceResponse.getBalance());
+        assertEquals(0, balanceResponse.getBalance().signum());
     }
 
     @Test
@@ -242,7 +242,7 @@ class AccountServiceIntegrationTest {
 
         // Verify balance was updated
         BalanceResponse balanceResponse = accountService.getAccountBalance(createdAccount.getId(), testUserId);
-        assertEquals(newBalance, balanceResponse.getBalance());
+        assertEquals(0, newBalance.compareTo(balanceResponse.getBalance()));
     }
 
     @Test

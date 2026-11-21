@@ -98,7 +98,7 @@ class TransactionServiceTest {
         assertNotNull(result);
         assertEquals(1, result.size());
         assertEquals(testTransaction.getId(), result.get(0).getId());
-        assertEquals(testTransaction.getAmount(), result.get(0).getAmount());
+        assertEquals(testTransaction.getAmount().doubleValue(), result.get(0).getAmount());
         assertEquals(testTransaction.getType(), result.get(0).getType());
         
         verify(transactionRepository, times(1)).findByUserIdOrderByCreatedAtDesc(testUserId);
@@ -116,7 +116,7 @@ class TransactionServiceTest {
         // Assert
         assertNotNull(result);
         assertEquals(testTransaction.getId(), result.getId());
-        assertEquals(testTransaction.getAmount(), result.getAmount());
+        assertEquals(testTransaction.getAmount().doubleValue(), result.getAmount());
         assertEquals(Transaction.TransactionType.DEPOSIT, result.getType());
         
         verify(movementCoordinator).execute(any(Transaction.class));
@@ -190,7 +190,7 @@ class TransactionServiceTest {
         // Assert
         assertNotNull(result);
         assertEquals(withdrawalTransaction.getId(), result.getId());
-        assertEquals(withdrawalTransaction.getAmount(), result.getAmount());
+        assertEquals(withdrawalTransaction.getAmount().doubleValue(), result.getAmount());
         assertEquals(Transaction.TransactionType.WITHDRAWAL, result.getType());
         
         verify(movementCoordinator).execute(any(Transaction.class));
@@ -237,7 +237,7 @@ class TransactionServiceTest {
         // Assert
         assertNotNull(result);
         assertEquals(transferTransaction.getId(), result.getId());
-        assertEquals(transferTransaction.getAmount(), result.getAmount());
+        assertEquals(transferTransaction.getAmount().doubleValue(), result.getAmount());
         assertEquals(Transaction.TransactionType.TRANSFER, result.getType());
         
         verify(paymentComplianceService, times(1)).verifyTransferCompliance(fromAccountId, toAccountId);

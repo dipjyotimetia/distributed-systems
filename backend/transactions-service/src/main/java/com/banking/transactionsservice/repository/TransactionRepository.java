@@ -44,7 +44,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long>,
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
             UPDATE Transaction t SET t.status = :cancelled, t.processedAt = :processedAt
-            WHERE t.id = :id AND t.userId = :userId AND t.status = :pending
+            WHERE t.id = :id AND t.userId = :userId AND t.status = :pending AND t.movementPosting = false
             """)
     int cancelPending(@Param("id") Long id, @Param("userId") Long userId,
                       @Param("pending") Transaction.TransactionStatus pending,

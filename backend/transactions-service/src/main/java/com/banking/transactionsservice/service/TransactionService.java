@@ -237,6 +237,11 @@ public class TransactionService {
         logger.info("Processing deposit for user: {}, account: {}, amount: {}",
                    userId, request.getAccountId(), request.getAmount());
 
+        Transaction draft = new Transaction(userId, null, request.getAccountId(),
+                request.getAmount(), Transaction.TransactionType.DEPOSIT, request.getDescription());
+        var existing = recoverLegacyIntent(draft, httpRequest);
+        if (existing != null) return existing;
+
         // Fraud check before processing
         var fraudResult = fraudServiceClient.checkTransaction(
                 String.valueOf(request.getAccountId()), String.valueOf(userId),
@@ -245,8 +250,7 @@ public class TransactionService {
             throw new RuntimeException("Transaction rejected by fraud check: " + fraudResult.getReason());
         }
 
-        return complete(new Transaction(userId, null, request.getAccountId(),
-                request.getAmount(), Transaction.TransactionType.DEPOSIT, request.getDescription()), httpRequest,
+        return complete(draft, httpRequest,
                 () -> depositAmountHistogram.record(request.getAmount().doubleValue()),
                 saved -> paymentComplianceService.fanOutPaymentAndCompliance(saved.getId(), "DEPOSIT", request.getAmount()));
     }
@@ -256,6 +260,11 @@ public class TransactionService {
         logger.info("Processing withdrawal for user: {}, account: {}, amount: {}",
                    userId, request.getAccountId(), request.getAmount());
 
+        Transaction draft = new Transaction(userId, request.getAccountId(), null,
+                request.getAmount(), Transaction.TransactionType.WITHDRAWAL, request.getDescription());
+        var existing = recoverLegacyIntent(draft, httpRequest);
+        if (existing != null) return existing;
+
         // Fraud check before processing
         var fraudResult = fraudServiceClient.checkTransaction(
                 String.valueOf(request.getAccountId()), String.valueOf(userId),
@@ -264,8 +273,7 @@ public class TransactionService {
             throw new RuntimeException("Transaction rejected by fraud check: " + fraudResult.getReason());
         }
 
-        return complete(new Transaction(userId, request.getAccountId(), null,
-                request.getAmount(), Transaction.TransactionType.WITHDRAWAL, request.getDescription()), httpRequest,
+        return complete(draft, httpRequest,
                 () -> withdrawAmountHistogram.record(request.getAmount().doubleValue()),
                 saved -> paymentComplianceService.fanOutPaymentAndCompliance(saved.getId(), "WITHDRAWAL", request.getAmount()));
     }
@@ -274,6 +282,11 @@ public class TransactionService {
     public TransactionResponse transfer(TransferRequest request, Long userId, HttpServletRequest httpRequest) {
         logger.info("Processing transfer for user: {}, from: {}, to: {}, amount: {}",
                    userId, request.getFromAccountId(), request.getToAccountId(), request.getAmount());
+
+        Transaction draft = new Transaction(userId, request.getFromAccountId(), request.getToAccountId(),
+                request.getAmount(), Transaction.TransactionType.TRANSFER, request.getDescription());
+        var existing = recoverLegacyIntent(draft, httpRequest);
+        if (existing != null) return existing;
 
         // Fraud check before processing
         var fraudResult = fraudServiceClient.checkTransaction(
@@ -284,10 +297,16 @@ public class TransactionService {
         }
 
         paymentComplianceService.verifyTransferCompliance(request.getFromAccountId(), request.getToAccountId());
-        return complete(new Transaction(userId, request.getFromAccountId(), request.getToAccountId(),
-                request.getAmount(), Transaction.TransactionType.TRANSFER, request.getDescription()), httpRequest,
+        return complete(draft, httpRequest,
                 () -> transferAmountHistogram.record(request.getAmount().doubleValue()),
                 saved -> paymentComplianceService.fanOutPaymentAndCompliance(saved.getId(), "TRANSFER", request.getAmount()));
+    }
+
+    private TransactionResponse recoverLegacyIntent(Transaction draft, HttpServletRequest request) {
+        String key = Idempotency.key(request);
+        if (key == null) return null;
+        return transactionRepository.findByUserIdAndIdempotencyKey(draft.getUserId(), key)
+                .map(existing -> replay(existing, Idempotency.fingerprint(draft))).orElse(null);
     }
 
     private TransactionResponse complete(Transaction draft, HttpServletRequest httpRequest, Runnable metrics,
@@ -320,6 +339,9 @@ public class TransactionService {
     private TransactionResponse replay(Transaction existing, String hash) {
         if (hash == null || !hash.equals(existing.getIdempotencyHash())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Idempotency key was reused for a different transaction");
+        }
+        if (existing.getStatus() == Transaction.TransactionStatus.PENDING) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Movement outcome requires reconciliation");
         }
         return convertToResponse(existing);
     }
@@ -366,7 +388,7 @@ public class TransactionService {
             transaction.getUserId(),
             transaction.getFromAccountId(),
             transaction.getToAccountId(),
-            transaction.getAmount(),
+            transaction.getAmount().doubleValue(),
             transaction.getType(),
             transaction.getDescription(),
             transaction.getStatus(),

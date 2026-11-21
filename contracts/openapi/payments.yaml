@@ -7,6 +7,61 @@ servers:
   - url: http://localhost:8088
     description: Local development server
 paths:
+  /api/v1/operations/payments/review:
+    get:
+      tags: [paymentReview]
+      operationId: listPaymentReviews
+      summary: List unresolved clearing exceptions
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: offset, in: query, schema: {type: integer, minimum: 0, default: 0}}
+      responses:
+        '200':
+          description: Up to 50 reviews ordered by age and payment ID
+          content:
+            application/json:
+              schema: {type: array, items: {$ref: '#/components/schemas/PaymentReview'}}
+        '400': {description: Invalid pagination offset}
+        '401': {description: Authentication required}
+        '403': {description: Operator authorization required}
+  /api/v1/operations/payments/{id}/resolutions:
+    post:
+      tags: [paymentReview]
+      operationId: resolvePaymentReview
+      summary: Record an operator decision against verified evidence
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 128}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/PaymentResolutionRequest'}
+            example:
+              expectedRevision: 3
+              evidenceId: 62dd94c1-d619-4f49-b136-555b2df6395f
+              action: CONFIRM_SETTLEMENT
+              reason: Verified settlement against the clearing evidence.
+      responses:
+        '202':
+          description: Durable decision or current execution status of a same-key retry
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PaymentResolution'}
+        '400': {description: Invalid request}
+        '401': {description: Authentication required}
+        '403': {description: Operator authorization required}
+        '404': {description: Unknown payment}
+        '409':
+          description: Stale revision or conflicting resolution intent
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PaymentReviewError'}
+              examples:
+                stale: {value: {code: STALE_REVISION}}
+                reusedKey: {value: {code: IDEMPOTENCY_KEY_REUSED}}
+        '422': {description: Evidence cannot support this disposition}
   /api/v1/payments:
     get:
       tags: [payments]
@@ -119,6 +174,50 @@ components:
       scheme: bearer
       bearerFormat: JWT
   schemas:
+    PaymentReviewError:
+      type: object
+      required: [code]
+      properties:
+        code: {type: string}
+    PaymentReview:
+      type: object
+      required: [paymentId, revision, status, ageSeconds, reason, currency, heldAmountMinor, evidence]
+      properties:
+        paymentId: {type: string, format: uuid}
+        revision: {type: integer, format: int64}
+        status: {type: string}
+        ageSeconds: {type: integer, format: int64}
+        reason: {type: string}
+        currency: {type: string, enum: [AUD]}
+        heldAmountMinor: {type: integer, format: int64}
+        clearingReference: {type: string}
+        resolution: {$ref: '#/components/schemas/PaymentResolution'}
+        evidence: {type: array, items: {$ref: '#/components/schemas/PaymentReviewEvidence'}}
+    PaymentReviewEvidence:
+      type: object
+      required: [id, kind, amountMinor, currency, clearingReference, receivedAt]
+      properties:
+        id: {type: string, format: uuid}
+        kind: {type: string, enum: [ACCEPTED, SETTLED, REJECTED]}
+        amountMinor: {type: integer, format: int64}
+        currency: {type: string, enum: [AUD]}
+        clearingReference: {type: string}
+        receivedAt: {type: string, format: date-time}
+        businessDate: {type: string, format: date}
+    PaymentResolutionRequest:
+      type: object
+      required: [expectedRevision, evidenceId, action, reason]
+      properties:
+        expectedRevision: {type: integer, format: int64, minimum: 0}
+        evidenceId: {type: string, format: uuid}
+        action: {type: string, enum: [CONFIRM_SETTLEMENT, CONFIRM_REJECTION]}
+        reason: {type: string, minLength: 1, maxLength: 1000}
+    PaymentResolution:
+      type: object
+      required: [id, status]
+      properties:
+        id: {type: string, format: uuid}
+        status: {type: string, enum: [PENDING, APPLIED]}
     PaymentInstruction:
       type: object
       required: [accountId, destination, amountMinor]
@@ -141,6 +240,7 @@ components:
           $ref: '#/components/schemas/PaymentInstruction'
         status:
           type: string
+          description: REVIEW_REQUIRED can retain the hold. SETTLED requires durable account posting.
         clearingReference:
           type: string
         createdAt:

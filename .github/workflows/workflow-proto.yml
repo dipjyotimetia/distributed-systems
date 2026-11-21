@@ -77,6 +77,28 @@ jobs:
           python3 -m pip install --user 'grpcio-tools==1.83.2'
           go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.5.0
           bash scripts/check-contract-drift.sh
+      - name: Validate movement contract and examples
+        run: |
+          python3 -m venv "$RUNNER_TEMP/movement-contract"
+          "$RUNNER_TEMP/movement-contract/bin/pip" install openapi-spec-validator==0.7.2 openapi-schema-validator==0.6.3
+          "$RUNNER_TEMP/movement-contract/bin/python" scripts/check-movement-contract.py
+      - name: Verify frontend financial clients
+        run: |
+          generated="$(mktemp -d)"
+          bash scripts/generate-openapi-financial-clients.sh "$generated"
+          for spec in transactions accounts payments; do
+            diff -ru "frontend/src/gen/openapi/$spec/src" "$generated/$spec/src"
+          done
+      - name: Check financial HTTP compatibility with PR base
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          go install github.com/oasdiff/oasdiff@v1.38.0
+          for spec in transactions accounts payments; do
+            git show "${BASE_SHA}:contracts/openapi/$spec.yaml" > "$RUNNER_TEMP/base-$spec.yaml"
+            oasdiff breaking --fail-on ERR "$RUNNER_TEMP/base-$spec.yaml" "contracts/openapi/$spec.yaml"
+          done
       - name: Verify frontend gRPC clients
         run: |
           generated="$(mktemp -d)"
@@ -88,6 +110,10 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
+          if git cat-file -e "${BASE_SHA}:contracts/proto/buf.yaml"; then
+            git archive "$BASE_SHA" contracts/proto | tar -x -C "$RUNNER_TEMP"
+            buf breaking contracts/proto --against "$RUNNER_TEMP/contracts/proto"
+          fi
           if git cat-file -e "${BASE_SHA}:contracts/proto/workflows/buf.yaml"; then
             git archive "$BASE_SHA" contracts/proto/workflows | tar -x -C "$RUNNER_TEMP"
             buf breaking contracts/proto/workflows --against "$RUNNER_TEMP/contracts/proto/workflows"

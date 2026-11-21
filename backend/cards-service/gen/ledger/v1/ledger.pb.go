@@ -21,6 +21,248 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type MovementScope int32
+
+const (
+	MovementScope_MOVEMENT_SCOPE_UNSPECIFIED MovementScope = 0
+	MovementScope_MOVEMENT_SCOPE_INTERNAL    MovementScope = 1
+	MovementScope_MOVEMENT_SCOPE_OUTBOUND    MovementScope = 2
+)
+
+// Enum value maps for MovementScope.
+var (
+	MovementScope_name = map[int32]string{
+		0: "MOVEMENT_SCOPE_UNSPECIFIED",
+		1: "MOVEMENT_SCOPE_INTERNAL",
+		2: "MOVEMENT_SCOPE_OUTBOUND",
+	}
+	MovementScope_value = map[string]int32{
+		"MOVEMENT_SCOPE_UNSPECIFIED": 0,
+		"MOVEMENT_SCOPE_INTERNAL":    1,
+		"MOVEMENT_SCOPE_OUTBOUND":    2,
+	}
+)
+
+func (x MovementScope) Enum() *MovementScope {
+	p := new(MovementScope)
+	*p = x
+	return p
+}
+
+func (x MovementScope) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (MovementScope) Descriptor() protoreflect.EnumDescriptor {
+	return file_ledger_proto_enumTypes[0].Descriptor()
+}
+
+func (MovementScope) Type() protoreflect.EnumType {
+	return &file_ledger_proto_enumTypes[0]
+}
+
+func (x MovementScope) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use MovementScope.Descriptor instead.
+func (MovementScope) EnumDescriptor() ([]byte, []int) {
+	return file_ledger_proto_rawDescGZIP(), []int{0}
+}
+
+type ExactMovementOutcome_Status int32
+
+const (
+	ExactMovementOutcome_STATUS_UNSPECIFIED ExactMovementOutcome_Status = 0
+	ExactMovementOutcome_STATUS_RESERVED    ExactMovementOutcome_Status = 1
+	ExactMovementOutcome_STATUS_POSTED      ExactMovementOutcome_Status = 2
+	ExactMovementOutcome_STATUS_RELEASED    ExactMovementOutcome_Status = 3
+)
+
+// Enum value maps for ExactMovementOutcome_Status.
+var (
+	ExactMovementOutcome_Status_name = map[int32]string{
+		0: "STATUS_UNSPECIFIED",
+		1: "STATUS_RESERVED",
+		2: "STATUS_POSTED",
+		3: "STATUS_RELEASED",
+	}
+	ExactMovementOutcome_Status_value = map[string]int32{
+		"STATUS_UNSPECIFIED": 0,
+		"STATUS_RESERVED":    1,
+		"STATUS_POSTED":      2,
+		"STATUS_RELEASED":    3,
+	}
+)
+
+func (x ExactMovementOutcome_Status) Enum() *ExactMovementOutcome_Status {
+	p := new(ExactMovementOutcome_Status)
+	*p = x
+	return p
+}
+
+func (x ExactMovementOutcome_Status) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ExactMovementOutcome_Status) Descriptor() protoreflect.EnumDescriptor {
+	return file_ledger_proto_enumTypes[1].Descriptor()
+}
+
+func (ExactMovementOutcome_Status) Type() protoreflect.EnumType {
+	return &file_ledger_proto_enumTypes[1]
+}
+
+func (x ExactMovementOutcome_Status) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ExactMovementOutcome_Status.Descriptor instead.
+func (ExactMovementOutcome_Status) EnumDescriptor() ([]byte, []int) {
+	return file_ledger_proto_rawDescGZIP(), []int{1, 0}
+}
+
+// The service authenticates and authorizes the calling workload and verifies
+// ownership and command scope before writing. An operation ID binds to the
+// original caller, scope and normalized parameters across all three methods.
+// A successful retry returns the outcome recorded for that method.
+type ExactMovementCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	OperationId   string                 `protobuf:"bytes,1,opt,name=operation_id,json=operationId,proto3" json:"operation_id,omitempty"`
+	UserId        int64                  `protobuf:"varint,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	FromAccountId *int64                 `protobuf:"varint,3,opt,name=from_account_id,json=fromAccountId,proto3,oneof" json:"from_account_id,omitempty"`
+	ToAccountId   *int64                 `protobuf:"varint,4,opt,name=to_account_id,json=toAccountId,proto3,oneof" json:"to_account_id,omitempty"`
+	Currency      string                 `protobuf:"bytes,5,opt,name=currency,proto3" json:"currency,omitempty"`
+	// Positive, base-10 decimal within the currency scale, with no rounding.
+	Amount        string        `protobuf:"bytes,6,opt,name=amount,proto3" json:"amount,omitempty"`
+	Scope         MovementScope `protobuf:"varint,7,opt,name=scope,proto3,enum=ledger.v1.MovementScope" json:"scope,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ExactMovementCommand) Reset() {
+	*x = ExactMovementCommand{}
+	mi := &file_ledger_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExactMovementCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExactMovementCommand) ProtoMessage() {}
+
+func (x *ExactMovementCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_ledger_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExactMovementCommand.ProtoReflect.Descriptor instead.
+func (*ExactMovementCommand) Descriptor() ([]byte, []int) {
+	return file_ledger_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *ExactMovementCommand) GetOperationId() string {
+	if x != nil {
+		return x.OperationId
+	}
+	return ""
+}
+
+func (x *ExactMovementCommand) GetUserId() int64 {
+	if x != nil {
+		return x.UserId
+	}
+	return 0
+}
+
+func (x *ExactMovementCommand) GetFromAccountId() int64 {
+	if x != nil && x.FromAccountId != nil {
+		return *x.FromAccountId
+	}
+	return 0
+}
+
+func (x *ExactMovementCommand) GetToAccountId() int64 {
+	if x != nil && x.ToAccountId != nil {
+		return *x.ToAccountId
+	}
+	return 0
+}
+
+func (x *ExactMovementCommand) GetCurrency() string {
+	if x != nil {
+		return x.Currency
+	}
+	return ""
+}
+
+func (x *ExactMovementCommand) GetAmount() string {
+	if x != nil {
+		return x.Amount
+	}
+	return ""
+}
+
+func (x *ExactMovementCommand) GetScope() MovementScope {
+	if x != nil {
+		return x.Scope
+	}
+	return MovementScope_MOVEMENT_SCOPE_UNSPECIFIED
+}
+
+type ExactMovementOutcome struct {
+	state         protoimpl.MessageState      `protogen:"open.v1"`
+	Status        ExactMovementOutcome_Status `protobuf:"varint,1,opt,name=status,proto3,enum=ledger.v1.ExactMovementOutcome_Status" json:"status,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ExactMovementOutcome) Reset() {
+	*x = ExactMovementOutcome{}
+	mi := &file_ledger_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExactMovementOutcome) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExactMovementOutcome) ProtoMessage() {}
+
+func (x *ExactMovementOutcome) ProtoReflect() protoreflect.Message {
+	mi := &file_ledger_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExactMovementOutcome.ProtoReflect.Descriptor instead.
+func (*ExactMovementOutcome) Descriptor() ([]byte, []int) {
+	return file_ledger_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *ExactMovementOutcome) GetStatus() ExactMovementOutcome_Status {
+	if x != nil {
+		return x.Status
+	}
+	return ExactMovementOutcome_STATUS_UNSPECIFIED
+}
+
 type MovementRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	OperationId   string                 `protobuf:"bytes,1,opt,name=operation_id,json=operationId,proto3" json:"operation_id,omitempty"`
@@ -35,7 +277,7 @@ type MovementRequest struct {
 
 func (x *MovementRequest) Reset() {
 	*x = MovementRequest{}
-	mi := &file_ledger_proto_msgTypes[0]
+	mi := &file_ledger_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -47,7 +289,7 @@ func (x *MovementRequest) String() string {
 func (*MovementRequest) ProtoMessage() {}
 
 func (x *MovementRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ledger_proto_msgTypes[0]
+	mi := &file_ledger_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -60,7 +302,7 @@ func (x *MovementRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MovementRequest.ProtoReflect.Descriptor instead.
 func (*MovementRequest) Descriptor() ([]byte, []int) {
-	return file_ledger_proto_rawDescGZIP(), []int{0}
+	return file_ledger_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *MovementRequest) GetOperationId() string {
@@ -113,7 +355,7 @@ type MovementResult struct {
 
 func (x *MovementResult) Reset() {
 	*x = MovementResult{}
-	mi := &file_ledger_proto_msgTypes[1]
+	mi := &file_ledger_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -125,7 +367,7 @@ func (x *MovementResult) String() string {
 func (*MovementResult) ProtoMessage() {}
 
 func (x *MovementResult) ProtoReflect() protoreflect.Message {
-	mi := &file_ledger_proto_msgTypes[1]
+	mi := &file_ledger_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -138,7 +380,7 @@ func (x *MovementResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MovementResult.ProtoReflect.Descriptor instead.
 func (*MovementResult) Descriptor() ([]byte, []int) {
-	return file_ledger_proto_rawDescGZIP(), []int{1}
+	return file_ledger_proto_rawDescGZIP(), []int{3}
 }
 
 type GetAccountRequest struct {
@@ -150,7 +392,7 @@ type GetAccountRequest struct {
 
 func (x *GetAccountRequest) Reset() {
 	*x = GetAccountRequest{}
-	mi := &file_ledger_proto_msgTypes[2]
+	mi := &file_ledger_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -162,7 +404,7 @@ func (x *GetAccountRequest) String() string {
 func (*GetAccountRequest) ProtoMessage() {}
 
 func (x *GetAccountRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ledger_proto_msgTypes[2]
+	mi := &file_ledger_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -175,7 +417,7 @@ func (x *GetAccountRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAccountRequest.ProtoReflect.Descriptor instead.
 func (*GetAccountRequest) Descriptor() ([]byte, []int) {
-	return file_ledger_proto_rawDescGZIP(), []int{2}
+	return file_ledger_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *GetAccountRequest) GetAccountId() int64 {
@@ -196,7 +438,7 @@ type GetAccountResponse struct {
 
 func (x *GetAccountResponse) Reset() {
 	*x = GetAccountResponse{}
-	mi := &file_ledger_proto_msgTypes[3]
+	mi := &file_ledger_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -208,7 +450,7 @@ func (x *GetAccountResponse) String() string {
 func (*GetAccountResponse) ProtoMessage() {}
 
 func (x *GetAccountResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ledger_proto_msgTypes[3]
+	mi := &file_ledger_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -221,7 +463,7 @@ func (x *GetAccountResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAccountResponse.ProtoReflect.Descriptor instead.
 func (*GetAccountResponse) Descriptor() ([]byte, []int) {
-	return file_ledger_proto_rawDescGZIP(), []int{3}
+	return file_ledger_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *GetAccountResponse) GetAccountId() int64 {
@@ -249,7 +491,24 @@ var File_ledger_proto protoreflect.FileDescriptor
 
 const file_ledger_proto_rawDesc = "" +
 	"\n" +
-	"\fledger.proto\x12\tledger.v1\"\xf9\x01\n" +
+	"\fledger.proto\x12\tledger.v1\"\xb2\x02\n" +
+	"\x14ExactMovementCommand\x12!\n" +
+	"\foperation_id\x18\x01 \x01(\tR\voperationId\x12\x17\n" +
+	"\auser_id\x18\x02 \x01(\x03R\x06userId\x12+\n" +
+	"\x0ffrom_account_id\x18\x03 \x01(\x03H\x00R\rfromAccountId\x88\x01\x01\x12'\n" +
+	"\rto_account_id\x18\x04 \x01(\x03H\x01R\vtoAccountId\x88\x01\x01\x12\x1a\n" +
+	"\bcurrency\x18\x05 \x01(\tR\bcurrency\x12\x16\n" +
+	"\x06amount\x18\x06 \x01(\tR\x06amount\x12.\n" +
+	"\x05scope\x18\a \x01(\x0e2\x18.ledger.v1.MovementScopeR\x05scopeB\x12\n" +
+	"\x10_from_account_idB\x10\n" +
+	"\x0e_to_account_id\"\xb5\x01\n" +
+	"\x14ExactMovementOutcome\x12>\n" +
+	"\x06status\x18\x01 \x01(\x0e2&.ledger.v1.ExactMovementOutcome.StatusR\x06status\"]\n" +
+	"\x06Status\x12\x16\n" +
+	"\x12STATUS_UNSPECIFIED\x10\x00\x12\x13\n" +
+	"\x0fSTATUS_RESERVED\x10\x01\x12\x11\n" +
+	"\rSTATUS_POSTED\x10\x02\x12\x13\n" +
+	"\x0fSTATUS_RELEASED\x10\x03\"\xf9\x01\n" +
 	"\x0fMovementRequest\x12!\n" +
 	"\foperation_id\x18\x01 \x01(\tR\voperationId\x12\x16\n" +
 	"\x06action\x18\x02 \x01(\tR\x06action\x12\x17\n" +
@@ -267,12 +526,19 @@ const file_ledger_proto_rawDesc = "" +
 	"\n" +
 	"account_id\x18\x01 \x01(\x03R\taccountId\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\x03R\x06userId\x12%\n" +
-	"\x0eaccount_number\x18\x03 \x01(\tR\raccountNumber2\xed\x01\n" +
+	"\x0eaccount_number\x18\x03 \x01(\tR\raccountNumber*i\n" +
+	"\rMovementScope\x12\x1e\n" +
+	"\x1aMOVEMENT_SCOPE_UNSPECIFIED\x10\x00\x12\x1b\n" +
+	"\x17MOVEMENT_SCOPE_INTERNAL\x10\x01\x12\x1b\n" +
+	"\x17MOVEMENT_SCOPE_OUTBOUND\x10\x022\xd1\x03\n" +
 	"\rAccountLedger\x12F\n" +
 	"\rApplyMovement\x12\x1a.ledger.v1.MovementRequest\x1a\x19.ledger.v1.MovementResult\x12I\n" +
 	"\x10ApplyOutboundAud\x12\x1a.ledger.v1.MovementRequest\x1a\x19.ledger.v1.MovementResult\x12I\n" +
 	"\n" +
-	"GetAccount\x12\x1c.ledger.v1.GetAccountRequest\x1a\x1d.ledger.v1.GetAccountResponseBh\n" +
+	"GetAccount\x12\x1c.ledger.v1.GetAccountRequest\x1a\x1d.ledger.v1.GetAccountResponse\x12K\n" +
+	"\aReserve\x12\x1f.ledger.v1.ExactMovementCommand\x1a\x1f.ledger.v1.ExactMovementOutcome\x12H\n" +
+	"\x04Post\x12\x1f.ledger.v1.ExactMovementCommand\x1a\x1f.ledger.v1.ExactMovementOutcome\x12K\n" +
+	"\aRelease\x12\x1f.ledger.v1.ExactMovementCommand\x1a\x1f.ledger.v1.ExactMovementOutcomeBh\n" +
 	"\tledger.v1P\x01ZYgithub.com/dipjyotimetia/distributed-systems/backend/cards-service/gen/ledger/v1;ledgerv1b\x06proto3"
 
 var (
@@ -287,25 +553,38 @@ func file_ledger_proto_rawDescGZIP() []byte {
 	return file_ledger_proto_rawDescData
 }
 
-var file_ledger_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_ledger_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_ledger_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_ledger_proto_goTypes = []any{
-	(*MovementRequest)(nil),    // 0: ledger.v1.MovementRequest
-	(*MovementResult)(nil),     // 1: ledger.v1.MovementResult
-	(*GetAccountRequest)(nil),  // 2: ledger.v1.GetAccountRequest
-	(*GetAccountResponse)(nil), // 3: ledger.v1.GetAccountResponse
+	(MovementScope)(0),               // 0: ledger.v1.MovementScope
+	(ExactMovementOutcome_Status)(0), // 1: ledger.v1.ExactMovementOutcome.Status
+	(*ExactMovementCommand)(nil),     // 2: ledger.v1.ExactMovementCommand
+	(*ExactMovementOutcome)(nil),     // 3: ledger.v1.ExactMovementOutcome
+	(*MovementRequest)(nil),          // 4: ledger.v1.MovementRequest
+	(*MovementResult)(nil),           // 5: ledger.v1.MovementResult
+	(*GetAccountRequest)(nil),        // 6: ledger.v1.GetAccountRequest
+	(*GetAccountResponse)(nil),       // 7: ledger.v1.GetAccountResponse
 }
 var file_ledger_proto_depIdxs = []int32{
-	0, // 0: ledger.v1.AccountLedger.ApplyMovement:input_type -> ledger.v1.MovementRequest
-	0, // 1: ledger.v1.AccountLedger.ApplyOutboundAud:input_type -> ledger.v1.MovementRequest
-	2, // 2: ledger.v1.AccountLedger.GetAccount:input_type -> ledger.v1.GetAccountRequest
-	1, // 3: ledger.v1.AccountLedger.ApplyMovement:output_type -> ledger.v1.MovementResult
-	1, // 4: ledger.v1.AccountLedger.ApplyOutboundAud:output_type -> ledger.v1.MovementResult
-	3, // 5: ledger.v1.AccountLedger.GetAccount:output_type -> ledger.v1.GetAccountResponse
-	3, // [3:6] is the sub-list for method output_type
-	0, // [0:3] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	0, // 0: ledger.v1.ExactMovementCommand.scope:type_name -> ledger.v1.MovementScope
+	1, // 1: ledger.v1.ExactMovementOutcome.status:type_name -> ledger.v1.ExactMovementOutcome.Status
+	4, // 2: ledger.v1.AccountLedger.ApplyMovement:input_type -> ledger.v1.MovementRequest
+	4, // 3: ledger.v1.AccountLedger.ApplyOutboundAud:input_type -> ledger.v1.MovementRequest
+	6, // 4: ledger.v1.AccountLedger.GetAccount:input_type -> ledger.v1.GetAccountRequest
+	2, // 5: ledger.v1.AccountLedger.Reserve:input_type -> ledger.v1.ExactMovementCommand
+	2, // 6: ledger.v1.AccountLedger.Post:input_type -> ledger.v1.ExactMovementCommand
+	2, // 7: ledger.v1.AccountLedger.Release:input_type -> ledger.v1.ExactMovementCommand
+	5, // 8: ledger.v1.AccountLedger.ApplyMovement:output_type -> ledger.v1.MovementResult
+	5, // 9: ledger.v1.AccountLedger.ApplyOutboundAud:output_type -> ledger.v1.MovementResult
+	7, // 10: ledger.v1.AccountLedger.GetAccount:output_type -> ledger.v1.GetAccountResponse
+	3, // 11: ledger.v1.AccountLedger.Reserve:output_type -> ledger.v1.ExactMovementOutcome
+	3, // 12: ledger.v1.AccountLedger.Post:output_type -> ledger.v1.ExactMovementOutcome
+	3, // 13: ledger.v1.AccountLedger.Release:output_type -> ledger.v1.ExactMovementOutcome
+	8, // [8:14] is the sub-list for method output_type
+	2, // [2:8] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_ledger_proto_init() }
@@ -314,18 +593,20 @@ func file_ledger_proto_init() {
 		return
 	}
 	file_ledger_proto_msgTypes[0].OneofWrappers = []any{}
+	file_ledger_proto_msgTypes[2].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_ledger_proto_rawDesc), len(file_ledger_proto_rawDesc)),
-			NumEnums:      0,
-			NumMessages:   4,
+			NumEnums:      2,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_ledger_proto_goTypes,
 		DependencyIndexes: file_ledger_proto_depIdxs,
+		EnumInfos:         file_ledger_proto_enumTypes,
 		MessageInfos:      file_ledger_proto_msgTypes,
 	}.Build()
 	File_ledger_proto = out.File

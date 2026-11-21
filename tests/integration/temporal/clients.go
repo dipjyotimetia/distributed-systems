@@ -138,6 +138,27 @@ func insufficientFunds(rejection *transactions.Rejection) bool {
 	return err == nil && funds.Code == transactions.INSUFFICIENTFUNDS && funds.Message != ""
 }
 
+func fieldErrors(rejection *transactions.Rejection) bool {
+	if rejection == nil || insufficientFunds(rejection) {
+		return false
+	}
+	fields, err := rejection.AsFieldErrors()
+	return err == nil && len(fields) > 0
+}
+
+func rejectionError(action string, status int, body []byte, parsed *transactions.Rejection) error {
+	if status == http.StatusBadRequest && insufficientFunds(parsed) {
+		return nil
+	}
+	if status == http.StatusBadRequest && fieldErrors(parsed) {
+		return fmt.Errorf("%s rejection returned field errors", action)
+	}
+	if status == http.StatusBadRequest && len(body) == 0 {
+		return fmt.Errorf("%s rejection returned an empty body", action)
+	}
+	return fmt.Errorf("%s rejection did not return INSUFFICIENT_FUNDS", action)
+}
+
 func transferRequest(t Transfer, amount int) transactions.TransferRequest {
 	return transactions.TransferRequest{
 		FromAccountId: t.From,

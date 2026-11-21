@@ -4,6 +4,8 @@ import PaymentForm from '../PaymentForm';
 import ReconciliationQueue from '../../operations/payments/ReconciliationQueue';
 import { AccountsAPI } from '@/lib/api/accounts';
 
+jest.mock('@/lib/auth/context', () => ({ useAuth: () => ({ user: { id: 71 } }) }));
+jest.mock('../../operations/payments/ReviewQueue', () => () => null);
 jest.mock('@/components/auth/ProtectedRoute', () => ({ children }: { children: ReactNode }) => children);
 jest.mock('@/components/layout/AuthenticatedLayout', () => ({ children }: { children: ReactNode }) => children);
 jest.mock('@/lib/api/accounts', () => ({ AccountsAPI: { getAccounts: jest.fn() } }));
@@ -14,6 +16,7 @@ const originalFetch = global.fetch;
 const paymentId = '597a4c24-019f-4ed6-884f-bf7cf8486f65';
 
 beforeEach(() => {
+  jest.mocked(sessionStorage.removeItem).mockClear();
   accounts.mockReset();
   fetchMock.mockReset();
   fetchMock.mockResolvedValue(response(200, []));
@@ -51,6 +54,21 @@ it('submits from an AUD account and refreshes the settlement reference', async (
   fireEvent.click(screen.getByRole('button', { name: 'Refresh status' }));
   expect(await screen.findByText('Clearing reference C00000000001')).toBeInTheDocument();
   expect(screen.getByText('Settlement date 2026-11-20')).toBeInTheDocument();
+});
+
+it('retries the saved payment after a reload using the same key and body', async () => {
+  const body = JSON.stringify({ accountId: 11, destination: 'DEST00000001', amountMinor: 2500 });
+  const key = 'saved-payment-key';
+  jest.mocked(sessionStorage.getItem).mockReturnValueOnce(JSON.stringify({ body, key }));
+  accounts.mockResolvedValue({ success: true, data: [] });
+  fetchMock.mockResolvedValueOnce(response(200, [])).mockResolvedValueOnce(response(202, { id: paymentId, status: 'PENDING' }));
+  render(<PaymentForm />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Retry saved payment' }));
+  await screen.findAllByText(paymentId);
+  expect(fetchMock).toHaveBeenLastCalledWith('/api/v1/payments', expect.objectContaining({
+    method: 'POST', body, headers: expect.objectContaining({ 'Idempotency-Key': key }),
+  }));
+  expect(sessionStorage.removeItem).toHaveBeenCalledWith('banking.payment.71');
 });
 
 it('lists the customer payments and reports a history failure', async () => {

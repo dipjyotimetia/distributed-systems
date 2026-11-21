@@ -1,6 +1,9 @@
 package com.banking.transactionsservice.event;
 
 import com.banking.transactionsservice.entity.Transaction;
+import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.util.JsonFormat;
+import transactions.v1.MovementLifecycleEvent;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
@@ -12,6 +15,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -42,6 +46,18 @@ public class TransactionEventOutbox {
                 """, transaction.getId(), payload(transaction));
     }
 
+    public void enqueueMovement(UUID movementId, MovementLifecycleEvent event) {
+        try {
+            jdbc.update("""
+                    INSERT INTO transactions_service.event_outbox (movement_id, topic, payload, event_key)
+                    VALUES (?, 'movement-lifecycle-v1', ?, ?)
+                    ON CONFLICT (event_key) DO NOTHING
+                    """, movementId, JsonFormat.printer().omittingInsignificantWhitespace().print(event), event.getEventId());
+        } catch (InvalidProtocolBufferException invalid) {
+            throw new IllegalStateException("Unable to serialize movement event", invalid);
+        }
+    }
+
     @Scheduled(fixedDelayString = "${transactions.outbox.delay-ms:1000}")
     public void publishPending() {
         if (!publishEnabled) {
@@ -52,12 +68,19 @@ public class TransactionEventOutbox {
                 FROM transactions_service.event_outbox WHERE published_at IS NULL
                 """, Double.class));
         List<Pending> pending = jdbc.query("""
-                SELECT id, transaction_id, payload FROM transactions_service.event_outbox
-                WHERE published_at IS NULL ORDER BY id LIMIT 20
-                """, (rs, row) -> new Pending(rs.getLong("id"), rs.getLong("transaction_id"), rs.getString("payload")));
+                SELECT e.id, e.transaction_id, e.movement_id, e.topic, e.payload
+                FROM transactions_service.event_outbox e
+                WHERE e.published_at IS NULL AND NOT EXISTS (
+                    SELECT 1 FROM transactions_service.movement_decisions d
+                    WHERE d.ledger_id = e.transaction_id AND NOT d.finalized
+                )
+                ORDER BY e.id LIMIT 20
+                """, (rs, row) -> new Pending(rs.getLong("id"),
+                rs.getString("transaction_id"), rs.getString("movement_id"), rs.getString("topic"), rs.getString("payload")));
         for (Pending event : pending) {
             try {
-                kafka.send(topic, String.valueOf(event.transactionId()), event.payload()).get(5, TimeUnit.SECONDS);
+                kafka.send(event.topic() == null ? topic : event.topic(),
+                        event.movementId() == null ? event.transactionId() : event.movementId(), event.payload()).get(5, TimeUnit.SECONDS);
             } catch (Exception failure) {
                 if (failure instanceof InterruptedException) {
                     Thread.currentThread().interrupt();
@@ -81,11 +104,11 @@ public class TransactionEventOutbox {
         return "{\"transaction_id\":" + transaction.getId()
                 + ",\"account_id\":" + accountId
                 + ",\"user_id\":" + transaction.getUserId()
-                + ",\"amount\":" + transaction.getAmount()
+                + ",\"amount\":" + transaction.getAmount().toPlainString()
                 + ",\"transaction_type\":\"" + transaction.getType().name()
                 + "\",\"status\":\"" + transaction.getStatus().name()
                 + "\",\"timestamp\":\"" + timestamp + "\"}";
     }
 
-    private record Pending(long id, long transactionId, String payload) {}
+    private record Pending(long id, String transactionId, String movementId, String topic, String payload) {}
 }

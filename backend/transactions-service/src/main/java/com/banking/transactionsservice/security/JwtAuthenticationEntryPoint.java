@@ -30,6 +30,9 @@ public class JwtAuthenticationEntryPoint implements AuthenticationEntryPoint {
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
 
         Map<String, Object> body = new HashMap<>();
+        if (request.getRequestURI().startsWith("/api/v1/movements")) {
+            body.put("code", "UNAUTHENTICATED");
+        }
         body.put("status", HttpServletResponse.SC_UNAUTHORIZED);
         body.put("error", "Unauthorized");
         body.put("message", "Access denied. Please provide valid authentication credentials.");
