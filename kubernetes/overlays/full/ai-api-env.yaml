@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: banking-ai
+spec:
+  template:
+    spec:
+      containers:
+        - name: ai-service
+          env:
+            - name: TEMPORAL_ADDRESS
+              value: banking-temporal:7233
+            - name: DISPUTES_SERVICE_URL
+              value: http://banking-disputes
+            - name: DISPUTES_INTERNAL_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: banking-workflow-credentials
+                  key: disputes-internal-token
+                  optional: true
+            - name: ACCOUNTS_SERVICE_URL
+              value: http://banking-accounts
+            - name: TRANSACTIONS_SERVICE_URL
+              value: http://banking-transactions
+            - name: CLAIM_CHECK_DIR
+              value: /tmp/ai-claim-check

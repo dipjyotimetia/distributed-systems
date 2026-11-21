@@ -39,6 +39,8 @@ class DisputeResearchWorkflow:
         )
 
         context_blob = json.dumps(context, default=str)
+        # Offload a copy for callers/history references, but always feed the real
+        # context text to LLM activities — never the claim key alone.
         claim = None
         if len(context_blob.encode("utf-8")) >= 2048:
             claim = await workflow.execute_activity(
@@ -47,9 +49,7 @@ class DisputeResearchWorkflow:
                 result_type=str,
                 start_to_close_timeout=timedelta(seconds=10),
             )
-            context_ref = f"claim:{claim}"
-        else:
-            context_ref = context_blob
+        context_for_llm = context_blob
 
         async def _agent(role: str, instruction: str) -> str:
             req = LlmRequest(
@@ -58,7 +58,7 @@ class DisputeResearchWorkflow:
                     LlmMessage(role="system", content=instruction),
                     LlmMessage(
                         role="user",
-                        content=f"Dispute case context:\n{context_ref}",
+                        content=f"Dispute case context:\n{context_for_llm}",
                     ),
                 ],
                 response_format=None,
@@ -104,7 +104,7 @@ class DisputeResearchWorkflow:
             f"Ledger notes:\n{ledger_notes}\n\n"
             f"Evidence notes:\n{evidence_notes}\n\n"
             f"Policy notes:\n{policy_notes}\n\n"
-            f"Original context ref:\n{context_ref}"
+            f"Original case context:\n{context_for_llm}"
         )
         synth = await workflow.execute_activity(
             "llmComplete",

@@ -358,10 +358,19 @@ async def agent_chat(req: AgentChatRequest, request: Request):
 
 
 @app.post("/api/disputes/research")
-async def dispute_research(req: DisputeResearchRequest):
-    """Start multi-agent dispute research; persists draft via disputes internal API."""
+async def dispute_research(req: DisputeResearchRequest, request: Request):
+    """Start multi-agent dispute research; persists draft via disputes internal API.
+
+    Protected by the shared DISPUTES_INTERNAL_TOKEN (service-to-service only).
+    Production dispute research is normally started by the disputes Temporal worker.
+    """
     from temporal.client import start_dispute_research
     from temporal.models import DisputeResearchInput
+
+    expected = os.environ.get("DISPUTES_INTERNAL_TOKEN", "")
+    provided = request.headers.get("X-Internal-Token", "")
+    if not expected or provided != expected:
+        return Response(content="Internal token required", status_code=401)
 
     try:
         return await start_dispute_research(

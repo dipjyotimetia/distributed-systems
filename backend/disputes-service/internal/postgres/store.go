@@ -135,7 +135,11 @@ func (s *Store) SaveAiDraft(ctx context.Context, id int64, draft json.RawMessage
 	if !errors.Is(err, sql.ErrNoRows) {
 		return c, err
 	}
-	return scanCase(s.db.QueryRowContext(ctx, "SELECT "+caseColumns+" FROM disputes.cases WHERE id=$1", id))
+	c, err = scanCase(s.db.QueryRowContext(ctx, "SELECT "+caseColumns+" FROM disputes.cases WHERE id=$1", id))
+	if err != nil {
+		return c, err
+	}
+	return c, cases.ErrConflict
 }
 
 // ByIDInternal loads a case without customer scoping (internal AI worker).

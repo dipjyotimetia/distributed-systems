@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import AuthenticatedLayout from '@/components/layout/AuthenticatedLayout';
+import { TokenManager } from '@/lib/auth/token';
 
 interface ProviderResult {
   provider: string;
@@ -19,6 +20,7 @@ interface ChatMessage {
   results?: ProviderResult[];
   agent?: boolean;
   blocked?: boolean;
+  conversationClaim?: string;
 }
 
 const PROVIDER_COLORS: Record<string, { bg: string; border: string; badge: string }> = {
@@ -34,6 +36,7 @@ const AIAssistantPage: React.FC = () => {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [mode, setMode] = useState<'fanout' | 'agent'>('fanout');
+  const [conversationClaim, setConversationClaim] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -50,12 +53,24 @@ const AIAssistantPage: React.FC = () => {
     setIsLoading(true);
 
     try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      const token = TokenManager.getToken();
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+
       const res = await fetch('/api/ai/chat', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ message: trimmed, mode }),
+        headers,
+        body: JSON.stringify({
+          message: trimmed,
+          mode,
+          ...(mode === 'agent' && conversationClaim
+            ? { conversationClaim }
+            : {}),
+        }),
       });
 
       const data = await res.json();
@@ -68,6 +83,9 @@ const AIAssistantPage: React.FC = () => {
         };
         setMessages(prev => [...prev, assistantMessage]);
       } else if (typeof data.reply === 'string') {
+        if (typeof data.conversationClaim === 'string' && data.conversationClaim) {
+          setConversationClaim(data.conversationClaim);
+        }
         setMessages(prev => [
           ...prev,
           {
@@ -75,6 +93,8 @@ const AIAssistantPage: React.FC = () => {
             content: data.reply,
             agent: true,
             blocked: Boolean(data.blocked),
+            conversationClaim:
+              typeof data.conversationClaim === 'string' ? data.conversationClaim : undefined,
           },
         ]);
       } else {
@@ -115,7 +135,10 @@ const AIAssistantPage: React.FC = () => {
             <div className="mt-3 flex gap-2">
               <button
                 type="button"
-                onClick={() => setMode('fanout')}
+                onClick={() => {
+                  setMode('fanout');
+                  setConversationClaim(null);
+                }}
                 className={`rounded-full px-3 py-1 text-xs font-medium ${
                   mode === 'fanout' ? 'bg-ink text-canvas' : 'border border-line text-ink/70'
                 }`}

@@ -522,4 +522,12 @@ func TestAiDraftInternalAPI(t *testing.T) {
 	if err := db.QueryRowContext(ctx, "SELECT count(*) FROM disputes.signal_outbox WHERE case_id=$1", c.ID).Scan(&pending); err != nil || pending != 1 {
 		t.Fatalf("expected signal outbox row, pending=%d err=%v", pending, err)
 	}
+
+	if _, err := store.Resolve(ctx, c.ID, 8, "Closed after draft"); err != nil {
+		t.Fatal(err)
+	}
+	_, err = store.SaveAiDraft(ctx, c.ID, json.RawMessage(`{"summary":"late"}`))
+	if !errors.Is(err, casesmodel.ErrConflict) {
+		t.Fatalf("expected conflict after resolve, got %v", err)
+	}
 }
