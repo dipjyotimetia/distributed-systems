@@ -127,7 +127,7 @@ public class UsersController : UsersApiController
         Email = user.Email,
         Roles = ContractRoles(user.Roles),
         CreatedAt = ContractTime(user.CreatedAt),
-        UpdatedAt = ContractTime(user.UpdatedAt)
+        UpdatedAt = ContractTime(user.UpdatedAt ?? user.CreatedAt)
     };
 
     private static List<string> ContractRoles(string roles) =>
