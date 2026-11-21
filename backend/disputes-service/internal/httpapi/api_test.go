@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -24,6 +25,14 @@ func token(t *testing.T, method jwt.SigningMethod, identity string, expiry *jwt.
 		t.Fatal(err)
 	}
 	return "Bearer " + raw
+}
+
+func TestResearchDraftRequiresFields(t *testing.T) {
+	api := API{internalToken: "token"}
+	_, err := api.ResearchDraft(context.Background(), "token", 1, json.RawMessage(`{}`))
+	if err == nil || err.Error() != "draft object is required" {
+		t.Fatalf("empty draft: %v", err)
+	}
 }
 
 func signed(t *testing.T, id string) string {

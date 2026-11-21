@@ -1,5 +1,6 @@
 package com.banking.accountsservice.controller;
 
+import com.banking.accountsservice.contract.ContractJson;
 import com.banking.accountsservice.dto.AccountCreateRequest;
 import com.banking.accountsservice.dto.AccountResponse;
 import com.banking.accountsservice.dto.AccountQuery;
@@ -17,6 +18,8 @@ import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.SpanBuilder;
 import io.opentelemetry.api.trace.Tracer;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Validation;
+import jakarta.validation.Validator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -241,6 +244,16 @@ class AccountControllerTest {
             lenient().when(mockTracer.spanBuilder(anyString())).thenReturn(mockSpanBuilder);
             lenient().when(mockSpanBuilder.startSpan()).thenReturn(mockSpan);
             return mockTracer;
+        }
+
+        @Bean
+        public ContractJson contractJson() {
+            return new ContractJson();
+        }
+
+        @Bean
+        public Validator validator() {
+            return Validation.buildDefaultValidatorFactory().getValidator();
         }
 
         @Bean

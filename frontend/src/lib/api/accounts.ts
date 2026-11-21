@@ -3,9 +3,9 @@ import { ApiResponse, PaginatedResponse } from './client';
 
 const accountsApi = new AccountsApi(new Configuration({ basePath: '' }));
 
-async function call<T>(request: () => Promise<T>): Promise<ApiResponse<T>> {
+async function call<T>(request: () => Promise<unknown>): Promise<ApiResponse<T>> {
   try {
-    return { success: true, data: await request() };
+    return { success: true, data: (await request()) as T };
   } catch (error) {
     return { success: false, message: error instanceof Error ? error.message : 'Request failed' };
   }
@@ -31,7 +31,7 @@ export interface CreateAccountRequest {
 
 export interface UpdateAccountRequest {
   accountType?: 'CHECKING' | 'SAVINGS' | 'CREDIT' | 'INVESTMENT';
-  status?: 'ACTIVE' | 'INACTIVE' | 'FROZEN' | 'CLOSED';
+  status?: 'ACTIVE' | 'FROZEN' | 'CLOSED';
 }
 
 export interface AccountSummary {
@@ -94,7 +94,7 @@ export class AccountsAPI {
   // Update account status
   static async updateAccountStatus(
     accountId: number,
-    status: Account['status']
+    status: 'ACTIVE' | 'FROZEN' | 'CLOSED'
   ): Promise<ApiResponse<Account>> {
     return call(() => accountsApi.updateAccountStatus({ accountId, statusUpdateRequest: { status } }));
   }

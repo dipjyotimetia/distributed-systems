@@ -120,8 +120,8 @@ func TestDisputeLifecycle(t *testing.T) {
 	const queue = "/api/v1/operations/disputes"
 	expect(t, call(routes, "GET", "/api/v1/health", "", ""), 200)
 	expect(t, call(routes, "GET", queue+"?page=-1", operator, ""), 400)
-	expect(t, call(routes, "GET", cases+"/bad", customer, ""), 404)
-	expect(t, call(routes, "POST", queue+"/bad/resolve", operator, "{}"), 404)
+	expect(t, call(routes, "GET", cases+"/bad", customer, ""), 400)
+	expect(t, call(routes, "POST", queue+"/bad/resolve", operator, "{}"), 400)
 	for _, body := range []string{`{}`, `{"transferId":17,"reason":" "}`, `{"transferId":17,"reason":"x","extra":42}`, `{"transferId":17,"reason":"x"} true`} {
 		expect(t, call(routes, "POST", cases, customer, body), 400)
 	}

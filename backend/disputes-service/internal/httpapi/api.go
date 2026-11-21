@@ -14,9 +14,9 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/golang-jwt/jwt/v5"
-	"github.com/dipjyotimetia/distributed-systems/backend/disputes-service/internal/cases"
 	transactionsv1 "github.com/dipjyotimetia/distributed-systems/backend/disputes-service/gen/transactions/v1"
+	"github.com/dipjyotimetia/distributed-systems/backend/disputes-service/internal/cases"
+	"github.com/golang-jwt/jwt/v5"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
@@ -141,7 +141,7 @@ func (a API) ResearchDraft(ctx context.Context, token string, id int64, draft js
 	if err := a.authorizeInternal(token); err != nil {
 		return cases.Case{}, err
 	}
-	if len(draft) == 0 || !json.Valid(draft) || draft[0] != '{' {
+	if !completeDraft(draft) {
 		return cases.Case{}, errors.New("draft object is required")
 	}
 	return a.SaveAiDraft(ctx, id, draft)
@@ -173,6 +173,19 @@ func decode(w http.ResponseWriter, r *http.Request, value any) bool {
 	d := json.NewDecoder(http.MaxBytesReader(w, r.Body, 16384))
 	d.DisallowUnknownFields()
 	return d.Decode(value) == nil && d.Decode(new(any)) == io.EOF
+}
+
+func completeDraft(draft json.RawMessage) bool {
+	var body map[string]json.RawMessage
+	if len(draft) == 0 || json.Unmarshal(draft, &body) != nil {
+		return false
+	}
+	var summary, reason, action string
+	var confidence float64
+	return json.Unmarshal(body["summary"], &summary) == nil && summary != "" &&
+		json.Unmarshal(body["reasonCode"], &reason) == nil && reason != "" &&
+		json.Unmarshal(body["recommendedAction"], &action) == nil && action != "" &&
+		json.Unmarshal(body["confidence"], &confidence) == nil
 }
 
 func validText(value string, limit int) bool {

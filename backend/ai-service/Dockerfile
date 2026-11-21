@@ -5,8 +5,14 @@ COPY requirements.txt .
 # install requirements-live.txt in overlays that set AI_PROVIDER_MODE=live.
 ARG AI_INSTALL_LIVE_DEPS=0
 COPY requirements-live.txt .
-RUN pip install --no-cache-dir -r requirements.txt \
-    && if [ "$AI_INSTALL_LIVE_DEPS" = "1" ]; then pip install --no-cache-dir -r requirements-live.txt; fi
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends g++ \
+    && pip install --no-cache-dir -r requirements.txt \
+    && if [ "$AI_INSTALL_LIVE_DEPS" = "1" ]; then pip install --no-cache-dir -r requirements-live.txt; fi \
+    && apt-mark manual libstdc++6 \
+    && apt-get purge -y g++ \
+    && apt-get autoremove -y \
+    && rm -rf /var/lib/apt/lists/*
 COPY . .
 EXPOSE 8080
 # AI_MODE=worker runs the Temporal worker; default serves the FastAPI chat/agent API.
