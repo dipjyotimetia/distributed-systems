@@ -9,6 +9,7 @@
 !backend/*/gradle.properties
 !backend/transactions-service/src/**
 !contracts/openapi/transactions.yaml
+!contracts/avro/**
 !contracts/proto/fraud/**
 !contracts/proto/ledger/**
 !contracts/proto/transactions/**
