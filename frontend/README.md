@@ -19,7 +19,7 @@ npm run dev
 ```
 
 Open <http://localhost:3000>. Routes and pages live in `src/app`. Check
-`/api/healthz` for frontend health.
+`/api/v1/healthz` for frontend health.
 
 Run `npm run build` for the production build and `npm test` for Jest.
 The [Playwright guide](e2e/README.md) explains which browser test mode to use.

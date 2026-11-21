@@ -22,7 +22,7 @@ func (a *Activities) SeedPendingTransaction(ctx context.Context, userID, account
 }
 
 func (a *Activities) AssertConditionalCancellation(ctx context.Context, input Input, id int64) (BoundaryEvidence, error) {
-	path := fmt.Sprintf("/api/transactions/%d/cancel", id)
+	path := fmt.Sprintf("/api/v1/transactions/%d/cancel", id)
 	otherToken, err := a.login(ctx, Input{User: input.User + "b"})
 	if err != nil {
 		return BoundaryEvidence{}, err

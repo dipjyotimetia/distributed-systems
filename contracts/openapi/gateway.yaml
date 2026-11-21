@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: API Gateway
   description: Health endpoints served by the gateway process. Banking routes are proxied and described by the other contracts.
-  version: 1.0.0
+  version: v1
 servers:
   - url: http://localhost:8080
     description: Local development server
@@ -43,7 +43,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HealthReport'
-  /api/healthz:
+  /api/v1/healthz:
     get:
       tags: [gateway]
       operationId: healthz

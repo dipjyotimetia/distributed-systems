@@ -105,7 +105,7 @@ class TransactionControllerTest {
         when(transactionService.getUserTransactions(testUserId)).thenReturn(transactions);
 
         // Act & Assert
-        mockMvc.perform(get("/api/transactions"))
+        mockMvc.perform(get("/api/v1/transactions"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(1L))
                 .andExpect(jsonPath("$[0].amount").value(100.00))
@@ -122,7 +122,7 @@ class TransactionControllerTest {
         when(transactionService.queryTransactions(eq(testUserId), eq(query), eq(false), any(HttpServletRequest.class)))
                 .thenReturn(new PageImpl<>(List.of(testTransactionResponse), PageRequest.of(0, 2, Sort.by("id")), 1));
 
-        mockMvc.perform(get("/api/transactions").param("accountId", testAccountId.toString())
+        mockMvc.perform(get("/api/v1/transactions").param("accountId", testAccountId.toString())
                 .param("status", "COMPLETED").param("page", "0").param("size", "2").param("sort", "id,asc"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].id").value(1))
@@ -137,10 +137,10 @@ class TransactionControllerTest {
         when(transactionService.cancelTransaction(1L, testUserId))
                 .thenThrow(new ResponseStatusException(HttpStatus.CONFLICT));
 
-        mockMvc.perform(get("/api/transactions/1"))
+        mockMvc.perform(get("/api/v1/transactions/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(1));
-        mockMvc.perform(patch("/api/transactions/1/cancel"))
+        mockMvc.perform(patch("/api/v1/transactions/1/cancel"))
                 .andExpect(status().isConflict());
     }
 
@@ -151,7 +151,7 @@ class TransactionControllerTest {
                 .thenReturn(testTransactionResponse);
 
         // Act & Assert
-        mockMvc.perform(post("/api/transactions/deposit")
+        mockMvc.perform(post("/api/v1/transactions/deposit")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(depositRequest)))
                 .andExpect(status().isCreated())
@@ -169,7 +169,7 @@ class TransactionControllerTest {
         depositRequest.setAmount(-10.00); // Invalid negative amount
 
         // Act & Assert
-        mockMvc.perform(post("/api/transactions/deposit")
+        mockMvc.perform(post("/api/v1/transactions/deposit")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(depositRequest)))
                 .andExpect(status().isBadRequest());
@@ -184,7 +184,7 @@ class TransactionControllerTest {
                 .thenThrow(new RuntimeException("Account not owned by user"));
 
         // Act & Assert
-        mockMvc.perform(post("/api/transactions/deposit")
+        mockMvc.perform(post("/api/v1/transactions/deposit")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(depositRequest)))
                 .andExpect(status().isBadRequest());
@@ -197,7 +197,7 @@ class TransactionControllerTest {
         when(transactionService.deposit(any(DepositRequest.class), anyLong(), any(HttpServletRequest.class)))
                 .thenThrow(new NullPointerException());
 
-        mockMvc.perform(post("/api/transactions/deposit")
+        mockMvc.perform(post("/api/v1/transactions/deposit")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(depositRequest)))
                 .andExpect(status().isInternalServerError());
@@ -223,7 +223,7 @@ class TransactionControllerTest {
                 .thenReturn(withdrawResponse);
 
         // Act & Assert
-        mockMvc.perform(post("/api/transactions/withdraw")
+        mockMvc.perform(post("/api/v1/transactions/withdraw")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(withdrawRequest)))
                 .andExpect(status().isCreated())
@@ -242,7 +242,7 @@ class TransactionControllerTest {
                 .thenThrow(new InsufficientFundsException("Insufficient balance"));
 
         // Act & Assert
-        mockMvc.perform(post("/api/transactions/withdraw")
+        mockMvc.perform(post("/api/v1/transactions/withdraw")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(withdrawRequest)))
                 .andExpect(status().isBadRequest())
@@ -270,7 +270,7 @@ class TransactionControllerTest {
                 .thenReturn(transferResponse);
 
         // Act & Assert
-        mockMvc.perform(post("/api/transactions/transfer")
+        mockMvc.perform(post("/api/v1/transactions/transfer")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(transferRequest)))
                 .andExpect(status().isCreated())
@@ -288,7 +288,7 @@ class TransactionControllerTest {
         transferRequest.setToAccountId(testAccountId); // Same as fromAccountId
 
         // Act & Assert
-        mockMvc.perform(post("/api/transactions/transfer")
+        mockMvc.perform(post("/api/v1/transactions/transfer")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(transferRequest)))
                 .andExpect(status().isBadRequest());
@@ -303,7 +303,7 @@ class TransactionControllerTest {
                 .thenThrow(new InsufficientFundsException("Insufficient balance"));
 
         // Act & Assert
-        mockMvc.perform(post("/api/transactions/transfer")
+        mockMvc.perform(post("/api/v1/transactions/transfer")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(transferRequest)))
                 .andExpect(status().isBadRequest())

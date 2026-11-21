@@ -182,7 +182,7 @@ jobs:
           kubectl -n banking-app port-forward svc/banking-notification 33001:80 >/tmp/forward-notification.log 2>&1 &
           notification_pid=$!
           trap 'kill "$frontend_pid" "$jaeger_pid" "$notification_pid" 2>/dev/null || true' EXIT
-          curl -fsS --retry 20 --retry-connrefused --retry-delay 1 http://127.0.0.1:33000/api/healthz >/dev/null
+          curl -fsS --retry 20 --retry-connrefused --retry-delay 1 http://127.0.0.1:33000/api/v1/healthz >/dev/null
           python3 tests/integration/kubernetes-smoke.py http://127.0.0.1:33000 http://127.0.0.1:33686 http://127.0.0.1:33001 | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Collect cluster diagnostics
         if: failure()

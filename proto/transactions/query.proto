@@ -7,7 +7,7 @@ option java_multiple_files = true;
 option go_package = "github.com/dipjyotimetia/distributed-systems/backend/disputes-service/gen/transactions/v1;transactionsv1";
 
 // Internal read used by disputes. The caller JWT is authorization metadata.
-// The public GET /api/transactions/{id} stays for browsers and the AI tool.
+// The public GET /api/v1/transactions/{id} stays for browsers and the AI tool.
 service TransactionQuery {
   rpc GetTransaction(GetTransactionRequest) returns (TransactionView);
 }

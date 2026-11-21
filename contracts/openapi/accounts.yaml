@@ -2,12 +2,12 @@ openapi: 3.0.3
 info:
   title: Accounts Service
   description: API for managing bank accounts.
-  version: 1.0.0
+  version: v1
 servers:
 - url: http://localhost:8082
   description: Local development server
 paths:
-  /api/accounts:
+  /api/v1/accounts:
     get:
       summary: Get all accounts for the authenticated user
       security:
@@ -50,7 +50,7 @@ paths:
       tags:
       - accounts
       operationId: createAccount
-  /api/accounts/search:
+  /api/v1/accounts/search:
     get:
       summary: Search owned accounts by number or type
       security:
@@ -77,7 +77,7 @@ paths:
       tags:
       - accounts
       operationId: searchAccounts
-  /api/accounts/summary:
+  /api/v1/accounts/summary:
     get:
       summary: Summarize owned accounts
       security:
@@ -92,7 +92,7 @@ paths:
       tags:
       - accounts
       operationId: summarizeAccounts
-  /api/accounts/{accountId}:
+  /api/v1/accounts/{accountId}:
     get:
       summary: Get account by ID
       security:
@@ -170,7 +170,7 @@ paths:
       tags:
       - accounts
       operationId: closeAccount
-  /api/accounts/{accountId}/status:
+  /api/v1/accounts/{accountId}/status:
     patch:
       summary: Freeze, unfreeze, or close an owned account
       security:
@@ -204,7 +204,7 @@ paths:
       tags:
       - accounts
       operationId: updateAccountStatus
-  /api/accounts/{accountId}/balance:
+  /api/v1/accounts/{accountId}/balance:
     get:
       summary: Get account balance
       security:
@@ -253,7 +253,7 @@ paths:
       tags:
       - accounts
       operationId: updateAccountBalance
-  /api/accounts/{accountId}/export-statement:
+  /api/v1/accounts/{accountId}/export-statement:
     post:
       tags:
       - accounts
@@ -277,7 +277,7 @@ paths:
                 $ref: '#/components/schemas/StatementExport'
         '500':
           description: Export failed
-  /api/accounts/{accountId}/statement-jobs:
+  /api/v1/accounts/{accountId}/statement-jobs:
     post:
       tags:
       - statement-jobs
@@ -328,7 +328,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/StatementJobPage'
-  /api/accounts/{accountId}/statement-jobs/{jobId}:
+  /api/v1/accounts/{accountId}/statement-jobs/{jobId}:
     get:
       tags:
       - statement-jobs
@@ -353,7 +353,7 @@ paths:
                 $ref: '#/components/schemas/StatementJob'
         '404':
           description: Job not found
-  /api/accounts/{accountId}/statement-jobs/{jobId}/download:
+  /api/v1/accounts/{accountId}/statement-jobs/{jobId}/download:
     get:
       tags:
       - statement-jobs

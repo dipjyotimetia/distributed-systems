@@ -37,7 +37,7 @@ public class StatementJobsController implements StatementJobsApi {
     public ResponseEntity<StatementJob> createStatementJob(Long accountId, String idempotencyKey) {
         var job = jobs.create(accountId, customer(), idempotencyKey);
         return ResponseEntity.accepted().cacheControl(CacheControl.noStore())
-                .location(URI.create("/api/accounts/" + accountId + "/statement-jobs/" + job.id()))
+                .location(URI.create("/api/v1/accounts/" + accountId + "/statement-jobs/" + job.id()))
                 .body(contractJson.convert(job, StatementJob.class));
     }
 

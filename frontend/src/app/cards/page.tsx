@@ -59,7 +59,7 @@ function Form() {
     let active = true;
     async function load() {
       try {
-        const response = await fetch('/api/cards');
+        const response = await fetch('/api/v1/cards');
         const body = await response.json();
         if (!active) return;
         if (!response.ok) {
@@ -98,7 +98,7 @@ function Form() {
     setResult('');
     setIssuing(true);
     try {
-      const response = await fetch('/api/cards', {
+      const response = await fetch('/api/v1/cards', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ accountId }),
@@ -128,7 +128,7 @@ function Form() {
     setError('');
     setAuthorizing(true);
     try {
-      const response = await fetch('/api/cards/authorize', {
+      const response = await fetch('/api/v1/cards/authorize', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({

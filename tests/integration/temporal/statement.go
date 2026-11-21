@@ -42,7 +42,7 @@ func (a *Activities) ExportStatement(ctx context.Context, input Input, accountID
 		return "", err
 	}
 	var response struct{ Status, Key string }
-	path := fmt.Sprintf("/api/accounts/%d/export-statement", accountID)
+	path := fmt.Sprintf("/api/v1/accounts/%d/export-statement", accountID)
 	if err := call(ctx, a.Frontend, path, token, struct{}{}, 200, &response); err != nil {
 		return "", err
 	}

@@ -2,12 +2,12 @@ openapi: 3.0.3
 info:
   title: User Service
   description: Registration, login, and profile for the banking user service.
-  version: 1.0.0
+  version: v1
 servers:
   - url: http://localhost:8081
     description: Local development server
 paths:
-  /api/users/register:
+  /api/v1/users/register:
     post:
       tags: [users]
       operationId: register
@@ -37,7 +37,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-  /api/users/login:
+  /api/v1/users/login:
     post:
       tags: [users]
       operationId: login
@@ -67,7 +67,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-  /api/users/profile:
+  /api/v1/users/profile:
     get:
       tags: [users]
       operationId: getProfile
@@ -93,7 +93,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-  /api/users/check-username:
+  /api/v1/users/check-username:
     get:
       tags: [users]
       operationId: checkUsername
@@ -111,7 +111,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Availability'
-  /api/users/check-email:
+  /api/v1/users/check-email:
     get:
       tags: [users]
       operationId: checkEmail

@@ -319,7 +319,7 @@ With the default Compose stack running, use `docker compose ps` for service
 status and these HTTP checks for published endpoints:
 
 ```bash
-curl -fsS http://localhost:3000/api/healthz
+curl -fsS http://localhost:3000/api/v1/healthz
 curl -fsS http://localhost:8080/actuator/health
 curl -fsS http://localhost:8081/actuator/health
 curl -fsS http://localhost:8082/actuator/health

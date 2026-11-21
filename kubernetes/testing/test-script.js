@@ -28,7 +28,7 @@ async function runTests() {
 
     // Test 2: User Registration
     console.log('\n👤 Test 2: User Registration');
-    const registerResponse = await fetch(`${API_BASE_URL}/api/user-service/register`, {
+    const registerResponse = await fetch(`${API_BASE_URL}/api/v1/user-service/register`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -51,7 +51,7 @@ async function runTests() {
 
     // Test 3: User Login
     console.log('\n🔐 Test 3: User Login');
-    const loginResponse = await fetch(`${API_BASE_URL}/api/user-service/login`, {
+    const loginResponse = await fetch(`${API_BASE_URL}/api/v1/user-service/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -74,7 +74,7 @@ async function runTests() {
 
     // Test 4: Get User Profile
     console.log('\n📝 Test 4: Get User Profile');
-    const profileResponse = await fetch(`${API_BASE_URL}/api/user-service/profile`, {
+    const profileResponse = await fetch(`${API_BASE_URL}/api/v1/user-service/profile`, {
       headers: {
         'Authorization': `Bearer ${authToken}`,
       }
@@ -91,7 +91,7 @@ async function runTests() {
 
     // Test 5: Create Account
     console.log('\n🏦 Test 5: Create Account');
-    const accountResponse = await fetch(`${API_BASE_URL}/api/accounts-service/`, {
+    const accountResponse = await fetch(`${API_BASE_URL}/api/v1/accounts-service/`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -115,7 +115,7 @@ async function runTests() {
 
     // Test 6: Get Account Details
     console.log('\n💰 Test 6: Get Account Details');
-    const accountDetailsResponse = await fetch(`${API_BASE_URL}/api/accounts-service/${accountId}`, {
+    const accountDetailsResponse = await fetch(`${API_BASE_URL}/api/v1/accounts-service/${accountId}`, {
       headers: {
         'Authorization': `Bearer ${authToken}`,
       }
@@ -132,7 +132,7 @@ async function runTests() {
 
     // Test 7: Get Account Balance
     console.log('\n💵 Test 7: Get Account Balance');
-    const balanceResponse = await fetch(`${API_BASE_URL}/api/accounts-service/${accountId}/balance`, {
+    const balanceResponse = await fetch(`${API_BASE_URL}/api/v1/accounts-service/${accountId}/balance`, {
       headers: {
         'Authorization': `Bearer ${authToken}`,
       }
@@ -149,7 +149,7 @@ async function runTests() {
 
     // Test 8: Get Transaction History
     console.log('\n📊 Test 8: Get Transaction History');
-    const transactionsResponse = await fetch(`${API_BASE_URL}/api/transactions-service/`, {
+    const transactionsResponse = await fetch(`${API_BASE_URL}/api/v1/transactions-service/`, {
       headers: {
         'Authorization': `Bearer ${authToken}`,
       }

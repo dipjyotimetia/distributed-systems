@@ -27,7 +27,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
 // Internal read used by disputes. The caller JWT is authorization metadata.
-// The public GET /api/transactions/{id} stays for browsers and the AI tool.
+// The public GET /api/v1/transactions/{id} stays for browsers and the AI tool.
 type TransactionQueryClient interface {
 	GetTransaction(ctx context.Context, in *GetTransactionRequest, opts ...grpc.CallOption) (*TransactionView, error)
 }
@@ -55,7 +55,7 @@ func (c *transactionQueryClient) GetTransaction(ctx context.Context, in *GetTran
 // for forward compatibility.
 //
 // Internal read used by disputes. The caller JWT is authorization metadata.
-// The public GET /api/transactions/{id} stays for browsers and the AI tool.
+// The public GET /api/v1/transactions/{id} stays for browsers and the AI tool.
 type TransactionQueryServer interface {
 	GetTransaction(context.Context, *GetTransactionRequest) (*TransactionView, error)
 	mustEmbedUnimplementedTransactionQueryServer()

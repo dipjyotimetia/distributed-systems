@@ -32,7 +32,7 @@ describe('TransactionsAPI', () => {
 
       const result = await TransactionsAPI.getTransactions()
 
-      expect(mockApiClient.get).toHaveBeenCalledWith('/api/transactions')
+      expect(mockApiClient.get).toHaveBeenCalledWith('/api/v1/transactions')
       expect(result).toEqual(mockResponse)
     })
   })
@@ -51,7 +51,7 @@ describe('TransactionsAPI', () => {
 
       const result = await TransactionsAPI.getTransactionsPaginated()
 
-      expect(mockApiClient.get).toHaveBeenCalledWith('/api/transactions?page=0&size=10&sort=createdAt%2Cdesc')
+      expect(mockApiClient.get).toHaveBeenCalledWith('/api/v1/transactions?page=0&size=10&sort=createdAt%2Cdesc')
       expect(result).toEqual(mockResponse)
     })
 
@@ -61,7 +61,7 @@ describe('TransactionsAPI', () => {
 
       await TransactionsAPI.getTransactionsPaginated(2, 5, 'amount,asc')
 
-      expect(mockApiClient.get).toHaveBeenCalledWith('/api/transactions?page=2&size=5&sort=amount%2Casc')
+      expect(mockApiClient.get).toHaveBeenCalledWith('/api/v1/transactions?page=2&size=5&sort=amount%2Casc')
     })
   })
 
@@ -83,7 +83,7 @@ describe('TransactionsAPI', () => {
       const result = await TransactionsAPI.getFilteredTransactions(filters)
 
       expect(mockApiClient.get).toHaveBeenCalledWith(
-        expect.stringContaining('/api/transactions?page=0&size=10&sort=createdAt%2Cdesc')
+        expect.stringContaining('/api/v1/transactions?page=0&size=10&sort=createdAt%2Cdesc')
       )
       expect(result).toEqual(mockResponse)
     })
@@ -94,7 +94,7 @@ describe('TransactionsAPI', () => {
 
       await TransactionsAPI.getFilteredTransactions({})
 
-      expect(mockApiClient.get).toHaveBeenCalledWith('/api/transactions?page=0&size=10&sort=createdAt%2Cdesc')
+      expect(mockApiClient.get).toHaveBeenCalledWith('/api/v1/transactions?page=0&size=10&sort=createdAt%2Cdesc')
     })
   })
 
@@ -108,7 +108,7 @@ describe('TransactionsAPI', () => {
 
       const result = await TransactionsAPI.getTransaction(1)
 
-      expect(mockApiClient.get).toHaveBeenCalledWith('/api/transactions/1')
+      expect(mockApiClient.get).toHaveBeenCalledWith('/api/v1/transactions/1')
       expect(result).toEqual(mockResponse)
     })
   })
@@ -125,7 +125,7 @@ describe('TransactionsAPI', () => {
 
       const result = await TransactionsAPI.getAccountTransactions(1)
 
-      expect(mockApiClient.get).toHaveBeenCalledWith('/api/transactions?accountId=1')
+      expect(mockApiClient.get).toHaveBeenCalledWith('/api/v1/transactions?accountId=1')
       expect(result).toEqual(mockResponse)
     })
   })
@@ -147,7 +147,7 @@ describe('TransactionsAPI', () => {
 
       const result = await TransactionsAPI.createTransaction(transactionData)
 
-      expect(mockApiClient.post).toHaveBeenCalledWith('/api/transactions', transactionData, {
+      expect(mockApiClient.post).toHaveBeenCalledWith('/api/v1/transactions', transactionData, {
         headers: { 'Idempotency-Key': expect.any(String) },
       })
       expect(result).toEqual(mockResponse)
@@ -184,7 +184,7 @@ describe('TransactionsAPI', () => {
 
       const result = await TransactionsAPI.createDeposit(1, 1000, 'Test deposit')
 
-      expect(mockApiClient.post).toHaveBeenCalledWith('/api/transactions/deposit', {
+      expect(mockApiClient.post).toHaveBeenCalledWith('/api/v1/transactions/deposit', {
         accountId: 1,
         amount: 1000,
         currency: 'USD',
@@ -201,7 +201,7 @@ describe('TransactionsAPI', () => {
 
       await TransactionsAPI.createDeposit(1, 1000, 'Test deposit', 'EUR')
 
-      expect(mockApiClient.post).toHaveBeenCalledWith('/api/transactions/deposit', {
+      expect(mockApiClient.post).toHaveBeenCalledWith('/api/v1/transactions/deposit', {
         accountId: 1,
         amount: 1000,
         currency: 'EUR',
@@ -222,7 +222,7 @@ describe('TransactionsAPI', () => {
 
       const result = await TransactionsAPI.createWithdrawal(1, 500, 'Test withdrawal')
 
-      expect(mockApiClient.post).toHaveBeenCalledWith('/api/transactions/withdraw', {
+      expect(mockApiClient.post).toHaveBeenCalledWith('/api/v1/transactions/withdraw', {
         accountId: 1,
         amount: 500,
         currency: 'USD',
@@ -244,7 +244,7 @@ describe('TransactionsAPI', () => {
 
       const result = await TransactionsAPI.createTransfer(1, 2, 300, 'Test transfer')
 
-      expect(mockApiClient.post).toHaveBeenCalledWith('/api/transactions/transfer', {
+      expect(mockApiClient.post).toHaveBeenCalledWith('/api/v1/transactions/transfer', {
         fromAccountId: 1,
         toAccountId: 2,
         amount: 300,
@@ -267,7 +267,7 @@ describe('TransactionsAPI', () => {
 
       const result = await TransactionsAPI.cancelTransaction(1)
 
-      expect(mockApiClient.patch).toHaveBeenCalledWith('/api/transactions/1/cancel')
+      expect(mockApiClient.patch).toHaveBeenCalledWith('/api/v1/transactions/1/cancel')
       expect(result).toEqual(mockResponse)
     })
   })
@@ -290,7 +290,7 @@ describe('TransactionsAPI', () => {
 
       const result = await TransactionsAPI.getTransactionSummary()
 
-      expect(mockApiClient.get).toHaveBeenCalledWith('/api/transactions/summary')
+      expect(mockApiClient.get).toHaveBeenCalledWith('/api/v1/transactions/summary')
       expect(result).toEqual(mockResponse)
     })
   })
@@ -309,7 +309,7 @@ describe('TransactionsAPI', () => {
 
       const result = await TransactionsAPI.getAccountTransactionSummary(1)
 
-      expect(mockApiClient.get).toHaveBeenCalledWith('/api/accounts/1/transactions/summary')
+      expect(mockApiClient.get).toHaveBeenCalledWith('/api/v1/accounts/1/transactions/summary')
       expect(result).toEqual(mockResponse)
     })
   })
@@ -324,7 +324,7 @@ describe('TransactionsAPI', () => {
 
       const result = await TransactionsAPI.getTransactionsByType('DEPOSIT')
 
-      expect(mockApiClient.get).toHaveBeenCalledWith('/api/transactions?type=DEPOSIT&page=0&size=10&sort=createdAt%2Cdesc')
+      expect(mockApiClient.get).toHaveBeenCalledWith('/api/v1/transactions?type=DEPOSIT&page=0&size=10&sort=createdAt%2Cdesc')
       expect(result).toEqual(mockResponse)
     })
   })
@@ -339,7 +339,7 @@ describe('TransactionsAPI', () => {
 
       const result = await TransactionsAPI.getTransactionsByStatus('COMPLETED')
 
-      expect(mockApiClient.get).toHaveBeenCalledWith('/api/transactions?status=COMPLETED&page=0&size=10&sort=createdAt%2Cdesc')
+      expect(mockApiClient.get).toHaveBeenCalledWith('/api/v1/transactions?status=COMPLETED&page=0&size=10&sort=createdAt%2Cdesc')
       expect(result).toEqual(mockResponse)
     })
   })
@@ -354,7 +354,7 @@ describe('TransactionsAPI', () => {
 
       const result = await TransactionsAPI.getPendingTransactions()
 
-      expect(mockApiClient.get).toHaveBeenCalledWith('/api/transactions?status=PENDING')
+      expect(mockApiClient.get).toHaveBeenCalledWith('/api/v1/transactions?status=PENDING')
       expect(result).toEqual(mockResponse)
     })
   })
@@ -369,7 +369,7 @@ describe('TransactionsAPI', () => {
 
       const result = await TransactionsAPI.getRecentTransactions()
 
-      expect(mockApiClient.get).toHaveBeenCalledWith('/api/transactions/recent?limit=10')
+      expect(mockApiClient.get).toHaveBeenCalledWith('/api/v1/transactions/recent?limit=10')
       expect(result).toEqual(mockResponse)
     })
 
@@ -379,7 +379,7 @@ describe('TransactionsAPI', () => {
 
       await TransactionsAPI.getRecentTransactions(5)
 
-      expect(mockApiClient.get).toHaveBeenCalledWith('/api/transactions/recent?limit=5')
+      expect(mockApiClient.get).toHaveBeenCalledWith('/api/v1/transactions/recent?limit=5')
     })
   })
 
@@ -393,7 +393,7 @@ describe('TransactionsAPI', () => {
 
       const result = await TransactionsAPI.searchTransactions('deposit')
 
-      expect(mockApiClient.get).toHaveBeenCalledWith('/api/transactions/search?q=deposit&page=0&size=10')
+      expect(mockApiClient.get).toHaveBeenCalledWith('/api/v1/transactions/search?q=deposit&page=0&size=10')
       expect(result).toEqual(mockResponse)
     })
   })
@@ -408,7 +408,7 @@ describe('TransactionsAPI', () => {
 
       const result = await TransactionsAPI.getTransactionsByDateRange('2023-01-01', '2023-01-31')
 
-      expect(mockApiClient.get).toHaveBeenCalledWith('/api/transactions?startDate=2023-01-01&endDate=2023-01-31&page=0&size=10&sort=createdAt%2Cdesc')
+      expect(mockApiClient.get).toHaveBeenCalledWith('/api/v1/transactions?startDate=2023-01-01&endDate=2023-01-31&page=0&size=10&sort=createdAt%2Cdesc')
       expect(result).toEqual(mockResponse)
     })
   })
@@ -427,7 +427,7 @@ describe('TransactionsAPI', () => {
 
       const result = await TransactionsAPI.getMonthlyTransactionReport(2023, 1)
 
-      expect(mockApiClient.get).toHaveBeenCalledWith('/api/transactions/reports/monthly?year=2023&month=1')
+      expect(mockApiClient.get).toHaveBeenCalledWith('/api/v1/transactions/reports/monthly?year=2023&month=1')
       expect(result).toEqual(mockResponse)
     })
   })
@@ -442,7 +442,7 @@ describe('TransactionsAPI', () => {
 
       const result = await TransactionsAPI.exportTransactions('CSV')
 
-      expect(mockApiClient.get).toHaveBeenCalledWith('/api/transactions/export?format=CSV')
+      expect(mockApiClient.get).toHaveBeenCalledWith('/api/v1/transactions/export?format=CSV')
       expect(result).toEqual(mockResponse)
     })
 
@@ -462,7 +462,7 @@ describe('TransactionsAPI', () => {
       const result = await TransactionsAPI.exportTransactions('PDF', filters)
 
       expect(mockApiClient.get).toHaveBeenCalledWith(
-        expect.stringContaining('/api/transactions/export?format=PDF')
+        expect.stringContaining('/api/v1/transactions/export?format=PDF')
       )
       expect(result).toEqual(mockResponse)
     })

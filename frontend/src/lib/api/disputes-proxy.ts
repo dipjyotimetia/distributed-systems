@@ -37,7 +37,7 @@ export function disputeProxy(operations: boolean) {
       return NextResponse.json({ message: 'Dispute route not found' }, { status: 404 });
     }
 
-    const prefix = operations ? '/api/operations/disputes' : '/api/disputes';
+    const prefix = operations ? '/api/v1/operations/disputes' : '/api/v1/disputes';
     const suffix = casePath.length ? '/' + casePath.join('/') : '';
     const headers = new Headers();
     const auth = request.headers.get('authorization');

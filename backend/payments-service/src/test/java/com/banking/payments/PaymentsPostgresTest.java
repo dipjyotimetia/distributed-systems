@@ -72,9 +72,9 @@ class PaymentsPostgresTest {
                 assertEquals(404, status(client, read(server.resolve(location), stranger)));
 
                 var db = context.getBean(JdbcTemplate.class);
-                UUID id = UUID.fromString(location.substring("/api/payments/".length()));
-                var owned = client.sendAsync(read(server.resolve("/api/payments"), customer), HttpResponse.BodyHandlers.ofString()).join();
-                var other = client.sendAsync(read(server.resolve("/api/payments"), stranger), HttpResponse.BodyHandlers.ofString()).join();
+                UUID id = UUID.fromString(location.substring("/api/v1/payments/".length()));
+                var owned = client.sendAsync(read(server.resolve("/api/v1/payments"), customer), HttpResponse.BodyHandlers.ofString()).join();
+                var other = client.sendAsync(read(server.resolve("/api/v1/payments"), stranger), HttpResponse.BodyHandlers.ofString()).join();
                 assertEquals(200, owned.statusCode());
                 assertTrue(owned.body().contains(id.toString()));
                 assertEquals(200, other.statusCode());
@@ -193,7 +193,7 @@ class PaymentsPostgresTest {
                     """, String.class, date, arrivedAfterImport));
             var serverContext = (ServletWebServerApplicationContext) context;
             URI queue = URI.create("http://127.0.0.1:" + serverContext.getWebServer().getPort()
-                    + "/api/operations/payments/reconciliation");
+                    + "/api/v1/operations/payments/reconciliation");
             try (HttpClient client = HttpClient.newHttpClient()) {
                 var operator = read(queue, token(71, Instant.now().plusSeconds(60)));
                 var response = client.sendAsync(operator, HttpResponse.BodyHandlers.ofString()).join();
@@ -253,7 +253,7 @@ class PaymentsPostgresTest {
     }
 
     private static HttpRequest post(URI server, String token, String key, String body) {
-        return HttpRequest.newBuilder(server.resolve("/api/payments"))
+        return HttpRequest.newBuilder(server.resolve("/api/v1/payments"))
                 .header("Authorization", "Bearer " + token)
                 .header("traceparent", "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01")
                 .header("Idempotency-Key", key)

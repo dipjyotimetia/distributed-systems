@@ -113,25 +113,25 @@ type ResolveDisputeJSONRequestBody = ResolutionRequest
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// List the caller's disputes
-	// (GET /api/disputes)
+	// (GET /api/v1/disputes)
 	ListDisputes(w http.ResponseWriter, r *http.Request)
 	// File a dispute for a completed transfer
-	// (POST /api/disputes)
+	// (POST /api/v1/disputes)
 	FileDispute(w http.ResponseWriter, r *http.Request)
 	// Read one of the caller's disputes
-	// (GET /api/disputes/{id})
+	// (GET /api/v1/disputes/{id})
 	GetDispute(w http.ResponseWriter, r *http.Request, id Id)
 	// Respond to an evidence request
-	// (POST /api/disputes/{id}/evidence-requests/{requestId}/response)
+	// (POST /api/v1/disputes/{id}/evidence-requests/{requestId}/response)
 	RespondToEvidence(w http.ResponseWriter, r *http.Request, id Id, requestId RequestId, params RespondToEvidenceParams)
 	// List the operations dispute queue
-	// (GET /api/operations/disputes)
+	// (GET /api/v1/operations/disputes)
 	OperationsQueue(w http.ResponseWriter, r *http.Request, params OperationsQueueParams)
 	// Ask the customer for evidence
-	// (POST /api/operations/disputes/{id}/evidence-requests)
+	// (POST /api/v1/operations/disputes/{id}/evidence-requests)
 	RequestEvidence(w http.ResponseWriter, r *http.Request, id Id, params RequestEvidenceParams)
 	// Resolve a dispute
-	// (POST /api/operations/disputes/{id}/resolve)
+	// (POST /api/v1/operations/disputes/{id}/resolve)
 	ResolveDispute(w http.ResponseWriter, r *http.Request, id Id)
 }
 
@@ -526,13 +526,13 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
-	m.HandleFunc("GET "+options.BaseURL+"/api/disputes", wrapper.ListDisputes)
-	m.HandleFunc("POST "+options.BaseURL+"/api/disputes", wrapper.FileDispute)
-	m.HandleFunc("GET "+options.BaseURL+"/api/disputes/{id}", wrapper.GetDispute)
-	m.HandleFunc("POST "+options.BaseURL+"/api/disputes/{id}/evidence-requests/{requestId}/response", wrapper.RespondToEvidence)
-	m.HandleFunc("GET "+options.BaseURL+"/api/operations/disputes", wrapper.OperationsQueue)
-	m.HandleFunc("POST "+options.BaseURL+"/api/operations/disputes/{id}/evidence-requests", wrapper.RequestEvidence)
-	m.HandleFunc("POST "+options.BaseURL+"/api/operations/disputes/{id}/resolve", wrapper.ResolveDispute)
+	m.HandleFunc("GET "+options.BaseURL+"/api/v1/disputes", wrapper.ListDisputes)
+	m.HandleFunc("POST "+options.BaseURL+"/api/v1/disputes", wrapper.FileDispute)
+	m.HandleFunc("GET "+options.BaseURL+"/api/v1/disputes/{id}", wrapper.GetDispute)
+	m.HandleFunc("POST "+options.BaseURL+"/api/v1/disputes/{id}/evidence-requests/{requestId}/response", wrapper.RespondToEvidence)
+	m.HandleFunc("GET "+options.BaseURL+"/api/v1/operations/disputes", wrapper.OperationsQueue)
+	m.HandleFunc("POST "+options.BaseURL+"/api/v1/operations/disputes/{id}/evidence-requests", wrapper.RequestEvidence)
+	m.HandleFunc("POST "+options.BaseURL+"/api/v1/operations/disputes/{id}/resolve", wrapper.ResolveDispute)
 
 	return m
 }

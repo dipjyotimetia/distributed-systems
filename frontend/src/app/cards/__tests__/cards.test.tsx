@@ -28,7 +28,7 @@ it('loads the signed-in customer cards', async () => {
   render(<CardsPage />);
   expect(await screen.findByRole('button', { name: /Card ending 1111/ })).toBeInTheDocument();
   expect(screen.getByText('Account 4')).toBeInTheDocument();
-  expect(fetchMock).toHaveBeenCalledWith('/api/cards');
+  expect(fetchMock).toHaveBeenCalledWith('/api/v1/cards');
 });
 
 it('reports a card list failure', async () => {

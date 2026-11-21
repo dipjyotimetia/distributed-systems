@@ -2,12 +2,12 @@ openapi: 3.0.3
 info:
   title: Disputes Service
   description: Customer disputes and the operations queue.
-  version: 1.0.0
+  version: v1
 servers:
   - url: http://localhost:8087
     description: Local development server
 paths:
-  /api/disputes:
+  /api/v1/disputes:
     post:
       tags: [disputes]
       operationId: fileDispute
@@ -78,7 +78,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorMessage'
-  /api/disputes/{id}:
+  /api/v1/disputes/{id}:
     get:
       tags: [disputes]
       operationId: getDispute
@@ -106,7 +106,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorMessage'
-  /api/disputes/{id}/evidence-requests/{requestId}/response:
+  /api/v1/disputes/{id}/evidence-requests/{requestId}/response:
     post:
       tags: [disputes]
       operationId: respondToEvidence
@@ -154,7 +154,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorMessage'
-  /api/operations/disputes:
+  /api/v1/operations/disputes:
     get:
       tags: [disputes]
       operationId: operationsQueue
@@ -193,7 +193,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorMessage'
-  /api/operations/disputes/{id}/resolve:
+  /api/v1/operations/disputes/{id}/resolve:
     post:
       tags: [disputes]
       operationId: resolveDispute
@@ -245,7 +245,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorMessage'
-  /api/operations/disputes/{id}/evidence-requests:
+  /api/v1/operations/disputes/{id}/evidence-requests:
     post:
       tags: [disputes]
       operationId: requestEvidence

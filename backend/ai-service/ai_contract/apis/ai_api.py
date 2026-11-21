@@ -41,7 +41,7 @@ for _, name, _ in pkgutil.iter_modules(ns_pkg.__path__, ns_pkg.__name__ + "."):
 
 
 @router.post(
-    "/api/agent/chat",
+    "/api/v1/agent/chat",
     responses={
         200: {"model": Dict[str, object], "description": "Workflow result or handle"},
         503: {"description": "Agent workflow unavailable"},
@@ -76,7 +76,7 @@ async def ai_health(
 
 
 @router.post(
-    "/api/chat",
+    "/api/v1/chat",
     responses={
         200: {"model": ChatResponse, "description": "Provider replies"},
     },
@@ -93,7 +93,7 @@ async def chat(
 
 
 @router.post(
-    "/api/disputes/research",
+    "/api/v1/disputes/research",
     responses={
         200: {"model": Dict[str, object], "description": "Research result or handle"},
         401: {"description": "Internal token required"},
@@ -113,7 +113,7 @@ async def dispute_research(
 
 
 @router.get(
-    "/api/providers",
+    "/api/v1/providers",
     responses={
         200: {"model": List[Provider], "description": "Providers"},
     },

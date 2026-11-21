@@ -116,8 +116,8 @@ func TestDisputeLifecycle(t *testing.T) {
 	const delay = 24 * time.Hour
 	a := httpapi.New(db, s, testKey, map[int64]bool{8: true}, lifecycleTransfers{customer: customer}, delay)
 	routes := a.Routes()
-	const cases = "/api/disputes"
-	const queue = "/api/operations/disputes"
+	const cases = "/api/v1/disputes"
+	const queue = "/api/v1/operations/disputes"
 	expect(t, call(routes, "GET", "/health", "", ""), 200)
 	expect(t, call(routes, "GET", queue+"?page=-1", operator, ""), 400)
 	expect(t, call(routes, "GET", cases+"/bad", customer, ""), 404)
@@ -351,7 +351,7 @@ func TestRuntime(t *testing.T) {
 
 	db.Close()
 	expect(t, call(httpapi.HealthRoutes(db), "GET", "/health", "", ""), 503)
-	expect(t, call(httpapi.New(db, postgres.New(db), testKey, nil, nil, 0).Routes(), "GET", "/api/disputes", signed(t, "7"), ""), 500)
+	expect(t, call(httpapi.New(db, postgres.New(db), testKey, nil, nil, 0).Routes(), "GET", "/api/v1/disputes", signed(t, "7"), ""), 500)
 }
 
 func waitUntil(t *testing.T, check func() bool) {

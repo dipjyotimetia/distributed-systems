@@ -2,12 +2,12 @@ openapi: 3.0.3
 info:
   title: Payments Service
   description: Outbound AUD payments and reconciliation discrepancies.
-  version: 1.0.0
+  version: v1
 servers:
   - url: http://localhost:8088
     description: Local development server
 paths:
-  /api/payments:
+  /api/v1/payments:
     get:
       tags: [payments]
       operationId: listPayments
@@ -58,7 +58,7 @@ paths:
           description: Invalid outbound payment
         '401':
           description: Sign in required
-  /api/payments/{id}:
+  /api/v1/payments/{id}:
     get:
       tags: [payments]
       operationId: getPayment
@@ -83,7 +83,7 @@ paths:
           description: Sign in required
         '404':
           description: Payment not found
-  /api/operations/payments/reconciliation:
+  /api/v1/operations/payments/reconciliation:
     get:
       tags: [payments]
       operationId: listDiscrepancies

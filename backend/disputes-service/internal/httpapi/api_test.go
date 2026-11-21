@@ -59,10 +59,10 @@ func TestAuthorization(t *testing.T) {
 		token(t, jwt.SigningMethodHS256, "", future, testKey),
 		token(t, jwt.SigningMethodHS256, "0", future, testKey),
 	} {
-		expect(t, call(routes, "GET", "/api/disputes", header, ""), 401)
+		expect(t, call(routes, "GET", "/api/v1/disputes", header, ""), 401)
 	}
-	expect(t, call(routes, "GET", "/api/operations/disputes", signed(t, "8"), ""), 403)
-	expect(t, call(routes, "POST", "/api/operations/disputes/1/resolve", signed(t, "8"), "{}"), 403)
+	expect(t, call(routes, "GET", "/api/v1/operations/disputes", signed(t, "8"), ""), 403)
+	expect(t, call(routes, "POST", "/api/v1/operations/disputes/1/resolve", signed(t, "8"), "{}"), 403)
 	ids, err := OperatorIDs("8, 12")
 	if err != nil || !ids[8] || !ids[12] || ids[1] {
 		t.Fatalf("operator allowlist %v, %v", ids, err)

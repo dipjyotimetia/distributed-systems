@@ -31,10 +31,10 @@ class Journey:
         self.notifications = os.environ["MICROSVC_NOTIFICATIONS"]
         username = "recovery" + secrets.token_hex(5)
         password = "T3st!" + secrets.token_hex(16)
-        self.customer = self.request(self.frontend, "/api/users/register", 201, {
+        self.customer = self.request(self.frontend, "/api/v1/users/register", 201, {
             "username": username, "email": username + "@example.test", "password": password,
         })["id"]
-        login = self.request(self.frontend, "/api/users/login", 200, {
+        login = self.request(self.frontend, "/api/v1/users/login", 200, {
             "usernameOrEmail": username, "password": password,
         })
         self.auth = {"Authorization": "Bearer " + login["token"]}
@@ -127,22 +127,22 @@ class Journey:
             """)
 
     def submit(self):
-        account = self.request(self.frontend, "/api/accounts", 201,
+        account = self.request(self.frontend, "/api/v1/accounts", 201,
             {"accountType": "CHECKING", "currency": "AUD", "initialBalance": 100}, self.auth)["id"]
-        payment = self.request(self.frontend, "/api/payments", 202,
+        payment = self.request(self.frontend, "/api/v1/payments", 202,
             {"accountId": account, "destination": "DEST00000001", "amountMinor": 2500},
             {**self.auth, "Idempotency-Key": str(uuid.uuid4())})
         return account, str(uuid.UUID(payment["id"]))
 
     def state(self, payment):
-        return self.request(self.frontend, "/api/payments/" + payment, 200, headers=self.auth)["status"]
+        return self.request(self.frontend, "/api/v1/payments/" + payment, 200, headers=self.auth)["status"]
 
     def balance(self, account):
-        result = self.request(self.frontend, f"/api/accounts/{account}/balance", 200, headers=self.auth)
+        result = self.request(self.frontend, f"/api/v1/accounts/{account}/balance", 200, headers=self.auth)
         return round(result["balance"] * 100)
 
     def notices(self, payment):
-        rows = self.request(self.notifications, f"/notifications/{self.customer}", 200) or []
+        rows = self.request(self.notifications, f"/api/v1/notifications/{self.customer}", 200) or []
         return [row for row in rows if row.get("payment_id") == payment]
 
     def pending(self, payment, destination):
@@ -245,7 +245,7 @@ class Journey:
 
         def operator_rows():
             try:
-                return self.request(self.frontend, "/api/operations/payments/reconciliation", 200, headers=self.auth)
+                return self.request(self.frontend, "/api/v1/operations/payments/reconciliation", 200, headers=self.auth)
             except (AssertionError, OSError):
                 return None
 

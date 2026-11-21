@@ -25,11 +25,11 @@ test.beforeAll(async ({ request }, info) => {
 async function register(request: APIRequestContext) {
   const username = 'payment' + randomUUID().replaceAll('-', '').slice(0, 12);
   const password = 'T3st!' + randomUUID();
-  const response = await request.post('/api/users/register', {
+  const response = await request.post('/api/v1/users/register', {
     data: { username, email: username + '@example.test', password },
   });
   expect(response.status()).toBe(201);
-  const login = await request.post('/api/users/login', {
+  const login = await request.post('/api/v1/users/login', {
     headers: { 'X-Banking-Session': 'cookie' },
     data: { usernameOrEmail: username, password },
   });
@@ -38,7 +38,7 @@ async function register(request: APIRequestContext) {
 }
 
 async function openAccount(request: APIRequestContext, initialBalance = 100) {
-  const response = await request.post('/api/accounts', {
+  const response = await request.post('/api/v1/accounts', {
     data: { accountType: 'CHECKING', currency: 'AUD', initialBalance },
   });
   expect(response.status()).toBe(201);
@@ -48,7 +48,7 @@ async function openAccount(request: APIRequestContext, initialBalance = 100) {
 }
 
 async function balance(request: APIRequestContext, account: number) {
-  const response = await request.get('/api/accounts/' + account + '/balance');
+  const response = await request.get('/api/v1/accounts/' + account + '/balance');
   expect(response.status()).toBe(200);
   const payload = await response.json();
   expect(payload.currency).toBe('AUD');
@@ -56,13 +56,13 @@ async function balance(request: APIRequestContext, account: number) {
 }
 
 async function getPayment(request: APIRequestContext, id: string): Promise<Payment> {
-  const response = await request.get('/api/payments/' + id);
+  const response = await request.get('/api/v1/payments/' + id);
   expect(response.status()).toBe(200);
   return response.json();
 }
 
 async function submit(request: APIRequestContext, accountId: number, destination: string, amountMinor = 2500) {
-  const response = await request.post('/api/payments', {
+  const response = await request.post('/api/v1/payments', {
     headers: { 'Idempotency-Key': randomUUID() },
     data: { accountId, destination, amountMinor },
   });
@@ -82,7 +82,7 @@ test('outbound payment settles through ActiveMQ Artemis and delivers one notific
   const traceId = randomBytes(16).toString('hex');
   const parentId = randomBytes(8).toString('hex');
   await page.setExtraHTTPHeaders({ traceparent: `00-${traceId}-${parentId}-01` });
-  const accepted = page.waitForResponse(response => response.url().endsWith('/api/payments') && response.request().method() === 'POST');
+  const accepted = page.waitForResponse(response => response.url().endsWith('/api/v1/payments') && response.request().method() === 'POST');
   await page.getByRole('button', { name: 'Submit payment' }).click();
   const response = await accepted;
   expect(response.status()).toBe(202);
@@ -90,13 +90,13 @@ test('outbound payment settles through ActiveMQ Artemis and delivers one notific
   await expect(page.getByRole('status')).toContainText(initial.id);
 
   const key = response.request().headers()['idempotency-key'];
-  const repeat = await page.request.post('/api/payments', {
+  const repeat = await page.request.post('/api/v1/payments', {
     headers: { 'Idempotency-Key': key },
     data: { accountId: account, destination: 'DEST00000001', amountMinor: 2500 },
   });
   expect(repeat.status()).toBe(202);
   expect((await repeat.json()).id).toBe(initial.id);
-  const changed = await page.request.post('/api/payments', {
+  const changed = await page.request.post('/api/v1/payments', {
     headers: { 'Idempotency-Key': key },
     data: { accountId: account, destination: 'DEST00000001', amountMinor: 2501 },
   });
@@ -104,7 +104,7 @@ test('outbound payment settles through ActiveMQ Artemis and delivers one notific
 
   await expect.poll(async () => (await getPayment(page.request, initial.id)).status, { timeout: 50000 }).toBe('ACCEPTED');
   expect(await balance(page.request, account)).toBe(10000);
-  const blockedDebit = await page.request.post('/api/transactions/withdraw', {
+  const blockedDebit = await page.request.post('/api/v1/transactions/withdraw', {
     data: { accountId: account, amount: 1, description: 'Check that clearing acceptance retains the hold' },
   });
   expect(blockedDebit.ok()).toBe(false);
@@ -112,7 +112,7 @@ test('outbound payment settles through ActiveMQ Artemis and delivers one notific
   const stranger = await browser.newContext();
   try {
     await register(stranger.request);
-    expect((await stranger.request.get('/api/payments/' + initial.id)).status()).toBe(404);
+    expect((await stranger.request.get('/api/v1/payments/' + initial.id)).status()).toBe(404);
   } finally {
     await stranger.close();
   }
@@ -128,7 +128,7 @@ test('outbound payment settles through ActiveMQ Artemis and delivers one notific
   await expect(page.getByRole('status')).toContainText(settlement.clearingReference!);
 
   await expect.poll(async () => {
-    const notifications = await request.get(notificationBase + '/notifications/' + customer);
+    const notifications = await request.get(notificationBase + '/api/v1/notifications/' + customer);
     expect(notifications.status()).toBe(200);
     const rows = await notifications.json() ?? [];
     return rows.filter((row: { payment_id?: string }) => row.payment_id === initial.id);
@@ -165,7 +165,7 @@ test('outbound payment rejection and missing-reply scenarios preserve booked bal
     expect(await balance(request, account)).toBe(scenario.opening * 100);
 
     // Another debit is the externally visible difference between a released hold and a retained hold.
-    const withdrawal = await request.post('/api/transactions/withdraw', {
+    const withdrawal = await request.post('/api/v1/transactions/withdraw', {
       data: { accountId: account, amount: 1, description: 'Payment hold acceptance check' },
     });
     if (scenario.status === 'REVIEW_REQUIRED') {

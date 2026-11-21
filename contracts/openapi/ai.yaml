@@ -2,12 +2,12 @@ openapi: 3.0.3
 info:
   title: AI Service
   description: Banking assistant chat and dispute research entry points.
-  version: 1.0.0
+  version: v1
 servers:
   - url: http://localhost:8090
     description: Local development server
 paths:
-  /api/chat:
+  /api/v1/chat:
     post:
       tags: [ai]
       operationId: chat
@@ -25,7 +25,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ChatResponse'
-  /api/providers:
+  /api/v1/providers:
     get:
       tags: [ai]
       operationId: listProviders
@@ -39,7 +39,7 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Provider'
-  /api/agent/chat:
+  /api/v1/agent/chat:
     post:
       tags: [ai]
       operationId: agentChat
@@ -66,7 +66,7 @@ paths:
                 additionalProperties: true
         '503':
           description: Agent workflow unavailable
-  /api/disputes/research:
+  /api/v1/disputes/research:
     post:
       tags: [ai]
       operationId: disputeResearch

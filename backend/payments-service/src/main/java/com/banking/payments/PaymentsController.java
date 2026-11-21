@@ -68,7 +68,7 @@ public class PaymentsController implements PaymentsApi {
         }
         Payment payment = store.initiate(customer, key, instruction);
         Span.current().setAttribute("payment.id", payment.id().toString());
-        return ResponseEntity.accepted().location(URI.create("/api/payments/" + payment.id()))
+        return ResponseEntity.accepted().location(URI.create("/api/v1/payments/" + payment.id()))
                 .cacheControl(CacheControl.noStore()).body(contractJson.convert(payment, com.banking.payments.contract.model.Payment.class));
     }
 

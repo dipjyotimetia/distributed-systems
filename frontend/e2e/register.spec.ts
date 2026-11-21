@@ -75,7 +75,7 @@ test.describe('Register Page', () => {
 
   test('should show loading state during registration', async ({ page }) => {
     // Mock a slow API response
-    await page.route('**/api/users/register', async (route) => {
+    await page.route('**/api/v1/users/register', async (route) => {
       await page.waitForTimeout(2000);
       await route.fulfill({
         status: 200,
@@ -99,7 +99,7 @@ test.describe('Register Page', () => {
 
   test('should display error message for existing username', async ({ page }) => {
     // Mock failed registration response
-    await page.route('**/api/users/register', async (route) => {
+    await page.route('**/api/v1/users/register', async (route) => {
       await route.fulfill({
         status: 409,
         contentType: 'application/json',
@@ -122,7 +122,7 @@ test.describe('Register Page', () => {
 
   test('should display success message on successful registration', async ({ page }) => {
     // Mock successful registration response
-    await page.route('**/api/users/register', async (route) => {
+    await page.route('**/api/v1/users/register', async (route) => {
       await route.fulfill({
         status: 201,
         contentType: 'application/json',

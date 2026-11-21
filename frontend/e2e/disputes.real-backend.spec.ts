@@ -22,11 +22,11 @@ async function compose(...args: string[]) {
 async function createSession(request: APIRequestContext, kind: string) {
   const username = kind + randomUUID().replaceAll('-', '').slice(0, 16);
   const password = 'T3st!' + randomUUID();
-  const registered = await request.post('/api/users/register', {
+  const registered = await request.post('/api/v1/users/register', {
     data: { username, email: username + '@example.test', password },
   });
   expect(registered.status()).toBe(201);
-  const login = await request.post('/api/users/login', {
+  const login = await request.post('/api/v1/users/login', {
     data: { usernameOrEmail: username, password },
     headers: { 'X-Banking-Session': 'cookie' },
   });
@@ -52,27 +52,27 @@ test('transfer dispute survives replacement of the application worker', async ({
   try {
     expect(await createSession(operator.request, 'operator')).toBe(1);
     await createSession(page.request, 'customer');
-    expect((await page.request.get('/api/operations/disputes')).status()).toBe(403);
+    expect((await page.request.get('/api/v1/operations/disputes')).status()).toBe(403);
 
     async function createAccount(accountType: string, initialBalance: number) {
-      const response = await page.request.post('/api/accounts', { data: { accountType, initialBalance } });
+      const response = await page.request.post('/api/v1/accounts', { data: { accountType, initialBalance } });
       expect(response.status()).toBe(201);
       return (await response.json()).id as number;
     }
 
     const from = await createAccount('CHECKING', 100);
     const to = await createAccount('SAVINGS', 20);
-    const transfer = await page.request.post('/api/transactions/transfer', {
+    const transfer = await page.request.post('/api/v1/transactions/transfer', {
       data: { fromAccountId: from, toAccountId: to, amount: 25, description: 'Disputed transfer' },
     });
     expect(transfer.status()).toBe(201);
     const transferID = (await transfer.json()).id;
 
     async function ledger() {
-      const entries = await page.request.get('/api/transactions');
+      const entries = await page.request.get('/api/v1/transactions');
       expect(entries.status()).toBe(200);
       const balances = await Promise.all([from, to].map(async id => {
-        const response = await page.request.get(`/api/accounts/${id}/balance`);
+        const response = await page.request.get(`/api/v1/accounts/${id}/balance`);
         expect(response.status()).toBe(200);
         return (await response.json()).balance;
       }));
@@ -88,7 +88,7 @@ test('transfer dispute survives replacement of the application worker', async ({
     await page.goto('/transactions');
     await page.getByRole('link', { name: 'Dispute transfer', exact: true }).click();
     await page.getByLabel('Reason').fill('Please review this transfer.');
-    const filed = page.waitForResponse(response => response.url().endsWith('/api/disputes') && response.request().method() === 'POST');
+    const filed = page.waitForResponse(response => response.url().endsWith('/api/v1/disputes') && response.request().method() === 'POST');
     await page.getByRole('button', { name: 'File dispute' }).click();
     const fileResponse = await filed;
     expect(fileResponse.status()).toBe(201);
@@ -119,7 +119,7 @@ test('transfer dispute survives replacement of the application worker', async ({
     expect(newWorker).not.toBe(oldWorker);
 
     await expect.poll(async () => {
-      const response = await page.request.get(`/api/disputes/${id}`);
+      const response = await page.request.get(`/api/v1/disputes/${id}`);
       return response.ok() ? (await response.json()).status : response.status();
     }, { timeout: 60000, intervals: [300, 1000, 2000] }).toBe('ESCALATED');
     await page.getByRole('button', { name: 'Refresh disputes' }).click();
@@ -148,12 +148,12 @@ test('statement export survives replacement of the application worker', async ({
   test.skip(!project, 'Run through the isolated banking journey suite');
   test.setTimeout(150000);
   await createSession(page.request, 'statement');
-  const account = await page.request.post('/api/accounts', {
+  const account = await page.request.post('/api/v1/accounts', {
     data: { accountType: 'CHECKING', initialBalance: 40 },
   });
   expect(account.status()).toBe(201);
   const { id } = await account.json();
-  const base = `/api/accounts/${id}/statement-jobs`;
+  const base = `/api/v1/accounts/${id}/statement-jobs`;
   const oldWorker = await compose('ps', '-q', 'statement-worker');
   expect(oldWorker).toBeTruthy();
 
@@ -174,7 +174,7 @@ test('statement export survives replacement of the application worker', async ({
   expect(retried.status()).toBe(202);
   expect((await retried.json()).id).toBe(job.id);
 
-  const sync = await page.request.post(`/api/accounts/${id}/export-statement`);
+  const sync = await page.request.post(`/api/v1/accounts/${id}/export-statement`);
   expect(sync.status()).toBe(200);
   expect((await sync.json()).statement).toMatchObject({ accountId: id, balance: 40 });
 

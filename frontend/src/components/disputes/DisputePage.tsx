@@ -62,7 +62,7 @@ function Cases({ operations, transferId }: { operations: boolean; transferId?: n
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [filed, setFiled] = useState(false);
-  const prefix = operations ? '/api/operations/disputes' : '/api/disputes';
+  const prefix = operations ? '/api/v1/operations/disputes' : '/api/v1/disputes';
 
   useEffect(() => {
     const controller = new AbortController();

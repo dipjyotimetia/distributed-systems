@@ -58,18 +58,18 @@ type ListUserNotificationsParams struct {
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// List the latest notifications
+	// (GET /api/v1/notifications)
+	ListNotifications(w http.ResponseWriter, r *http.Request, params ListNotificationsParams)
+	// List notifications for the signed-in customer
+	// (GET /api/v1/notifications/me)
+	ListMyNotifications(w http.ResponseWriter, r *http.Request, params ListMyNotificationsParams)
+	// List notifications for one user
+	// (GET /api/v1/notifications/{user_id})
+	ListUserNotifications(w http.ResponseWriter, r *http.Request, userId string, params ListUserNotificationsParams)
 	// Liveness
 	// (GET /health)
 	NotificationHealth(w http.ResponseWriter, r *http.Request)
-	// List the latest notifications
-	// (GET /notifications)
-	ListNotifications(w http.ResponseWriter, r *http.Request, params ListNotificationsParams)
-	// List notifications for the signed-in customer
-	// (GET /notifications/me)
-	ListMyNotifications(w http.ResponseWriter, r *http.Request, params ListMyNotificationsParams)
-	// List notifications for one user
-	// (GET /notifications/{user_id})
-	ListUserNotifications(w http.ResponseWriter, r *http.Request, userId string, params ListUserNotificationsParams)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -80,20 +80,6 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
-
-// NotificationHealth operation middleware
-func (siw *ServerInterfaceWrapper) NotificationHealth(w http.ResponseWriter, r *http.Request) {
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.NotificationHealth(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
 
 // ListNotifications operation middleware
 func (siw *ServerInterfaceWrapper) ListNotifications(w http.ResponseWriter, r *http.Request) {
@@ -182,6 +168,20 @@ func (siw *ServerInterfaceWrapper) ListUserNotifications(w http.ResponseWriter, 
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListUserNotifications(w, r, userId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// NotificationHealth operation middleware
+func (siw *ServerInterfaceWrapper) NotificationHealth(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.NotificationHealth(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -311,10 +311,10 @@ func OpenAPIHandlerWithOptions(si ServerInterface, options StdHTTPServerOptions)
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
+	m.HandleFunc("GET "+options.BaseURL+"/api/v1/notifications", wrapper.ListNotifications)
+	m.HandleFunc("GET "+options.BaseURL+"/api/v1/notifications/me", wrapper.ListMyNotifications)
+	m.HandleFunc("GET "+options.BaseURL+"/api/v1/notifications/{user_id}", wrapper.ListUserNotifications)
 	m.HandleFunc("GET "+options.BaseURL+"/health", wrapper.NotificationHealth)
-	m.HandleFunc("GET "+options.BaseURL+"/notifications", wrapper.ListNotifications)
-	m.HandleFunc("GET "+options.BaseURL+"/notifications/me", wrapper.ListMyNotifications)
-	m.HandleFunc("GET "+options.BaseURL+"/notifications/{user_id}", wrapper.ListUserNotifications)
 
 	return m
 }

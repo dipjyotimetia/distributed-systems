@@ -121,8 +121,8 @@ _NUM_SEG = re.compile(r"^\d+$")
 
 
 def url_pattern(url):
-    """Collapse numeric path segments so /api/accounts/226722/balance and .../589223/...
-    share one schema: -> /api/accounts/{id}/balance. Query string is dropped."""
+    """Collapse numeric path segments so /api/v1/accounts/226722/balance and .../589223/...
+    share one schema: -> /api/v1/accounts/{id}/balance. Query string is dropped."""
     path = url.split("?", 1)[0]
     segs = [("{id}" if _NUM_SEG.match(s) else s) for s in path.split("/")]
     return "/".join(segs)

@@ -9,9 +9,9 @@ non-public route. Each downstream service re-validates the token with the shared
 ```mermaid
 flowchart LR
   fe[Frontend] --> gw[api-gateway]
-  gw -->|/api/users/**| us[user-service .NET 8]
-  gw -->|/api/accounts/**| acc[accounts-service]
-  gw -->|/api/transactions/**| tx[transactions-service]
+  gw -->|/api/v1/users/**| us[user-service .NET 8]
+  gw -->|/api/v1/accounts/**| acc[accounts-service]
+  gw -->|/api/v1/transactions/**| tx[transactions-service]
   us --> pg[(Postgres user_service)]
   us -.async.-> idv[Socure / Jumio / HIBP]
 ```

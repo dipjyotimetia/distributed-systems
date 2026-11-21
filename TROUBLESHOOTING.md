@@ -12,7 +12,7 @@ curl http://localhost:8080/actuator/health  # API Gateway
 curl http://localhost:8081/actuator/health  # User Service
 curl http://localhost:8082/actuator/health  # Accounts Service
 curl http://localhost:8083/actuator/health  # Transactions Service
-curl http://localhost:3000/api/healthz       # Frontend
+curl http://localhost:3000/api/v1/healthz       # Frontend
 ```
 
 ### Database Connection
@@ -303,10 +303,10 @@ docker compose logs user-service accounts-service
 ### API Testing
 ```bash
 # Use httpie for API testing
-http POST localhost:8080/api/users/register username=test email=test@test.com password=pass123
+http POST localhost:8080/api/v1/users/register username=test email=test@test.com password=pass123
 
 # Use curl with proper headers
-curl -X POST http://localhost:8080/api/users/register \
+curl -X POST http://localhost:8080/api/v1/users/register \
   -H "Content-Type: application/json" \
   -d '{"username":"test","email":"test@test.com","password":"pass123"}'
 ```

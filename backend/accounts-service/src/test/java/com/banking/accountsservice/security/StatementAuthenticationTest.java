@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class StatementAuthenticationTest {
     private static final String SIGNING_KEY = "synthetic-accounts-service-test-signing-key";
-    private static final String DOWNLOAD = "/api/accounts/42/statement-jobs/item/download";
+    private static final String DOWNLOAD = "/api/v1/accounts/42/statement-jobs/item/download";
     private final JwtTokenUtil tokens = new JwtTokenUtil();
     private final JwtRequestFilter filter = new JwtRequestFilter();
 

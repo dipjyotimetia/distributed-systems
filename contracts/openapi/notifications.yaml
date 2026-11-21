@@ -2,12 +2,12 @@ openapi: 3.0.3
 info:
   title: Notification Service
   description: Recently consumed transaction notifications.
-  version: 1.0.0
+  version: v1
 servers:
   - url: http://localhost:8086
     description: Local development server
 paths:
-  /notifications/me:
+  /api/v1/notifications/me:
     get:
       tags: [notifications]
       operationId: listMyNotifications
@@ -37,7 +37,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-  /notifications:
+  /api/v1/notifications:
     get:
       tags: [notifications]
       operationId: listNotifications
@@ -59,7 +59,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-  /notifications/{user_id}:
+  /api/v1/notifications/{user_id}:
     get:
       tags: [notifications]
       operationId: listUserNotifications

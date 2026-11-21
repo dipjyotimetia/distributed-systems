@@ -34,7 +34,7 @@ class StatementJobsControllerTest {
         var api = MockMvcBuilders.standaloneSetup(new StatementJobsController(new StatementJobs(accounts, store), new com.banking.accountsservice.contract.ContractJson())).build();
         var owner = identity(7);
         var stranger = identity(8);
-        String base = "/api/accounts/42/statement-jobs";
+        String base = "/api/v1/accounts/42/statement-jobs";
         String resource = base + "/" + id;
 
         api.perform(post(base).principal(owner).header("Idempotency-Key", "create-1"))

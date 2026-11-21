@@ -7,48 +7,48 @@ cards rows are Next.js HTTP adapters over the Buf clients generated from
 
 | Method and frontend route | Expected outcome | Test layer | Evidence |
 | --- | --- | --- | --- |
-| GET `/api/accounts` | Owned accounts, an array by default and a page on request | Temporal, service integration | `LedgerJourney.VerifyAccounts` verifies the owned array and page metadata |
-| POST `/api/accounts` | Create an account with the requested balance and currency | Temporal, service integration | `Journey.CreateAccount` and `AccountServiceIntegrationTest` |
-| GET `/api/accounts/[id]` | Return an owned account | Temporal | `LedgerJourney.VerifyAccounts` compares the detail and checks an empty cross-user 404 |
-| PUT `/api/accounts/[id]` | Update account type or status | Temporal, service integration | `VerifyAccountTypeUpdate` and `updateAccountTypePreservesBalanceAndOwnership` cover type changes; status uses the same lifecycle rules as PATCH |
-| DELETE `/api/accounts/[id]` | Close an owned zero-balance account, return 204 on repeat | Real stack, service integration | `VerifyAccountLifecycle` checks repeated closure and retained history. `MovementReservationsPostgresTest` races closure against an incoming movement |
-| PATCH `/api/accounts/[id]/status` | Freeze, unfreeze, or close subject to lifecycle rules | Real stack, service integration | `VerifyAccountLifecycle` and `MovementReservationsPostgresTest` check freeze, unfreeze, and movement rejection |
-| GET `/api/accounts/[id]/balance` | Return the owned balance and currency | Temporal, service integration | `Journey.Verify` checks exact balances and `LedgerJourney.VerifyFinancialEnrichment` checks provider requests |
-| POST `/api/accounts/[id]/export-statement` | Generate an inline or stored statement | Temporal | `LedgerJourney.VerifyAccounts` verifies inline JSON and `StatementJourney.VerifyStoredStatement` reads back the S3-compatible object |
-| GET `/api/accounts/[id]/transactions` | Return the ledger after an account ownership check | Temporal, service integration | `LedgerJourney.VerifyLedger` checks ordered rows and a cross-user 404 |
-| GET `/api/accounts/[id]/transactions/summary` | Return counts after an account ownership check | Temporal, service integration | `LedgerJourney.VerifyLedger` checks counts and a cross-user 404 |
-| GET `/api/accounts/search` | Page matching owned accounts | Temporal, service integration | `LedgerJourney.VerifyAccounts` verifies a filtered page and ownership |
-| GET `/api/accounts/summary` | Count owned accounts by type and active status and sum balances | Temporal, service integration | `LedgerJourney.VerifyAccounts` verifies scoped count, type and exact balance |
+| GET `/api/v1/accounts` | Owned accounts, an array by default and a page on request | Temporal, service integration | `LedgerJourney.VerifyAccounts` verifies the owned array and page metadata |
+| POST `/api/v1/accounts` | Create an account with the requested balance and currency | Temporal, service integration | `Journey.CreateAccount` and `AccountServiceIntegrationTest` |
+| GET `/api/v1/accounts/[id]` | Return an owned account | Temporal | `LedgerJourney.VerifyAccounts` compares the detail and checks an empty cross-user 404 |
+| PUT `/api/v1/accounts/[id]` | Update account type or status | Temporal, service integration | `VerifyAccountTypeUpdate` and `updateAccountTypePreservesBalanceAndOwnership` cover type changes; status uses the same lifecycle rules as PATCH |
+| DELETE `/api/v1/accounts/[id]` | Close an owned zero-balance account, return 204 on repeat | Real stack, service integration | `VerifyAccountLifecycle` checks repeated closure and retained history. `MovementReservationsPostgresTest` races closure against an incoming movement |
+| PATCH `/api/v1/accounts/[id]/status` | Freeze, unfreeze, or close subject to lifecycle rules | Real stack, service integration | `VerifyAccountLifecycle` and `MovementReservationsPostgresTest` check freeze, unfreeze, and movement rejection |
+| GET `/api/v1/accounts/[id]/balance` | Return the owned balance and currency | Temporal, service integration | `Journey.Verify` checks exact balances and `LedgerJourney.VerifyFinancialEnrichment` checks provider requests |
+| POST `/api/v1/accounts/[id]/export-statement` | Generate an inline or stored statement | Temporal | `LedgerJourney.VerifyAccounts` verifies inline JSON and `StatementJourney.VerifyStoredStatement` reads back the S3-compatible object |
+| GET `/api/v1/accounts/[id]/transactions` | Return the ledger after an account ownership check | Temporal, service integration | `LedgerJourney.VerifyLedger` checks ordered rows and a cross-user 404 |
+| GET `/api/v1/accounts/[id]/transactions/summary` | Return counts after an account ownership check | Temporal, service integration | `LedgerJourney.VerifyLedger` checks counts and a cross-user 404 |
+| GET `/api/v1/accounts/search` | Page matching owned accounts | Temporal, service integration | `LedgerJourney.VerifyAccounts` verifies a filtered page and ownership |
+| GET `/api/v1/accounts/summary` | Count owned accounts by type and active status and sum balances | Temporal, service integration | `LedgerJourney.VerifyAccounts` verifies scoped count, type and exact balance |
 | GET `/api/ai/chat` | Discover available providers | Temporal | `AIJourney.VerifyAIProviders` checks discovery of all five providers |
 | POST `/api/ai/chat` | Aggregate five providers, preserve locale, and handle provider failures | Temporal | `AIJourney.VerifyAIChat` checks locale, five successes, one failure and five failures against fixture responses |
 | POST `/api/ai/chat` (`mode=agent`) | Durable Temporal banking agent with read-only tools and guardrails | Unit | `backend/ai-service/tests/test_workflows_fixture.py` covers happy path and blocked transfer tools |
-| POST `/api/disputes/research` (ai-service) | Multi-agent dispute research draft persisted via internal disputes API | Unit | `test_dispute_research_workflow_saves_structured_draft` |
-| GET `/api/healthz` | Return frontend health | Temporal startup | `testJourney` checks HTTP 200 from Next.js |
-| GET `/api/transactions` | Return the owned ledger, with optional filters and paging | Temporal, service integration | `LedgerJourney.VerifyLedger` checks the full list and a filtered page |
-| POST `/api/transactions` | Dispatch a supported generic transaction to its operation | Temporal | `LedgerJourney.MoveFunds` dispatches a deposit and verifies the resulting ledger |
-| GET `/api/transactions/[id]` | Read an owned transaction | Temporal, service integration | `LedgerJourney.VerifyLedger` compares exact detail and checks a cross-user 404 |
-| PATCH `/api/transactions/[id]/cancel` | Cancel an owned pending record once, return 409 for settled records | Temporal, service integration | `LedgerJourney` checks settled conflict, pending cancellation, retry and foreign ownership through Next.js and PostgreSQL |
-| POST `/api/transactions/create` | Dispatch a supported generic transaction to its operation | Temporal | `LedgerJourney.MoveFunds` dispatches a withdrawal and verifies the resulting ledger |
-| POST `/api/transactions/deposit` | Complete a deposit and update the ledger | Temporal, service integration | `LedgerJourney.MoveFunds` checks the completed deposit and exact ledger amount |
-| POST `/api/transactions/withdraw` | Complete a withdrawal or reject insufficient funds | Temporal, service integration | `LedgerJourney.MoveFunds` checks the withdrawal. `RejectWithdrawal` checks insufficient funds |
-| POST `/api/transactions/transfer` | Settle the transfer once and return 400 with `INSUFFICIENT_FUNDS` for a subsequent rejected transfer | Temporal | `Journey.SubmitTransfer`, `Journey.Verify`, and `Journey.Reject` check the completed transfer and rejected attempts |
-| GET `/api/transactions/recent` | Return the newest owned ledger entries | Temporal, service integration | `LedgerJourney.VerifyLedger` verifies newest-first returned entries |
-| GET `/api/transactions/search` | Page matching owned ledger entries | Temporal, service integration | `LedgerJourney.VerifyLedger` checks a filtered deposit page |
-| GET `/api/transactions/summary` | Count owned ledger entries by type and status | Temporal, service integration | `LedgerJourney.VerifyLedger` checks totals by type and completed status |
-| GET `/api/users/check-email` | Return email availability | Temporal | `IdentityJourney.AssertAvailability` checks availability before and after registration |
-| GET `/api/users/check-username` | Return username availability | Temporal | `IdentityJourney.AssertAvailability` checks availability before and after registration |
-| POST `/api/users/login` | Authenticate valid credentials and reject invalid credentials | Temporal, Playwright | `IdentityJourney` checks accepted and rejected credentials. `real-backend.spec.ts` checks cookie-backed login |
-| GET `/api/users/profile` | Return the authenticated profile | Temporal, Playwright | `IdentityJourney.AssertLoginAndProfile` verifies different identities and `real-backend.spec.ts` verifies session restoration |
-| POST `/api/users/register` | Register synthetic identity and reject duplicates | Temporal | `IdentityJourney.Register` and `AssertIdentityConflicts` check registration and conflicts on username and email |
-| POST `/api/users/logout` | Clear the browser session cookie | Playwright | `real-backend.spec.ts` checks logout |
-| GET and POST `/api/disputes/[[...casePath]]` | File and read owned disputes and respond to evidence requests | Playwright and integration | `disputes.real-backend.spec.ts` and the disputes scenario |
-| POST `/api/kyc` | Store a KYC application and return the pending case | Service | `kyc-service` store and workflow tests |
-| GET `/api/kyc` | Return the customer's latest KYC status | Service | `GetStatus` is gated by the same JWT as Apply |
-| GET and POST `/api/operations/kyc` | List review cases and record an operator decision | Service | `Queue` and `Decide` require `KYC_OPERATOR_IDS` |
-| POST `/api/cards` | Issue a virtual card after KYC approval | Service | `TestIssueRequiresKycAndAuthorizeIsIdempotent` |
-| POST `/api/cards/authorize` | Authorize a purchase once for an idempotency key | Service | The same cards test covers replay and `DECLINE` |
-| GET and POST `/api/operations/disputes/[[...casePath]]` | List disputes, request evidence, and resolve cases for allowlisted operators | Playwright and integration | `disputes.real-backend.spec.ts` and the disputes scenario |
-| GET and POST `/api/accounts/[id]/statement-jobs/[[...jobPath]]` | Queue an export, inspect job state, and download it before expiry | Integration | Statement jobs and worker recovery in the [integration guide](../tests/integration/README.md#disputes-and-statement-worker-recovery) |
+| POST `/api/v1/disputes/research` (ai-service) | Multi-agent dispute research draft persisted via internal disputes API | Unit | `test_dispute_research_workflow_saves_structured_draft` |
+| GET `/api/v1/healthz` | Return frontend health | Temporal startup | `testJourney` checks HTTP 200 from Next.js |
+| GET `/api/v1/transactions` | Return the owned ledger, with optional filters and paging | Temporal, service integration | `LedgerJourney.VerifyLedger` checks the full list and a filtered page |
+| POST `/api/v1/transactions` | Dispatch a supported generic transaction to its operation | Temporal | `LedgerJourney.MoveFunds` dispatches a deposit and verifies the resulting ledger |
+| GET `/api/v1/transactions/[id]` | Read an owned transaction | Temporal, service integration | `LedgerJourney.VerifyLedger` compares exact detail and checks a cross-user 404 |
+| PATCH `/api/v1/transactions/[id]/cancel` | Cancel an owned pending record once, return 409 for settled records | Temporal, service integration | `LedgerJourney` checks settled conflict, pending cancellation, retry and foreign ownership through Next.js and PostgreSQL |
+| POST `/api/v1/transactions/create` | Dispatch a supported generic transaction to its operation | Temporal | `LedgerJourney.MoveFunds` dispatches a withdrawal and verifies the resulting ledger |
+| POST `/api/v1/transactions/deposit` | Complete a deposit and update the ledger | Temporal, service integration | `LedgerJourney.MoveFunds` checks the completed deposit and exact ledger amount |
+| POST `/api/v1/transactions/withdraw` | Complete a withdrawal or reject insufficient funds | Temporal, service integration | `LedgerJourney.MoveFunds` checks the withdrawal. `RejectWithdrawal` checks insufficient funds |
+| POST `/api/v1/transactions/transfer` | Settle the transfer once and return 400 with `INSUFFICIENT_FUNDS` for a subsequent rejected transfer | Temporal | `Journey.SubmitTransfer`, `Journey.Verify`, and `Journey.Reject` check the completed transfer and rejected attempts |
+| GET `/api/v1/transactions/recent` | Return the newest owned ledger entries | Temporal, service integration | `LedgerJourney.VerifyLedger` verifies newest-first returned entries |
+| GET `/api/v1/transactions/search` | Page matching owned ledger entries | Temporal, service integration | `LedgerJourney.VerifyLedger` checks a filtered deposit page |
+| GET `/api/v1/transactions/summary` | Count owned ledger entries by type and status | Temporal, service integration | `LedgerJourney.VerifyLedger` checks totals by type and completed status |
+| GET `/api/v1/users/check-email` | Return email availability | Temporal | `IdentityJourney.AssertAvailability` checks availability before and after registration |
+| GET `/api/v1/users/check-username` | Return username availability | Temporal | `IdentityJourney.AssertAvailability` checks availability before and after registration |
+| POST `/api/v1/users/login` | Authenticate valid credentials and reject invalid credentials | Temporal, Playwright | `IdentityJourney` checks accepted and rejected credentials. `real-backend.spec.ts` checks cookie-backed login |
+| GET `/api/v1/users/profile` | Return the authenticated profile | Temporal, Playwright | `IdentityJourney.AssertLoginAndProfile` verifies different identities and `real-backend.spec.ts` verifies session restoration |
+| POST `/api/v1/users/register` | Register synthetic identity and reject duplicates | Temporal | `IdentityJourney.Register` and `AssertIdentityConflicts` check registration and conflicts on username and email |
+| POST `/api/v1/users/logout` | Clear the browser session cookie | Playwright | `real-backend.spec.ts` checks logout |
+| GET and POST `/api/v1/disputes/[[...casePath]]` | File and read owned disputes and respond to evidence requests | Playwright and integration | `disputes.real-backend.spec.ts` and the disputes scenario |
+| POST `/api/v1/kyc` | Store a KYC application and return the pending case | Service | `kyc-service` store and workflow tests |
+| GET `/api/v1/kyc` | Return the customer's latest KYC status | Service | `GetStatus` is gated by the same JWT as Apply |
+| GET and POST `/api/v1/operations/kyc` | List review cases and record an operator decision | Service | `Queue` and `Decide` require `KYC_OPERATOR_IDS` |
+| POST `/api/v1/cards` | Issue a virtual card after KYC approval | Service | `TestIssueRequiresKycAndAuthorizeIsIdempotent` |
+| POST `/api/v1/cards/authorize` | Authorize a purchase once for an idempotency key | Service | The same cards test covers replay and `DECLINE` |
+| GET and POST `/api/v1/operations/disputes/[[...casePath]]` | List disputes, request evidence, and resolve cases for allowlisted operators | Playwright and integration | `disputes.real-backend.spec.ts` and the disputes scenario |
+| GET and POST `/api/v1/accounts/[id]/statement-jobs/[[...jobPath]]` | Queue an export, inspect job state, and download it before expiry | Integration | Statement jobs and worker recovery in the [integration guide](../tests/integration/README.md#disputes-and-statement-worker-recovery) |
 
 ## Shared deployment checks
 
@@ -139,5 +139,5 @@ The MQ settlement reply carries the clearing business date as message metadata. 
 replay a specific date. Set `BANKING_SETTLEMENT_FIRST_DATE` to start a new deployment from a known earlier business date. An identical file is idempotent. A changed file
 for an already processed date fails and preserves the original evidence.
 The read-only queue is available at
-`GET /api/operations/payments/reconciliation` to customers whose IDs are
+`GET /api/v1/operations/payments/reconciliation` to customers whose IDs are
 listed in `BANKING_PAYMENTS_OPERATOR_IDS`. Operators can open the same queue at `/operations/payments`.

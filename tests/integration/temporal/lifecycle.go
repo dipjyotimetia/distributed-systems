@@ -12,7 +12,7 @@ func (a *Activities) VerifyAccountLifecycle(ctx context.Context, input Input, id
 	if err != nil {
 		return BoundaryEvidence{}, err
 	}
-	path := fmt.Sprintf("/api/accounts/%d", id)
+	path := fmt.Sprintf("/api/v1/accounts/%d", id)
 	other, err := a.login(ctx, Input{User: input.User + "b"})
 	if err != nil {
 		return BoundaryEvidence{}, err
@@ -42,20 +42,20 @@ func (a *Activities) VerifyAccountLifecycle(ctx context.Context, input Input, id
 		return BoundaryEvidence{}, err
 	}
 	payload := map[string]any{"accountId": id, "amount": 8, "description": "Lifecycle movement"}
-	if err := call(ctx, a.Frontend, "/api/transactions/deposit", token, payload, 409, nil); err != nil {
+	if err := call(ctx, a.Frontend, "/api/v1/transactions/deposit", token, payload, 409, nil); err != nil {
 		return BoundaryEvidence{}, err
 	}
 	if err := change("ACTIVE", 200); err != nil {
 		return BoundaryEvidence{}, err
 	}
 	var deposit, withdrawal ledgerEntry
-	if err := call(ctx, a.Frontend, "/api/transactions/deposit", token, payload, 201, &deposit); err != nil {
+	if err := call(ctx, a.Frontend, "/api/v1/transactions/deposit", token, payload, 201, &deposit); err != nil {
 		return BoundaryEvidence{}, err
 	}
 	if err := change("CLOSED", 409); err != nil {
 		return BoundaryEvidence{}, err
 	}
-	if err := call(ctx, a.Frontend, "/api/transactions/withdraw", token, payload, 201, &withdrawal); err != nil {
+	if err := call(ctx, a.Frontend, "/api/v1/transactions/withdraw", token, payload, 201, &withdrawal); err != nil {
 		return BoundaryEvidence{}, err
 	}
 	for range 2 {

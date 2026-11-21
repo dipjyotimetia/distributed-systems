@@ -49,7 +49,7 @@ test_health_endpoints() {
     print_header "TESTING HEALTH ENDPOINTS"
     
     # Test each service health endpoint
-    local services=("frontend:3000:/api/healthz" "api-gateway:80:/actuator/health" "user-service:80:/actuator/health" "accounts-service:80:/actuator/health" "transactions-service:80:/actuator/health")
+    local services=("frontend:3000:/api/v1/healthz" "api-gateway:80:/actuator/health" "user-service:80:/actuator/health" "accounts-service:80:/actuator/health" "transactions-service:80:/actuator/health")
     
     for service_info in "${services[@]}"; do
         IFS=':' read -r service port path <<< "$service_info"
@@ -185,7 +185,7 @@ show_config_status() {
     print_header "CURRENT CONFIGURATION STATUS"
     
     print_color $BLUE "📋 Health Check Endpoints:"
-    echo "  frontend: /api/healthz (port 3000)"
+    echo "  frontend: /api/v1/healthz (port 3000)"
     echo "  api-gateway: /actuator/health (port 80)"
     echo "  user-service: /actuator/health (port 80)"
     echo "  accounts-service: /actuator/health (port 80)"
@@ -194,7 +194,7 @@ show_config_status() {
     
     print_color $BLUE "📋 OTel Filter Patterns:"
     echo "  URL patterns: .*(actuator|prometheus|healthz|metrics).*"
-    echo "  Span names: GET /actuator/.*, GET /api/healthz, GET /healthz, GET /metrics"
+    echo "  Span names: GET /actuator/.*, GET /api/v1/healthz, GET /healthz, GET /metrics"
     echo ""
     
     print_color $BLUE "📋 Expected Business Spans:"
@@ -205,7 +205,7 @@ show_config_status() {
     
     print_color $BLUE "📋 Filtered (Unwanted) Spans:"
     echo "  ❌ /actuator/health, /actuator/prometheus, /actuator/info, /actuator/metrics"
-    echo "  ❌ /api/healthz, /healthz, /metrics"
+    echo "  ❌ /api/v1/healthz, /healthz, /metrics"
     echo "  ❌ Prometheus scrape requests"
     echo ""
 }

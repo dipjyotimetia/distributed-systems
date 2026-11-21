@@ -86,7 +86,7 @@ print_status "Generating test traffic to create traces..."
 
 # Create a test user and perform some operations
 print_status "Creating test user..."
-USER_RESPONSE=$(curl -s -X POST "http://$FRONTEND_URL:$FRONTEND_PORT/api/users/register" \
+USER_RESPONSE=$(curl -s -X POST "http://$FRONTEND_URL:$FRONTEND_PORT/api/v1/users/register" \
   -H "Content-Type: application/json" \
   -d '{
     "username": "trace-test-user",
@@ -104,7 +104,7 @@ fi
 
 # Login to get a token
 print_status "Logging in to get authentication token..."
-LOGIN_RESPONSE=$(curl -s -X POST "http://$FRONTEND_URL:$FRONTEND_PORT/api/users/login" \
+LOGIN_RESPONSE=$(curl -s -X POST "http://$FRONTEND_URL:$FRONTEND_PORT/api/v1/users/login" \
   -H "Content-Type: application/json" \
   -d '{
     "username": "trace-test-user",
@@ -118,7 +118,7 @@ if [ -n "$TOKEN" ]; then
     
     # Perform some operations that should create traces
     print_status "Creating test account..."
-    ACCOUNT_RESPONSE=$(curl -s -X POST "http://$FRONTEND_URL:$FRONTEND_PORT/api/accounts" \
+    ACCOUNT_RESPONSE=$(curl -s -X POST "http://$FRONTEND_URL:$FRONTEND_PORT/api/v1/accounts" \
       -H "Content-Type: application/json" \
       -H "Authorization: Bearer $TOKEN" \
       -d '{
@@ -134,7 +134,7 @@ if [ -n "$TOKEN" ]; then
         
         if [ -n "$ACCOUNT_ID" ]; then
             print_status "Performing test transaction..."
-            TRANSACTION_RESPONSE=$(curl -s -X POST "http://$FRONTEND_URL:$FRONTEND_PORT/api/transactions" \
+            TRANSACTION_RESPONSE=$(curl -s -X POST "http://$FRONTEND_URL:$FRONTEND_PORT/api/v1/transactions" \
               -H "Content-Type: application/json" \
               -H "Authorization: Bearer $TOKEN" \
               -d "{

@@ -2,12 +2,12 @@ openapi: 3.0.3
 info:
   title: Transactions Service
   description: API for managing financial transactions.
-  version: 1.0.0
+  version: v1
 servers:
 - url: http://localhost:8083
   description: Local development server
 paths:
-  /api/transactions:
+  /api/v1/transactions:
     get:
       summary: Get all transactions for the authenticated user
       security:
@@ -38,7 +38,7 @@ paths:
       tags:
       - transactions
       operationId: listTransactions
-  /api/transactions/search:
+  /api/v1/transactions/search:
     get:
       summary: Search owned transactions
       security:
@@ -71,7 +71,7 @@ paths:
       tags:
       - transactions
       operationId: searchTransactions
-  /api/transactions/recent:
+  /api/v1/transactions/recent:
     get:
       summary: Read the newest owned transactions
       security:
@@ -94,7 +94,7 @@ paths:
       tags:
       - transactions
       operationId: recentTransactions
-  /api/transactions/summary:
+  /api/v1/transactions/summary:
     get:
       summary: Count owned transactions by type and status
       security:
@@ -113,7 +113,7 @@ paths:
       tags:
       - transactions
       operationId: summarizeTransactions
-  /api/transactions/{id}:
+  /api/v1/transactions/{id}:
     parameters:
     - $ref: '#/components/parameters/TransactionId'
     get:
@@ -128,7 +128,7 @@ paths:
       tags:
       - transactions
       operationId: getTransaction
-  /api/transactions/{id}/cancel:
+  /api/v1/transactions/{id}/cancel:
     parameters:
     - $ref: '#/components/parameters/TransactionId'
     patch:
@@ -145,7 +145,7 @@ paths:
       tags:
       - transactions
       operationId: cancelTransaction
-  /api/transactions/create:
+  /api/v1/transactions/create:
     post:
       summary: Dispatch a generic transaction by type
       security:
@@ -185,7 +185,7 @@ paths:
       tags:
       - transactions
       operationId: createTransaction
-  /api/transactions/deposit:
+  /api/v1/transactions/deposit:
     post:
       summary: Deposit funds into an account
       security:
@@ -206,7 +206,7 @@ paths:
       tags:
       - transactions
       operationId: deposit
-  /api/transactions/withdraw:
+  /api/v1/transactions/withdraw:
     post:
       summary: Withdraw funds from an account
       security:
@@ -243,7 +243,7 @@ paths:
       tags:
       - transactions
       operationId: withdraw
-  /api/transactions/transfer:
+  /api/v1/transactions/transfer:
     post:
       summary: Transfer funds between accounts
       security:

@@ -152,12 +152,12 @@ const tracer = trace.getTracer('frontend');
 const span = tracer.startSpan('api-call', {
   attributes: {
     'http.method': 'POST',
-    'http.url': '/api/users/register'
+    'http.url': '/api/v1/users/register'
   }
 });
 
 try {
-  const response = await fetch('/api/users/register', options);
+  const response = await fetch('/api/v1/users/register', options);
   span.setAttributes({
     'http.status_code': response.status
   });

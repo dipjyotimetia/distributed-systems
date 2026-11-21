@@ -45,11 +45,11 @@ class GatewayConfigTest {
             assertNotNull(route);
             assertEquals("http://disputes:8080", route.getUri().toString());
             assertEquals(1, route.getFilters().size());
-            for (String path : new String[]{"/api/disputes", "/api/disputes/1",
-                    "/api/operations/disputes", "/api/operations/disputes/1/resolve"}) {
+            for (String path : new String[]{"/api/v1/disputes", "/api/v1/disputes/1",
+                    "/api/v1/operations/disputes", "/api/v1/operations/disputes/1/resolve"}) {
                 assertTrue(matches(route, path));
             }
-            assertFalse(matches(route, "/api/transactions/1"));
+            assertFalse(matches(route, "/api/v1/transactions/1"));
         }
     }
 
@@ -86,16 +86,16 @@ class GatewayConfigTest {
             }
         }
         assertEquals(List.of(
-                "/api/users/register",
-                "/api/users/login",
-                "/api/users/check-username",
-                "/api/users/check-email"), RouterValidator.publicEndpoints);
+                "/api/v1/users/register",
+                "/api/v1/users/login",
+                "/api/v1/users/check-username",
+                "/api/v1/users/check-email"), RouterValidator.publicEndpoints);
         RouterValidator validator = new RouterValidator();
         for (String path : RouterValidator.publicEndpoints) {
             assertFalse(validator.requiresAuthentication.test(
                     MockServerHttpRequest.get(path).build()));
         }
-        assertTrue(validator.requiresAuthentication.test(MockServerHttpRequest.get("/api/accounts").build()));
+        assertTrue(validator.requiresAuthentication.test(MockServerHttpRequest.get("/api/v1/accounts").build()));
     }
 
     private boolean matches(Route route, String path) {

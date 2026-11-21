@@ -71,7 +71,7 @@ volume across both workers.
 
 - **Frontend as Proxy**: Frontend contains Next.js API routes that proxy requests to the API Gateway
 - **Server-Side Communication**: Backend communication uses internal Kubernetes service URLs (e.g., `http://api-gateway:8080`)
-- **Relative Client URLs**: Frontend client code uses relative URLs (`/api/users/login`) that route to Next.js API handlers
+- **Relative Client URLs**: Frontend client code uses relative URLs (`/api/v1/users/login`) that route to Next.js API handlers
 - **Environment Agnostic**: No hardcoded URLs in client-side code, eliminating `NEXT_PUBLIC_API_URL` configuration issues
 
 ## Benefits

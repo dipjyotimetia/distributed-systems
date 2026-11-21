@@ -56,7 +56,7 @@ app.add_middleware(
 app.include_router(contract_router)
 
 # Match the Spring Boot Micrometer metric name + label set the banking-app dashboards use,
-# so /api/chat shows up in the cross-service "Errors by Endpoint" / "Status Codes by Service"
+# so /api/v1/chat shows up in the cross-service "Errors by Endpoint" / "Status Codes by Service"
 # panels alongside the Java services. Histogram (not Counter) so the exposed series is named
 # http_server_requests_seconds_count — without prometheus_client's automatic `_total` suffix.
 _metrics_registry = CollectorRegistry()
