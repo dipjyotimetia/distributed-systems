@@ -30,6 +30,7 @@ type Case struct {
 	ResolvedAt         *time.Time `json:"resolvedAt,omitempty"`
 	ResolvedBy         *int64     `json:"-"`
 	Resolution         *string    `json:"resolution,omitempty"`
+	AiDraft            any        `json:"aiDraft,omitempty"`
 }
 
 var ErrConflict = errors.New("case command conflicts with current state")

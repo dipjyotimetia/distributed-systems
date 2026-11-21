@@ -107,7 +107,7 @@ func Run(ctx context.Context, db *sql.DB, s *postgres.Store, serve func(context.
 	w.RegisterWorkflowWithOptions(escalateDispute, workflow.RegisterOptions{Name: "escalateDispute"})
 	w.RegisterWorkflowWithOptions(investigateDispute, workflow.RegisterOptions{Name: investigationWorkflow})
 	w.RegisterActivityWithOptions(func(ctx context.Context, input *disputesv1.CaseRevision) (*disputesv1.InvestigationState, error) {
-		return advance(ctx, s, input)
+		return advanceWithAI(ctx, s, temporal, input)
 	}, activity.RegisterOptions{Name: advanceActivity})
 	w.RegisterActivityWithOptions(func(ctx context.Context, id int64) error {
 		ctx, span := otel.Tracer("disputes").Start(ctx, "disputes.escalate")

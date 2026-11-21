@@ -447,3 +447,87 @@ func TestEscalationDelay(t *testing.T) {
 		}
 	}
 }
+
+func TestAiDraftInternalAPI(t *testing.T) {
+	dsn := os.Getenv("DISPUTES_TEST_DATABASE_URL")
+	if dsn == "" {
+		t.Skip("DISPUTES_TEST_DATABASE_URL is required for PostgreSQL tests")
+	}
+	db, err := sql.Open("pgx", dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	ctx := context.Background()
+	migrateTestDatabase(t, db)
+	store := postgres.New(db)
+	const token = "test-internal-token"
+	a := httpapi.NewWithInternal(db, store, testKey, map[int64]bool{8: true}, "http://example.invalid", http.DefaultClient, time.Hour, token)
+	routes := a.Routes()
+
+	c, created, err := store.Create(ctx, 7, time.Now().UnixNano(), "Need AI draft", time.Hour)
+	if err != nil || !created {
+		t.Fatalf("create: %+v %v", c, err)
+	}
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(ctx, "DELETE FROM disputes.signal_outbox WHERE case_id=$1", c.ID)
+		_, _ = db.ExecContext(ctx, "DELETE FROM disputes.workflow_outbox WHERE case_id=$1", c.ID)
+		_, _ = db.ExecContext(ctx, "DELETE FROM disputes.cases WHERE id=$1", c.ID)
+	})
+	if err := store.Escalate(ctx, c.ID); err != nil {
+		t.Fatal(err)
+	}
+	needed, err := store.NeedsAiDraft(ctx, c.ID)
+	if err != nil || !needed {
+		t.Fatalf("NeedsAiDraft=%v %v", needed, err)
+	}
+
+	contextPath := fmt.Sprintf("/internal/disputes/%d/context", c.ID)
+	draftPath := fmt.Sprintf("/internal/disputes/%d/ai-draft", c.ID)
+	expect(t, call(routes, "GET", contextPath, "", ""), 401)
+
+	req := httptest.NewRequest("GET", contextPath, nil)
+	req.Header.Set("X-Internal-Token", token)
+	res := httptest.NewRecorder()
+	routes.ServeHTTP(res, req)
+	expect(t, res, 200)
+	loaded := parse[casesmodel.Case](t, res)
+	if loaded.ID != c.ID || loaded.Status != "ESCALATED" {
+		t.Fatalf("unexpected context: %+v", loaded)
+	}
+
+	bad := httptest.NewRequest("POST", draftPath, strings.NewReader(`{}`))
+	bad.Header.Set("X-Internal-Token", token)
+	bad.Header.Set("Content-Type", "application/json")
+	badRes := httptest.NewRecorder()
+	routes.ServeHTTP(badRes, bad)
+	expect(t, badRes, 400)
+
+	body := `{"draft":{"reasonCode":"UNAUTHORIZED","summary":"Looks fraudulent","recommendedAction":"REQUEST_EVIDENCE","confidence":0.9}}`
+	save := httptest.NewRequest("POST", draftPath, strings.NewReader(body))
+	save.Header.Set("X-Internal-Token", token)
+	save.Header.Set("Content-Type", "application/json")
+	saveRes := httptest.NewRecorder()
+	routes.ServeHTTP(saveRes, save)
+	expect(t, saveRes, 200)
+	saved := parse[casesmodel.Case](t, saveRes)
+	if saved.AiDraft == nil {
+		t.Fatal("expected ai draft on response")
+	}
+	needed, err = store.NeedsAiDraft(ctx, c.ID)
+	if err != nil || needed {
+		t.Fatalf("draft should clear NeedsAiDraft: %v %v", needed, err)
+	}
+	var pending int
+	if err := db.QueryRowContext(ctx, "SELECT count(*) FROM disputes.signal_outbox WHERE case_id=$1", c.ID).Scan(&pending); err != nil || pending != 1 {
+		t.Fatalf("expected signal outbox row, pending=%d err=%v", pending, err)
+	}
+
+	if _, err := store.Resolve(ctx, c.ID, 8, "Closed after draft"); err != nil {
+		t.Fatal(err)
+	}
+	_, err = store.SaveAiDraft(ctx, c.ID, json.RawMessage(`{"summary":"late"}`))
+	if !errors.Is(err, casesmodel.ErrConflict) {
+		t.Fatalf("expected conflict after resolve, got %v", err)
+	}
+}

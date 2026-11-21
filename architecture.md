@@ -17,7 +17,7 @@ docker push localhost:5000/frontend:v1.3.4
 ```
 
 ## Traffic Flow Design
-Browser banking requests flow through the frontend server. The AI chat proxy uses `AI_SERVICE_URL` to call AI service directly.
+Browser banking requests flow through the frontend server. The AI chat proxy uses `AI_SERVICE_URL` to call AI service directly. Durable agent mode (`mode=agent`) starts Temporal workflows on the `ai-banking` task queue (LiteLLM activity, post-LLM guardrails, read-only banking tools, claim-check for large conversation history). Dispute investigation can start `disputeResearchV1` on that queue; the AI draft is stored on `disputes.cases.ai_draft` and signals `caseChangedV1` for operator HITL.
 
 ```
 Client → Frontend Service → API Gateway → Backend Services

@@ -319,6 +319,69 @@ async def providers():
     return PROVIDERS
 
 
+class AgentChatRequest(BaseModel):
+    message: str
+    accountId: str | None = None
+    locale: str = "en-US"
+    conversationClaim: str | None = None
+    authToken: str = ""
+    wait: bool = True
+
+
+class DisputeResearchRequest(BaseModel):
+    caseId: int
+    locale: str = "en-US"
+    wait: bool = True
+
+
+@app.post("/api/agent/chat")
+async def agent_chat(req: AgentChatRequest, request: Request):
+    """Start a durable banking agent workflow (tool-calling + guardrails)."""
+    from temporal.client import start_banking_agent
+    from temporal.models import AgentInput
+
+    auth = req.authToken or (request.headers.get("Authorization") or "").removeprefix("Bearer ").strip()
+    try:
+        return await start_banking_agent(
+            AgentInput(
+                message=req.message,
+                auth_token=auth,
+                account_id=req.accountId,
+                locale=req.locale,
+                conversation_claim=req.conversationClaim,
+            ),
+            wait=req.wait,
+        )
+    except Exception as exc:
+        logger.exception("agent chat failed")
+        return Response(content=f"Agent workflow unavailable: {exc}", status_code=503)
+
+
+@app.post("/api/disputes/research")
+async def dispute_research(req: DisputeResearchRequest, request: Request):
+    """Start multi-agent dispute research; persists draft via disputes internal API.
+
+    Protected by the shared DISPUTES_INTERNAL_TOKEN (service-to-service only).
+    Production dispute research is normally started by the disputes Temporal worker.
+    """
+    from temporal.client import start_dispute_research
+    from temporal.models import DisputeResearchInput
+
+    expected = os.environ.get("DISPUTES_INTERNAL_TOKEN", "")
+    provided = request.headers.get("X-Internal-Token", "")
+    if not expected or provided != expected:
+        return Response(content="Internal token required", status_code=401)
+
+    try:
+        return await start_dispute_research(
+            DisputeResearchInput(case_id=req.caseId, locale=req.locale),
+            wait=req.wait,
+        )
+    except Exception as exc:
+        logger.exception("dispute research failed")
+        return Response(content=f"Dispute research unavailable: {exc}", status_code=503)
+
+
 @app.get("/health")
 async def health():
-    return {"status": "ok"}
+    return {"status": "ok", "temporalQueue": "ai-banking"}

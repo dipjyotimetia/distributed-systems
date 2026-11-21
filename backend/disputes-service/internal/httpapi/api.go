@@ -9,6 +9,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -21,12 +22,14 @@ import (
 type caseStore interface {
 	ByTransfer(context.Context, int64, int64) (cases.Case, error)
 	ByID(context.Context, int64, int64) (cases.Case, error)
+	ByIDInternal(context.Context, int64) (cases.Case, error)
 	Create(context.Context, int64, int64, string, time.Duration) (cases.Case, bool, error)
 	CustomerCases(context.Context, int64) ([]cases.Case, error)
 	OperationsQueue(context.Context, int64, int64) ([]cases.Case, error)
 	Resolve(context.Context, int64, int64, string) (cases.Case, error)
 	RequestEvidence(context.Context, int64, int64, string, string) (cases.Case, error)
 	RespondToEvidence(context.Context, int64, int64, string, string, string) (cases.Case, error)
+	SaveAiDraft(context.Context, int64, json.RawMessage) (cases.Case, error)
 }
 
 type API struct {
@@ -37,6 +40,7 @@ type API struct {
 	transactionsURL string
 	client          *http.Client
 	delay           time.Duration
+	internalToken   string
 }
 
 type claims struct {
@@ -94,7 +98,55 @@ func (a API) Routes() *http.ServeMux {
 	mux.HandleFunc("POST /api/operations/disputes/{id}/resolve", a.authorized(true, a.resolveCase))
 	mux.HandleFunc("POST /api/operations/disputes/{id}/evidence-requests", a.authorized(true, a.evidence))
 	mux.HandleFunc("POST /api/disputes/{id}/evidence-requests/{requestId}/response", a.authorized(false, a.evidence))
+	mux.HandleFunc("GET /internal/disputes/{id}/context", a.internal(a.internalContext))
+	mux.HandleFunc("POST /internal/disputes/{id}/ai-draft", a.internal(a.internalSaveDraft))
 	return mux
+}
+
+func (a API) internal(next func(http.ResponseWriter, *http.Request)) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		if a.internalToken == "" || r.Header.Get("X-Internal-Token") != a.internalToken {
+			fail(w, http.StatusUnauthorized, "Internal token required")
+			return
+		}
+		next(w, r)
+	}
+}
+
+func (a API) internalContext(w http.ResponseWriter, r *http.Request) {
+	id, err := positiveID(r.PathValue("id"))
+	if err != nil {
+		storeError(w, sql.ErrNoRows)
+		return
+	}
+	c, err := a.ByIDInternal(r.Context(), id)
+	if err != nil {
+		storeError(w, err)
+		return
+	}
+	respond(w, 200, c)
+}
+
+func (a API) internalSaveDraft(w http.ResponseWriter, r *http.Request) {
+	id, err := positiveID(r.PathValue("id"))
+	if err != nil {
+		storeError(w, sql.ErrNoRows)
+		return
+	}
+	var input struct {
+		Draft json.RawMessage `json:"draft"`
+	}
+	if !decode(w, r, &input) || len(input.Draft) == 0 {
+		fail(w, 400, "draft object is required")
+		return
+	}
+	c, err := a.SaveAiDraft(r.Context(), id, input.Draft)
+	if err != nil {
+		storeError(w, err)
+		return
+	}
+	respond(w, 200, c)
 }
 
 func respond(w http.ResponseWriter, status int, value any) {
@@ -316,7 +368,11 @@ func OperatorIDs(value string) (map[int64]bool, error) {
 }
 
 func New(db *sql.DB, store caseStore, secret []byte, operators map[int64]bool, transactionsURL string, client *http.Client, delay time.Duration) API {
-	return API{caseStore: store, db: db, secret: secret, operators: operators, transactionsURL: transactionsURL, client: client, delay: delay}
+	return NewWithInternal(db, store, secret, operators, transactionsURL, client, delay, os.Getenv("DISPUTES_INTERNAL_TOKEN"))
+}
+
+func NewWithInternal(db *sql.DB, store caseStore, secret []byte, operators map[int64]bool, transactionsURL string, client *http.Client, delay time.Duration, internalToken string) API {
+	return API{caseStore: store, db: db, secret: secret, operators: operators, transactionsURL: transactionsURL, client: client, delay: delay, internalToken: internalToken}
 }
 
 func (a API) evidence(w http.ResponseWriter, r *http.Request, actor int64) {

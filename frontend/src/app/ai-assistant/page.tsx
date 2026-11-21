@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import AuthenticatedLayout from '@/components/layout/AuthenticatedLayout';
+import { TokenManager } from '@/lib/auth/token';
 
 interface ProviderResult {
   provider: string;
@@ -17,6 +18,9 @@ interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   results?: ProviderResult[];
+  agent?: boolean;
+  blocked?: boolean;
+  conversationClaim?: string;
 }
 
 const PROVIDER_COLORS: Record<string, { bg: string; border: string; badge: string }> = {
@@ -31,6 +35,8 @@ const AIAssistantPage: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [mode, setMode] = useState<'fanout' | 'agent'>('fanout');
+  const [conversationClaim, setConversationClaim] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -47,12 +53,24 @@ const AIAssistantPage: React.FC = () => {
     setIsLoading(true);
 
     try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      const token = TokenManager.getToken();
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+
       const res = await fetch('/api/ai/chat', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ message: trimmed }),
+        headers,
+        body: JSON.stringify({
+          message: trimmed,
+          mode,
+          ...(mode === 'agent' && conversationClaim
+            ? { conversationClaim }
+            : {}),
+        }),
       });
 
       const data = await res.json();
@@ -64,6 +82,21 @@ const AIAssistantPage: React.FC = () => {
           results: data.results,
         };
         setMessages(prev => [...prev, assistantMessage]);
+      } else if (typeof data.reply === 'string') {
+        if (typeof data.conversationClaim === 'string' && data.conversationClaim) {
+          setConversationClaim(data.conversationClaim);
+        }
+        setMessages(prev => [
+          ...prev,
+          {
+            role: 'assistant',
+            content: data.reply,
+            agent: true,
+            blocked: Boolean(data.blocked),
+            conversationClaim:
+              typeof data.conversationClaim === 'string' ? data.conversationClaim : undefined,
+          },
+        ]);
       } else {
         setMessages(prev => [
           ...prev,
@@ -94,7 +127,34 @@ const AIAssistantPage: React.FC = () => {
           <div className="mb-4">
             <p className="text-xs font-medium uppercase tracking-[0.18em] text-brass">Assistant</p>
             <h1 className="mt-1 text-3xl font-semibold tracking-tight text-ink">AI Banking Assistant</h1>
-            <p className="text-sm text-ink/70">Ask a question — all configured LLM providers respond simultaneously</p>
+            <p className="text-sm text-ink/70">
+              {mode === 'agent'
+                ? 'Durable Temporal agent with read-only tools and hard-rule guardrails'
+                : 'Ask a question — all configured LLM providers respond simultaneously'}
+            </p>
+            <div className="mt-3 flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setMode('fanout');
+                  setConversationClaim(null);
+                }}
+                className={`rounded-full px-3 py-1 text-xs font-medium ${
+                  mode === 'fanout' ? 'bg-ink text-canvas' : 'border border-line text-ink/70'
+                }`}
+              >
+                Multi-provider
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode('agent')}
+                className={`rounded-full px-3 py-1 text-xs font-medium ${
+                  mode === 'agent' ? 'bg-ink text-canvas' : 'border border-line text-ink/70'
+                }`}
+              >
+                Durable agent
+              </button>
+            </div>
           </div>
 
           <div className="mb-4 flex-1 space-y-4 overflow-y-auto rounded-3xl border border-line bg-surface p-4">
@@ -150,7 +210,7 @@ const AIAssistantPage: React.FC = () => {
             {isLoading && (
               <div className="flex justify-start">
                 <div className="bg-gray-100 rounded-lg px-4 py-2 text-sm text-gray-500">
-                  Querying all providers...
+                  {mode === 'agent' ? 'Running durable agent workflow...' : 'Querying all providers...'}
                 </div>
               </div>
             )}

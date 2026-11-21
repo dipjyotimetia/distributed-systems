@@ -10,3 +10,8 @@ os.environ.setdefault("GEMINI_API_KEY", "test-key")
 os.environ.setdefault("XAI_API_KEY", "test-key")
 os.environ.setdefault("OPENROUTER_API_KEY", "test-key")
 os.environ.setdefault("OTEL_SDK_DISABLED", "true")
+# Leave AI_PROVIDER_MODE unset for live-path chat tests that mock providers.
+# Temporal/agent fixture tests set AI_PROVIDER_MODE=fixture themselves.
+
+# Async Temporal workflow tests need pytest-asyncio in auto mode.
+pytest_plugins = ("pytest_asyncio",)

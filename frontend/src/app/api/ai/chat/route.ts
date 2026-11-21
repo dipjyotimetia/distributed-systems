@@ -22,13 +22,35 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Message is required' }, { status: 400 });
     }
 
-    const res = await fetch(`${AI_SERVICE_URL}/api/chat`, {
+    const mode = body.mode === 'agent' ? 'agent' : 'fanout';
+    const upstream =
+      mode === 'agent' ? `${AI_SERVICE_URL}/api/agent/chat` : `${AI_SERVICE_URL}/api/chat`;
+
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    const authorization = request.headers.get('authorization');
+    if (authorization) {
+      headers.Authorization = authorization;
+    }
+
+    const res = await fetch(upstream, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(body),
     });
 
+    const contentType = res.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      const text = await res.text();
+      return NextResponse.json(
+        { error: text || 'AI service error' },
+        { status: res.status || 503 }
+      );
+    }
+
     const data = await res.json();
+    if (!res.ok) {
+      return NextResponse.json(data, { status: res.status });
+    }
     return NextResponse.json(data);
   } catch (error) {
     console.error('AI service proxy error:', error);

@@ -10,7 +10,7 @@ import (
 	"github.com/dipjyotimetia/distributed-systems/backend/disputes-service/internal/cases"
 )
 
-const caseColumns = "id, transfer_id, reason, status, created_at, escalated_at, resolved_at, resolved_by, resolution, evidence - 'requestKey' - 'responseKey', evidence_closed_at, escalation_deadline IS NOT NULL"
+const caseColumns = "id, transfer_id, reason, status, created_at, escalated_at, resolved_at, resolved_by, resolution, evidence - 'requestKey' - 'responseKey', evidence_closed_at, escalation_deadline IS NOT NULL, ai_draft"
 const selectByTransfer = "SELECT " + caseColumns + " FROM disputes.cases WHERE customer_id=$1 AND transfer_id=$2"
 
 type Store struct {
@@ -21,12 +21,21 @@ func scanCase(row interface{ Scan(...any) error }) (cases.Case, error) {
 	var c cases.Case
 	var evidence []byte
 	var closed *time.Time
+	var aiDraft []byte
 	err := row.Scan(&c.ID, &c.TransferID, &c.Reason, &c.Status, &c.CreatedAt,
-		&c.EscalatedAt, &c.ResolvedAt, &c.ResolvedBy, &c.Resolution, &evidence, &closed, &c.EvidenceEnabled)
+		&c.EscalatedAt, &c.ResolvedAt, &c.ResolvedBy, &c.Resolution, &evidence, &closed, &c.EvidenceEnabled, &aiDraft)
 	if err == nil && len(evidence) != 0 {
 		err = json.Unmarshal(evidence, &c.Evidence)
 		if err == nil {
 			c.Evidence.ClosedAt = closed
+		}
+	}
+	if err == nil && len(aiDraft) != 0 {
+		var draft any
+		if unmarshalErr := json.Unmarshal(aiDraft, &draft); unmarshalErr == nil {
+			c.AiDraft = draft
+		} else {
+			err = unmarshalErr
 		}
 	}
 	c.InvestigationStage = c.Stage()
@@ -112,6 +121,40 @@ func (s *Store) Resolve(ctx context.Context, id, operator int64, summary string)
 func (s *Store) Escalate(ctx context.Context, id int64) error {
 	_, err := s.db.ExecContext(ctx, "UPDATE disputes.cases SET status='ESCALATED', escalated_at=now() WHERE id=$1 AND status='OPEN'", id)
 	return err
+}
+
+// SaveAiDraft stores an operator-facing AI research draft and signals the investigation workflow.
+func (s *Store) SaveAiDraft(ctx context.Context, id int64, draft json.RawMessage) (cases.Case, error) {
+	c, err := scanCase(s.db.QueryRowContext(ctx, `WITH updated AS (
+  UPDATE disputes.cases SET ai_draft=$2::jsonb, revision=revision+1
+  WHERE id=$1 AND status<>'RESOLVED' RETURNING *
+ ), queued AS (
+  INSERT INTO disputes.signal_outbox SELECT id, revision FROM updated WHERE escalation_deadline IS NOT NULL
+  ON CONFLICT(case_id) DO UPDATE SET revision=excluded.revision
+ ) SELECT `+caseColumns+` FROM updated`, id, draft))
+	if !errors.Is(err, sql.ErrNoRows) {
+		return c, err
+	}
+	c, err = scanCase(s.db.QueryRowContext(ctx, "SELECT "+caseColumns+" FROM disputes.cases WHERE id=$1", id))
+	if err != nil {
+		return c, err
+	}
+	return c, cases.ErrConflict
+}
+
+// ByIDInternal loads a case without customer scoping (internal AI worker).
+func (s *Store) ByIDInternal(ctx context.Context, id int64) (cases.Case, error) {
+	return scanCase(s.db.QueryRowContext(ctx, "SELECT "+caseColumns+" FROM disputes.cases WHERE id=$1", id))
+}
+
+// NeedsAiDraft reports whether research should be started for the case.
+func (s *Store) NeedsAiDraft(ctx context.Context, id int64) (bool, error) {
+	var needed bool
+	err := s.db.QueryRowContext(ctx, `SELECT status<>'RESOLVED' AND ai_draft IS NULL
+		AND (status='ESCALATED' OR evidence_closed_at IS NOT NULL OR
+			(evidence IS NULL AND escalation_deadline IS NOT NULL AND status='OPEN'))
+		FROM disputes.cases WHERE id=$1`, id).Scan(&needed)
+	return needed, err
 }
 
 func New(db *sql.DB) *Store { return &Store{db: db} }
