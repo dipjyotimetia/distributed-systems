@@ -97,7 +97,7 @@ describe('Input Component', () => {
   it('displays helper text with correct styling', () => {
     render(<Input helperText="We'll never share your email" />)
     const helperText = screen.getByText("We'll never share your email")
-    expect(helperText).toHaveClass('text-sm', 'text-gray-500')
+    expect(helperText).toHaveClass('text-sm', 'text-ink/60')
   })
 
   it('handles disabled state', () => {

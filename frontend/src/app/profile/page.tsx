@@ -4,7 +4,6 @@ import React from 'react';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import AuthenticatedLayout from '@/components/layout/AuthenticatedLayout';
 import { useAuth } from '@/lib/auth/context';
-import Button from '@/components/ui/Button';
 import PageHeader from '@/components/ui/PageHeader';
 
 const ProfilePage: React.FC = () => {
@@ -46,15 +45,6 @@ const ProfilePage: React.FC = () => {
                     <dd className="mt-1 text-sm text-ink">{new Date(user.updatedAt).toLocaleDateString()}</dd>
                   </div>
                 </dl>
-              </div>
-
-              <div className="border-t border-line pt-6">
-                <h3 className="mb-4 text-lg font-medium text-ink">Account Actions</h3>
-                <div className="flex flex-wrap gap-3">
-                  <Button variant="outline">Change Password</Button>
-                  <Button variant="outline">Update Profile</Button>
-                  <Button variant="outline">Security Settings</Button>
-                </div>
               </div>
             </div>
           )}

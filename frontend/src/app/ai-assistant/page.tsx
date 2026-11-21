@@ -23,14 +23,6 @@ interface ChatMessage {
   conversationClaim?: string;
 }
 
-const PROVIDER_COLORS: Record<string, { bg: string; border: string; badge: string }> = {
-  anthropic: { bg: 'bg-orange-50', border: 'border-orange-200', badge: 'bg-orange-100 text-orange-800' },
-  openai: { bg: 'bg-green-50', border: 'border-green-200', badge: 'bg-green-100 text-green-800' },
-  gemini: { bg: 'bg-blue-50', border: 'border-blue-200', badge: 'bg-blue-100 text-blue-800' },
-  xai: { bg: 'bg-purple-50', border: 'border-purple-200', badge: 'bg-purple-100 text-purple-800' },
-  openrouter: { bg: 'bg-pink-50', border: 'border-pink-200', badge: 'bg-pink-100 text-pink-800' },
-};
-
 const AIAssistantPage: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
@@ -159,8 +151,8 @@ const AIAssistantPage: React.FC = () => {
 
           <div className="mb-4 flex-1 space-y-4 overflow-y-auto rounded-3xl border border-line bg-surface p-4">
             {messages.length === 0 && (
-              <div className="text-center text-gray-400 py-12">
-                <p className="text-lg font-medium mb-2">No messages yet</p>
+              <div className="py-12 text-center text-ink/60">
+                <p className="mb-2 text-lg font-medium text-ink">No messages yet</p>
                 <p className="text-sm">Try asking about your account balance or recent transactions.</p>
               </div>
             )}
@@ -175,31 +167,28 @@ const AIAssistantPage: React.FC = () => {
                   </div>
                 ) : msg.results ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {msg.results.map((r, j) => {
-                      const colors = PROVIDER_COLORS[r.provider] || { bg: 'bg-gray-50', border: 'border-gray-200', badge: 'bg-gray-100 text-gray-600' };
-                      return (
-                        <div key={j} className={`rounded-lg border ${colors.border} ${colors.bg} p-3 text-sm`}>
-                          <div className="flex items-center justify-between mb-2">
-                            <span className={`inline-block text-xs px-2 py-0.5 rounded-full font-medium ${colors.badge}`}>
+                    {msg.results.map((r, j) => (
+                        <div key={j} className="rounded-2xl border border-line bg-[#f6f1e6] p-3 text-sm text-ink">
+                          <div className="mb-2 flex items-center justify-between">
+                            <span className="inline-block rounded-full bg-surface px-2 py-0.5 text-xs font-medium text-brass">
                               {r.name}
                             </span>
-                            <span className="text-xs text-gray-400">{r.durationMs}ms</span>
+                            <span className="text-xs text-ink/50">{r.durationMs}ms</span>
                           </div>
                           {r.error ? (
-                            <div className="text-red-600 text-xs">
+                            <div className="text-xs text-red-700">
                               <span className="font-medium">Error:</span> {r.error}
                             </div>
                           ) : (
-                            <div className="text-gray-900 whitespace-pre-wrap">{r.message}</div>
+                            <div className="whitespace-pre-wrap text-ink">{r.message}</div>
                           )}
-                          <div className="mt-2 text-xs text-gray-400">{r.model}</div>
+                          <div className="mt-2 text-xs text-ink/50">{r.model}</div>
                         </div>
-                      );
-                    })}
+                    ))}
                   </div>
                 ) : (
                   <div className="flex justify-start">
-                    <div className="max-w-[75%] rounded-lg px-4 py-2 text-sm whitespace-pre-wrap bg-gray-100 text-gray-900">
+                    <div className="max-w-[75%] whitespace-pre-wrap rounded-2xl border border-line bg-surface px-4 py-2 text-sm text-ink">
                       {msg.content}
                     </div>
                   </div>
@@ -209,7 +198,7 @@ const AIAssistantPage: React.FC = () => {
 
             {isLoading && (
               <div className="flex justify-start">
-                <div className="bg-gray-100 rounded-lg px-4 py-2 text-sm text-gray-500">
+                <div className="rounded-2xl border border-line bg-[#f6f1e6] px-4 py-2 text-sm text-ink/70">
                   {mode === 'agent' ? 'Running durable agent workflow...' : 'Querying all providers...'}
                 </div>
               </div>
@@ -218,8 +207,11 @@ const AIAssistantPage: React.FC = () => {
             <div ref={messagesEndRef} />
           </div>
 
-          <div className="flex gap-2">
+          <div>
+            <label htmlFor="ai-message" className="mb-2 block text-sm font-medium text-ink">Message</label>
+            <div className="flex gap-2">
             <input
+              id="ai-message"
               type="text"
               value={input}
               onChange={e => setInput(e.target.value)}
@@ -235,6 +227,7 @@ const AIAssistantPage: React.FC = () => {
             >
               Send
             </button>
+            </div>
           </div>
         </div>
       </AuthenticatedLayout>

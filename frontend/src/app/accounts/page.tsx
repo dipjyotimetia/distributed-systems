@@ -24,10 +24,8 @@ const AccountsPage: React.FC = () => {
         const response = await AccountsAPI.getAccounts();
         
         if (response.success && response.data) {
-          console.log('Accounts data:', response.data); // Debug log
           setAccounts(response.data);
         } else {
-          console.error('Failed to fetch accounts:', response.message);
           setError(response.message || 'Failed to load accounts');
         }
       } catch (err) {
