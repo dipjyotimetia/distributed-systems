@@ -168,6 +168,8 @@ jobs:
         run: |
           if git cat-file -e "${BASE_SHA}:contracts/proto/buf.yaml"; then
             git archive "$BASE_SHA" contracts/proto | tar -x -C "$RUNNER_TEMP"
+            # Kafka movement lifecycle moved to contracts/avro; allow that intentional deletion.
+            rm -f "$RUNNER_TEMP/contracts/proto/transactions/movement_event.proto"
             buf breaking contracts/proto --against "$RUNNER_TEMP/contracts/proto"
           fi
           if git cat-file -e "${BASE_SHA}:contracts/proto/workflows/buf.yaml"; then

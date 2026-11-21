@@ -50,7 +50,7 @@ Ten application backend services across four languages, a Next.js frontend, and 
 | `frontend` | Next.js 16 / React 19 | Server-side proxy + UI |
 | `simulation-client` | Node.js | Drives realistic user-session traffic with burst and negative-path patterns |
 
-**Storage / messaging:** PostgreSQL (per-service schemas), MongoDB, and Redpanda (Kafka-compatible transaction event stream).
+**Storage / messaging:** PostgreSQL (per-service schemas), MongoDB, and Redpanda (Kafka-compatible broker with Schema Registry on `:8081`). Event payloads default to Confluent Avro; see [`contracts/avro/`](contracts/avro/README.md).
 
 **Observability:** Compose sends traces directly to Jaeger. Kubernetes routes telemetry through the collector and includes Loki for logs.
 
@@ -80,7 +80,8 @@ flowchart LR
 
   postgres[(Postgres)]
   mongo[(MongoDB)]
-  kafka[(Kafka)]
+  kafka[(Redpanda)]
+  sr[Schema Registry]
 
   subgraph thirdparty["3rd parties"]
     llm["LLM APIs<br/>(Anthropic, OpenAI, Gemini, xAI, OpenRouter)"]
@@ -117,6 +118,8 @@ flowchart LR
   gateway -.-> outboundPayments[payments-service<br/>optional overlay]
   outboundPayments -.-> artemis[(Artemis)]
   outboundPayments -.-> temporal
+  outboundPayments -->|Avro outbox| kafka
+  outboundPayments -.-> sr
   worker --> postgres
   worker --> temporal
 
@@ -127,15 +130,51 @@ flowchart LR
 
   transactions --> fraud
   transactions --> payments
-  transactions --> kafka
+  transactions -->|Avro outbox| kafka
+  transactions -.-> sr
 
   fraud --> risk
 
   ai --> llm
 
-  notif -.consumes.-> kafka
+  notif -->|Avro consume| kafka
+  notif -.-> sr
   notif --> mongo
   notif --> messaging
+```
+
+```mermaid
+flowchart TB
+  subgraph producers["Producers (outbox → publish)"]
+    tx[transactions-service]
+    pay[payments-service]
+  end
+  subgraph wire["Wire format"]
+    avro["Confluent Avro<br/>KAFKA_VALUE_FORMAT=avro default"]
+    json["UTF-8 JSON opt-out<br/>KAFKA_VALUE_FORMAT=json"]
+  end
+  subgraph topics["Redpanda topics"]
+    te[transaction-events]
+    pe[payment-events.v1]
+    ml[movement-lifecycle-v1]
+  end
+  sr[(Schema Registry :8081)]
+  notif[notification-service]
+  ext[external / future consumers]
+
+  tx --> avro
+  pay --> avro
+  avro -.->|register / resolve| sr
+  avro --> te
+  avro --> pe
+  avro --> ml
+  json -.-> te
+  json -.-> pe
+  json -.-> ml
+  te --> notif
+  pe --> notif
+  ml --> ext
+  notif -.->|decode| sr
 ```
 
 ## Traffic Replay

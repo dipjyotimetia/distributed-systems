@@ -73,21 +73,21 @@ public class CustomerMovements {
     private final FraudServiceClient fraud;
     private final PaymentComplianceService compliance;
     private final TransactionEventOutbox outbox;
-    private final ObjectMapper json;
+    // Jackson 2 for outbox JSON; Boot auto-configures tools.jackson (Jackson 3) as the ObjectMapper bean.
+    private final ObjectMapper json = new ObjectMapper();
     private final AtomicReference<Double> oldestPendingSeconds = new AtomicReference<>(0.0);
     private final Timer postingLatency;
     private final Counter screeningOutages;
 
     public CustomerMovements(JdbcTemplate jdbc, PlatformTransactionManager manager, AccountsServiceClient accounts,
                              FraudServiceClient fraud, PaymentComplianceService compliance,
-                             TransactionEventOutbox outbox, ObjectMapper json, MeterRegistry metrics) {
+                             TransactionEventOutbox outbox, MeterRegistry metrics) {
         this.jdbc = jdbc;
         transaction = new TransactionTemplate(manager);
         this.accounts = accounts;
         this.fraud = fraud;
         this.compliance = compliance;
         this.outbox = outbox;
-        this.json = json;
         postingLatency = metrics.timer("transactions.movements.accepted.to.posted");
         screeningOutages = metrics.counter("transactions.movements.screening.outages");
         Gauge.builder("transactions.movements.oldest.pending.seconds", oldestPendingSeconds, AtomicReference::get)
