@@ -1,5 +1,6 @@
 package com.banking.transactionsservice.controller;
 
+import com.banking.transactionsservice.contract.ContractJson;
 import com.banking.transactionsservice.dto.*;
 import com.banking.transactionsservice.entity.Transaction;
 import com.banking.transactionsservice.security.UserAuthenticationDetails;
@@ -34,6 +35,8 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.web.servlet.MockMvc;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Validation;
+import jakarta.validation.Validator;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
@@ -317,6 +320,16 @@ class TransactionControllerTest {
     @TestConfiguration
     static class TestConfig {
         
+        @Bean
+        public ContractJson contractJson() {
+            return new ContractJson();
+        }
+
+        @Bean
+        public Validator validator() {
+            return Validation.buildDefaultValidatorFactory().getValidator();
+        }
+
         @Bean
         @Primary
         public Tracer tracer() {

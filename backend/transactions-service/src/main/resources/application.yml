@@ -1,12 +1,6 @@
 server:
   port: 8080
 
-transactions:
-  grpc:
-    port: ${TRANSACTIONS_GRPC_PORT:9095}
-  servlet:
-    context-path: /
-
 spring:
   grpc:
     client:
@@ -76,6 +70,10 @@ fraud:
   fail-open: ${FRAUD_FAIL_OPEN:true}
 
 transactions:
+  grpc:
+    port: ${TRANSACTIONS_GRPC_PORT:9095}
+  servlet:
+    context-path: /
   outbox:
     publish-enabled: ${TRANSACTIONS_OUTBOX_PUBLISH_ENABLED:true}
     delay-ms: ${TRANSACTIONS_OUTBOX_DELAY_MS:1000}

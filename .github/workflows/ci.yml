@@ -197,7 +197,9 @@ jobs:
         DISPUTES_TEST_DATABASE_URL: postgres://postgres:password@127.0.0.1:${{ job.services.disputes_postgres.ports['5432'] }}/postgres?sslmode=disable
       run: |
         go test -race -coverpkg=./cmd/...,./internal/cases,./internal/httpapi,./internal/postgres,./internal/temporal -coverprofile=coverage.out ./...
-        go tool cover -func=coverage.out | awk '/^total:/ { coverage=$3+0 } END { if (coverage <= 80) exit 1 }'
+        # Generated OpenAPI and protobuf bindings are not part of the service coverage gate.
+        grep -Ev '/(openapi\.gen\.go|.*\.pb\.go):' coverage.out > coverage.filtered
+        go tool cover -func=coverage.filtered | awk '/^total:/ { coverage=$3+0 } END { if (coverage <= 80) exit 1 }'
 
     - name: Test kyc-service and cards-service
       env:

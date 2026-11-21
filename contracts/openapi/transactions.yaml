@@ -452,6 +452,8 @@ components:
           type: number
         type:
           type: string
+        status:
+          type: string
         timestamp:
           type: string
           format: date-time
