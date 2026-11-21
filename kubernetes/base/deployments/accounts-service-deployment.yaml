@@ -48,6 +48,11 @@ spec:
             secretKeyRef:
               name: banking-jwt-secret
               key: secret
+        - name: MOVEMENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: banking-jwt-secret
+              key: movement
         - name: JAVA_OPTS
           value: "-Xms128m -Xmx384m -XX:MaxMetaspaceSize=192m -XX:ReservedCodeCacheSize=32m -XX:MaxDirectMemorySize=16m -XX:+UseSerialGC -XX:+UseStringDeduplication -XX:+UseContainerSupport -Djava.security.egd=file:/dev/./urandom -Dspring.main.lazy-initialization=true"
         - name: AWS_REGION

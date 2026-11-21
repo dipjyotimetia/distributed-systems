@@ -41,9 +41,12 @@ class Journey:
 
     @staticmethod
     def request(base, path, expected, payload=None, headers=None):
+        sent = {"Content-Type": "application/json", **(headers or {})}
+        if path.startswith("/notifications"):
+            sent.setdefault("X-Notification-Token", os.environ.get("NOTIFICATION_READ_TOKEN", "banking-notification-read-dev"))
         request = urllib.request.Request(base + path,
             data=json.dumps(payload).encode() if payload is not None else None,
-            headers={"Content-Type": "application/json", **(headers or {})})
+            headers=sent)
         try:
             with urllib.request.urlopen(request, timeout=6) as response:
                 assert response.status == expected, (path, response.status, expected)

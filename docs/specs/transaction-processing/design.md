@@ -58,7 +58,7 @@ schema; `ddl-auto=validate`.
 
 | Dependency | Behavior |
 |---|---|
-| Fraud service | Fail open |
+| Fraud service | Fail closed unless FRAUD_FAIL_OPEN=true |
 | Accounts service | Transaction fails, saved `FAILED` |
 | Transfer credit | Best-effort debit rollback, saved `FAILED` |
 | Kafka, payment fan-out | Logged only |

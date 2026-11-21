@@ -125,6 +125,7 @@ class TransactionRollbackTest {
         // Fraud service approves all transactions by default in tests
         when(fraudServiceClient.checkTransaction(anyString(), anyString(), anyDouble(), anyString(), anyString()))
                 .thenReturn(FraudCheckResponse.newBuilder().setApproved(true).setRiskScore(0.0).setReason("OK").build());
+        when(httpServletRequest.getHeader("Idempotency-Key")).thenAnswer(invocation -> java.util.UUID.randomUUID().toString());
     }
 
     @Test
@@ -156,7 +157,10 @@ class TransactionRollbackTest {
         var ambiguous = assertThrows(ResponseStatusException.class, () -> transactionService.transfer(
                 new TransferRequest(21L, 22L, 15.00, "First"), owner, httpServletRequest));
         assertEquals(503, ambiguous.getStatusCode().value());
-        assertEquals(1, transactionRepository.findByUserIdOrderByCreatedAtDesc(owner).size());
+        var pending = transactionRepository.findByUserIdOrderByCreatedAtDesc(owner);
+        assertEquals(1, pending.size());
+        assertEquals(Transaction.TransactionStatus.PENDING, pending.get(0).getStatus());
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM transactions_service.event_outbox", Integer.class));
 
         // The next distinct movement resolves the first operation with its original ID.
         var first = org.mockito.ArgumentCaptor.forClass(java.util.UUID.class);

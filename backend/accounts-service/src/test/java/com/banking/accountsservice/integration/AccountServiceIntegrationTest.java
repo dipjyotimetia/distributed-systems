@@ -229,51 +229,6 @@ class AccountServiceIntegrationTest {
     }
 
     @Test
-    void testUpdateBalance_Success() {
-        // Create account
-        AccountCreateRequest request = new AccountCreateRequest("CHECKING");
-        AccountResponse createdAccount = accountService.createAccount(request, testUserId);
-
-        // Update balance
-        BigDecimal newBalance = BigDecimal.valueOf(1000.00);
-        boolean updateResult = accountService.updateBalance(createdAccount.getId(), newBalance, testUserId);
-        
-        assertTrue(updateResult);
-
-        // Verify balance was updated
-        BalanceResponse balanceResponse = accountService.getAccountBalance(createdAccount.getId(), testUserId);
-        assertEquals(newBalance, balanceResponse.getBalance());
-    }
-
-    @Test
-    void testUpdateBalance_NotOwned() {
-        // Create account for other user
-        AccountCreateRequest request = new AccountCreateRequest("CHECKING");
-        AccountResponse createdAccount = accountService.createAccount(request, otherUserId);
-
-        // Try to update balance with different user
-        BigDecimal newBalance = BigDecimal.valueOf(1000.00);
-        
-        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
-            accountService.updateBalance(createdAccount.getId(), newBalance, testUserId);
-        });
-
-        assertEquals("Account not found or access denied", exception.getMessage());
-    }
-
-    @Test
-    void testUpdateBalance_NotFound() {
-        // Try to update balance of non-existent account
-        BigDecimal newBalance = BigDecimal.valueOf(1000.00);
-        
-        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
-            accountService.updateBalance(999L, newBalance, testUserId);
-        });
-
-        assertEquals("Account not found or access denied", exception.getMessage());
-    }
-
-    @Test
     void testAccountTypes() {
         // Create accounts of different types
         String[] accountTypes = {"CHECKING", "SAVINGS", "CREDIT", "INVESTMENT"};

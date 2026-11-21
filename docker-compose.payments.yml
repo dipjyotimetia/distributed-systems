@@ -49,6 +49,7 @@ services:
       PAYMENTS_KAFKA_BROKERS: redpanda:9092
       PAYMENTS_ACCOUNTS_URL: http://accounts-service:8080
       FRAUD_SERVICE_ADDRESS: fraud-service:8080
+      FRAUD_CLIENT_SECRET: ${BANKING_FRAUD_CLIENT_SECRET:-banking-fraud-client-dev}
       MOVEMENT_SECRET: ${BANKING_PAYMENTS_MOVEMENT_SECRET:?Set the account movement secret}
       PAYMENTS_COMPLIANCE_URL: ${BANKING_PAYMENTS_COMPLIANCE_URL:?Set the compliance searches endpoint}
       PAYMENTS_COMPLIANCE_TOKEN: ${BANKING_PAYMENTS_COMPLIANCE_TOKEN:?Set the compliance token}

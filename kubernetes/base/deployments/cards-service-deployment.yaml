@@ -45,4 +45,9 @@ spec:
           valueFrom:
             secretKeyRef:
               name: banking-jwt-secret
-              key: secret
+              key: movement
+        - name: FRAUD_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: banking-jwt-secret
+              key: fraud-client

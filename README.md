@@ -24,8 +24,8 @@ exits with an OpenTelemetry `ContainerAttributes` error, apply the
 | Environment | Features and dependencies |
 |---|---|
 | Default Compose | Identity, accounts, transactions, fraud, disputes, statement workers, fixture-backed AI chat, PostgreSQL, Redis, Redpanda, MongoDB, notifications, Jaeger, Prometheus, Grafana |
-| Kubernetes base and local overlay | Identity, accounts, transactions, fraud, AI, notifications, simulation, PostgreSQL, Redis, Redpanda and MongoDB |
-| Kubernetes full overlay | Base services plus disputes, the statement worker, and PostgreSQL-backed Temporal |
+| Kubernetes base and local overlay | Shared manifests only. Identity, accounts, transactions, fraud, AI, notifications, simulation, PostgreSQL, Redis, Redpanda and MongoDB. Disputes and Temporal workers are not included |
+| Kubernetes full overlay | The Kubernetes banking install: base services plus disputes, the statement worker, KYC worker, and PostgreSQL-backed Temporal |
 | Temporal integration stack | Isolated banking journeys with scenario-specific workers and provider fixtures |
 
 Use the [Kubernetes deployment guide](kubernetes/README.md) for cluster setup and

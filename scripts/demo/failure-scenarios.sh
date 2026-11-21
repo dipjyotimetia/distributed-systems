@@ -8,11 +8,12 @@ compose() {
 
 case "${1:-}" in
   fraud-closed)
-    echo "Recreate transactions-service so a fraud outage rejects the movement."
+    echo "Recreate transactions-service so a fraud outage rejects the movement. This is already the default."
     FRAUD_FAIL_OPEN=false compose up -d --no-deps --force-recreate transactions-service
     compose stop fraud-service
     echo "A deposit now returns 400. Jaeger shows fraud.decision=fail-closed on transactions-service."
-    echo "Restore with: FRAUD_FAIL_OPEN=true docker compose up -d --no-deps --force-recreate transactions-service && docker compose start fraud-service"
+    echo "Restore fraud with: docker compose start fraud-service"
+    echo "Fail open only for a demo: FRAUD_FAIL_OPEN=true docker compose up -d --no-deps --force-recreate transactions-service"
     ;;
   kafka-pause)
     echo "Pause Redpanda. New transfers still commit. transactions_outbox_oldest_seconds climbs"

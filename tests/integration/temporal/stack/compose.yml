@@ -62,6 +62,7 @@ services:
         gw_priority: 1
     ports: ["127.0.0.1::8080"]
     environment:
+      NOTIFICATION_READ_TOKEN: banking-notification-read-dev
       SLACK_WEBHOOK_URL: http://provider-fixtures:8081/slack
       SENDGRID_API_URL: http://provider-fixtures:8081/v3/mail/send
       TWILIO_API_BASE_URL: http://provider-fixtures:8081
@@ -69,6 +70,7 @@ services:
     container_name: !reset null
     ports: !reset []
     environment:
+      FRAUD_CLIENT_SECRET: banking-fraud-client-dev
       STRIPE_RADAR_URL: http://provider-fixtures:8081/radar
       SIFT_EVENTS_URL: http://provider-fixtures:8081/sift
       MAXMIND_SCORE_URL: http://provider-fixtures:8081/maxmind

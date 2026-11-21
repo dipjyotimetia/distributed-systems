@@ -195,19 +195,6 @@ public class AccountService {
         return convertToResponse(accountRepository.saveAndFlush(account));
     }
 
-    public boolean updateBalance(Long accountId, BigDecimal newBalance, Long userId) {
-        logger.info("Updating balance for account {} to {} for user: {}", accountId, newBalance, userId);
-        Account account = accountRepository.findOwnedForUpdate(accountId, userId)
-                .orElseThrow(() -> new RuntimeException("Account not found or access denied"));
-        movementReservations.assertUnreserved(accountId);
-        if (account.getStatus() != Account.Status.ACTIVE) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Account is not active");
-        }
-        account.setBalance(newBalance);
-        accountRepository.save(account);
-        return true;
-    }
-
     private AccountResponse convertToResponse(Account account) {
         AccountResponse response = new AccountResponse(
                 account.getId(),

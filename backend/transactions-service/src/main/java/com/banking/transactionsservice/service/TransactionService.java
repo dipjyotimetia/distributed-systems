@@ -293,15 +293,12 @@ public class TransactionService {
     private TransactionResponse complete(Transaction draft, HttpServletRequest httpRequest, Runnable metrics,
                                          java.util.function.Consumer<Transaction> afterCommit) {
         String key = Idempotency.key(httpRequest);
-        String hash = null;
-        if (key != null) {
-            hash = Idempotency.fingerprint(draft);
-            draft.setIdempotencyKey(key);
-            draft.setIdempotencyHash(hash);
-            var existing = transactionRepository.findByUserIdAndIdempotencyKey(draft.getUserId(), key);
-            if (existing.isPresent()) {
-                return replay(existing.get(), hash);
-            }
+        String hash = Idempotency.fingerprint(draft);
+        draft.setIdempotencyKey(key);
+        draft.setIdempotencyHash(hash);
+        var existing = transactionRepository.findByUserIdAndIdempotencyKey(draft.getUserId(), key);
+        if (existing.isPresent()) {
+            return replay(existing.get(), hash);
         }
         try {
             Transaction saved = movementCoordinator.execute(draft);
@@ -309,9 +306,6 @@ public class TransactionService {
             afterCommit.accept(saved);
             return convertToResponse(saved);
         } catch (DataIntegrityViolationException conflict) {
-            if (key == null) {
-                throw conflict;
-            }
             return replay(transactionRepository.findByUserIdAndIdempotencyKey(draft.getUserId(), key)
                     .orElseThrow(() -> conflict), hash);
         }

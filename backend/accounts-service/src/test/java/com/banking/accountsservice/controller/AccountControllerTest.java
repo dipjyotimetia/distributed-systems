@@ -208,28 +208,6 @@ class AccountControllerTest {
         verify(accountService, never()).createAccount(any(), anyLong());
     }
 
-    @Test
-    void updateBalance_Success() throws Exception {
-        when(accountService.updateBalance(eq(testAccountId), any(BigDecimal.class), eq(testUserId))).thenReturn(true);
-
-        mockMvc.perform(put("/api/accounts/{accountId}/balance", testAccountId)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"balance\": 1500.00}"))
-                .andExpect(status().isOk());
-    }
-
-    @Test
-    void updateBalance_Unauthorized() throws Exception {
-        when(accountService.updateBalance(eq(testAccountId), any(BigDecimal.class), eq(testUserId)))
-                .thenThrow(new RuntimeException("Account not found or access denied"));
-
-        mockMvc.perform(put("/api/accounts/{accountId}/balance", testAccountId)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"balance\": 1500.00}"))
-                .andExpect(status().isNotFound());
-    }
-
-
     @TestConfiguration
     static class TestConfig {
         @Bean

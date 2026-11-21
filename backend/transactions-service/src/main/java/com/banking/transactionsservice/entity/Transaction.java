@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import org.hibernate.annotations.CreationTimestamp;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -27,8 +28,12 @@ public class Transaction {
     
     @NotNull
     @Positive
-    @Column(name = "amount", nullable = false)
-    private Double amount;
+    @Column(name = "amount", nullable = false, precision = 19, scale = 2)
+    private BigDecimal amount;
+
+    @NotNull
+    @Column(name = "amount_minor", nullable = false)
+    private Long amountMinor;
     
     @NotNull
     @Enumerated(EnumType.STRING)
@@ -62,7 +67,7 @@ public class Transaction {
         this.userId = userId;
         this.fromAccountId = fromAccountId;
         this.toAccountId = toAccountId;
-        this.amount = amount;
+        setAmount(amount);
         this.type = type;
         this.description = description;
         this.status = TransactionStatus.PENDING;
@@ -101,12 +106,26 @@ public class Transaction {
         this.toAccountId = toAccountId;
     }
     
-    public Double getAmount() {
+    public BigDecimal getAmount() {
         return amount;
     }
-    
+
+    public Long getAmountMinor() {
+        return amountMinor;
+    }
+
     public void setAmount(Double amount) {
-        this.amount = amount;
+        setAmount(amount == null ? null : new BigDecimal(Double.toString(amount)));
+    }
+
+    public void setAmount(BigDecimal amount) {
+        if (amount == null) {
+            this.amount = null;
+            this.amountMinor = null;
+            return;
+        }
+        this.amount = Money.of(amount);
+        this.amountMinor = Money.minorUnits(this.amount);
     }
     
     public TransactionType getType() {

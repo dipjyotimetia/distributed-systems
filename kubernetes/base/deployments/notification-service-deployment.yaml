@@ -43,6 +43,11 @@ spec:
           value: "8080"
         - name: MONGO_URI
           value: "mongodb://banking-mongodb:27017"
+        - name: NOTIFICATION_READ_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: banking-jwt-secret
+              key: notification-read
         - name: OTEL_SERVICE_NAME
           value: "notification-service"
         envFrom:

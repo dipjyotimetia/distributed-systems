@@ -24,7 +24,7 @@ final class Idempotency {
         }
         String header = request.getHeader("Idempotency-Key");
         if (header == null || header.isBlank()) {
-            return null;
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "An Idempotency-Key of 1 to 128 characters is required");
         }
         String key = header.trim();
         if (!KEY.matcher(key).matches()) {
@@ -37,7 +37,7 @@ final class Idempotency {
         String material = transaction.getType()
                 + "|" + transaction.getFromAccountId()
                 + "|" + transaction.getToAccountId()
-                + "|" + BigDecimal.valueOf(transaction.getAmount()).setScale(2, RoundingMode.HALF_UP).toPlainString()
+                + "|" + transaction.getAmount().setScale(2, RoundingMode.UNNECESSARY).toPlainString()
                 + "|" + (transaction.getDescription() == null ? "" : transaction.getDescription());
         try {
             byte[] digest = MessageDigest.getInstance("SHA-256").digest(material.getBytes(StandardCharsets.UTF_8));

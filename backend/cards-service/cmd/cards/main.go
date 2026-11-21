@@ -17,6 +17,7 @@ import (
 	kycv1 "github.com/dipjyotimetia/distributed-systems/backend/kyc-service/gen/kyc/v1"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 )
 
 func main() {
@@ -29,12 +30,16 @@ func main() {
 	if err := db.Migrate(ctx); err != nil {
 		log.Fatal(err)
 	}
-	kycConn, err := dial(env("KYC_GRPC_ADDR", "kyc-service:8091"), "kyc-service")
+	kycConn, err := dial(env("KYC_GRPC_ADDR", "kyc-service:8091"), "kyc-service", "")
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer kycConn.Close()
-	fraudConn, err := dial(env("FRAUD_GRPC_ADDR", "fraud-service:8080"), "fraud-service")
+	fraudToken := os.Getenv("FRAUD_CLIENT_SECRET")
+	if fraudToken == "" {
+		log.Fatal("FRAUD_CLIENT_SECRET is required")
+	}
+	fraudConn, err := dial(env("FRAUD_GRPC_ADDR", "fraud-service:8080"), "fraud-service", fraudToken)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -49,9 +54,13 @@ func main() {
 	}
 	server := grpc.NewServer(options...)
 	secret := env("JWT_SECRET", "")
+	movementSecret := os.Getenv("MOVEMENT_SECRET")
+	if movementSecret == "" || movementSecret == secret {
+		log.Fatal("MOVEMENT_SECRET is required and must differ from JWT_SECRET")
+	}
 	cardsv1.RegisterCardsServer(server, &service.Server{
 		Repo: db, Secret: []byte(secret),
-		Ledger: ledger.Client{Base: env("ACCOUNTS_SERVICE_URL", "http://accounts-service:8080"), Secret: env("MOVEMENT_SECRET", secret), HTTP: &http.Client{Timeout: 4 * time.Second}},
+		Ledger: ledger.Client{Base: env("ACCOUNTS_SERVICE_URL", "http://accounts-service:8080"), Secret: movementSecret, HTTP: &http.Client{Timeout: 4 * time.Second}},
 		Fraud:  fraudv1.NewFraudCheckerClient(fraudConn),
 		Kyc:    kycv1.NewKycClient(kycConn),
 	})
@@ -69,12 +78,19 @@ func main() {
 	log.Fatal(server.Serve(listener))
 }
 
-func dial(address, serverName string) (*grpc.ClientConn, error) {
+func dial(address, serverName, fraudToken string) (*grpc.ClientConn, error) {
 	option, err := mtls.DialOption(serverName)
 	if err != nil {
 		return nil, err
 	}
-	return grpc.NewClient(address, option)
+	options := []grpc.DialOption{option}
+	if fraudToken != "" {
+		options = append(options, grpc.WithUnaryInterceptor(func(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+			ctx = metadata.AppendToOutgoingContext(ctx, "x-fraud-token", fraudToken)
+			return invoker(ctx, method, req, reply, cc, opts...)
+		}))
+	}
+	return grpc.NewClient(address, options...)
 }
 
 func env(key, fallback string) string {

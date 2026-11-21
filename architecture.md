@@ -44,10 +44,11 @@ Local Compose uses one PostgreSQL database with a schema per service
 `disputes`). That is a demo shortcut. A new service should still treat its
 schema as private and should not read another service's tables.
 
-Completed ledger movements record an `Idempotency-Key` when the client sends
-one, and write `transaction-events` through `transactions_service.event_outbox`
-in the same database transaction as the ledger row. Fraud screening fails open
-unless `FRAUD_FAIL_OPEN=false`. The gateway fault filter stays off unless
+Completed ledger movements require an `Idempotency-Key`. The account
+movement is committed before the customer row is marked `COMPLETED` and
+before `transaction-events` is written to `transactions_service.event_outbox`.
+Balances change only through signed movements. Fraud screening fails closed
+unless `FRAUD_FAIL_OPEN=true`. The gateway fault filter stays off unless
 `FAULT_INJECTION_RATE` is set above zero. Default Compose runs `ai-service`
 in fixture mode so chat does not call live LLM providers. `payments-service`
 stays on the Artemis and payments Compose overlays.

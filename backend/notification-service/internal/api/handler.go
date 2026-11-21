@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -23,14 +24,29 @@ type Handler struct {
 	events EventReader
 }
 
-func NewHandler(events EventReader) http.Handler {
+func NewHandler(events EventReader, token string) http.Handler {
 	h := &Handler{events: events}
 	r := mux.NewRouter()
 	r.HandleFunc("/health", h.health).Methods(http.MethodGet)
 	r.Handle("/metrics", promhttp.Handler()).Methods(http.MethodGet)
 	r.HandleFunc("/notifications", h.list).Methods(http.MethodGet)
 	r.HandleFunc("/notifications/{user_id}", h.byUser).Methods(http.MethodGet)
-	return r
+	return requireToken(token, r)
+}
+
+func requireToken(token string, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/health" || r.URL.Path == "/metrics" {
+			next.ServeHTTP(w, r)
+			return
+		}
+		supplied := r.Header.Get("X-Notification-Token")
+		if token == "" || subtle.ConstantTimeCompare([]byte(supplied), []byte(token)) != 1 {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "notification token is required"})
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func (h *Handler) health(w http.ResponseWriter, _ *http.Request) {

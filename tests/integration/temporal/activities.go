@@ -3,11 +3,14 @@ package integration
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"slices"
+	"strings"
 	"time"
 )
 
@@ -43,6 +46,13 @@ func request(ctx context.Context, method, base, path, token string, body any) (H
 	}
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
+	}
+	if method == http.MethodPost && (path == "/api/transactions" || strings.HasPrefix(path, "/api/transactions/")) {
+		buf := make([]byte, 16)
+		if _, err := rand.Read(buf); err != nil {
+			return HTTPResponse{}, fmt.Errorf("create idempotency key")
+		}
+		req.Header.Set("Idempotency-Key", hex.EncodeToString(buf))
 	}
 	res, err := apiClient.Do(req)
 	if err != nil {

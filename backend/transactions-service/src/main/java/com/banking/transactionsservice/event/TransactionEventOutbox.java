@@ -81,7 +81,8 @@ public class TransactionEventOutbox {
         return "{\"transaction_id\":" + transaction.getId()
                 + ",\"account_id\":" + accountId
                 + ",\"user_id\":" + transaction.getUserId()
-                + ",\"amount\":" + transaction.getAmount()
+                + ",\"amount\":" + transaction.getAmount().toPlainString()
+                + ",\"amount_minor\":" + transaction.getAmountMinor()
                 + ",\"transaction_type\":\"" + transaction.getType().name()
                 + "\",\"status\":\"" + transaction.getStatus().name()
                 + "\",\"timestamp\":\"" + timestamp + "\"}";

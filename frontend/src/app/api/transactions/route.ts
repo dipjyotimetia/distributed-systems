@@ -36,6 +36,9 @@ export async function POST(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization');
     const idempotencyKey = request.headers.get('idempotency-key');
+    if (!idempotencyKey) {
+      return NextResponse.json({ message: 'An Idempotency-Key header is required' }, { status: 400 });
+    }
     const body = await request.json();
     
     // transactions-service exposes POST /api/transactions/create (a type

@@ -63,9 +63,13 @@ func main() {
 		}
 	}(c)
 
+	readToken := os.Getenv("NOTIFICATION_READ_TOKEN")
+	if readToken == "" {
+		log.Fatal("NOTIFICATION_READ_TOKEN is required")
+	}
 	srv := &http.Server{
 		Addr:    ":" + port,
-		Handler: api.NewHandler(mongoStore),
+		Handler: api.NewHandler(mongoStore, readToken),
 	}
 
 	go func() {

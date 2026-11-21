@@ -9,10 +9,15 @@ import urllib.request
 
 
 def get_json(base, path, expected=200, body=None, headers=None):
+    sent = {"Content-Type": "application/json", **(headers or {})}
+    if body is not None and path.startswith("/api/transactions"):
+        sent.setdefault("Idempotency-Key", secrets.token_hex(16))
+    if path.startswith("/notifications"):
+        sent.setdefault("X-Notification-Token", "banking-notification-read-dev")
     request = urllib.request.Request(
         base + path,
         data=json.dumps(body).encode() if body is not None else None,
-        headers={"Content-Type": "application/json", **(headers or {})},
+        headers=sent,
     )
     try:
         with urllib.request.urlopen(request, timeout=5) as response:

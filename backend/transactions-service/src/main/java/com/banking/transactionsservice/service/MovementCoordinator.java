@@ -16,7 +16,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -25,7 +24,7 @@ public class MovementCoordinator {
     private static final Logger logger = LoggerFactory.getLogger(MovementCoordinator.class);
     public record Movement(long userId, Long fromAccountId, Long toAccountId, BigDecimal amount) {}
     public enum Action { RESERVE, COMMIT, COMPENSATE }
-    private record Decision(UUID operation, Movement movement, String state, boolean finalized) {}
+    private record Decision(UUID operation, Movement movement, String state, boolean finalized, Long ledgerId) {}
 
     private final JdbcTemplate jdbc;
     private final TransactionTemplate durable;
@@ -47,7 +46,7 @@ public class MovementCoordinator {
         if (java.util.Objects.equals(transaction.getFromAccountId(), transaction.getToAccountId())) {
             throw new IllegalArgumentException("Movement requires distinct accounts");
         }
-        BigDecimal amount = BigDecimal.valueOf(transaction.getAmount()).setScale(2, RoundingMode.UNNECESSARY);
+        BigDecimal amount = transaction.getAmount();
         if (amount.signum() <= 0 || amount.precision() > 19) {
             throw new IllegalArgumentException("Invalid movement amount");
         }
@@ -67,12 +66,13 @@ public class MovementCoordinator {
                     throw new IllegalStateException("Movement already resolved");
                 }
                 accounts.applyMovement(operation, Action.RESERVE, movement);
-                transaction.setStatus(Transaction.TransactionStatus.COMPLETED);
-                transaction.setProcessedAt(LocalDateTime.now());
+                transaction.setStatus(Transaction.TransactionStatus.PENDING);
                 Transaction entry = ledger.saveAndFlush(transaction);
-                outbox.enqueue(entry);
+                // COMMITTED means the account hold must be committed. The customer
+                // row stays PENDING and nothing is published until that call succeeds.
                 jdbc.update("""
-                        UPDATE transactions_service.movement_decisions SET state = 'COMMITTED', ledger_id = ?
+                        UPDATE transactions_service.movement_decisions
+                        SET state = 'COMMITTED', ledger_id = ?
                         WHERE operation_id = ?
                         """, entry.getId(), operation);
                 return entry;
@@ -80,8 +80,6 @@ public class MovementCoordinator {
         } catch (RuntimeException failure) {
             String outcome;
             try {
-                // Read the decision under a fresh database lock. If the ledger is
-                // unavailable, leave any account hold in place for reconciliation.
                 outcome = resolve(operation);
             } catch (RuntimeException unresolved) {
                 failure.addSuppressed(unresolved);
@@ -98,7 +96,7 @@ public class MovementCoordinator {
         } catch (RuntimeException failure) {
             throw pending(failure);
         }
-        return saved;
+        return ledger.findById(saved.getId()).orElseThrow();
     }
 
     private static ResponseStatusException pending(RuntimeException cause) {
@@ -136,19 +134,45 @@ public class MovementCoordinator {
     private String resolve(UUID operation) {
         Decision decision = durable.execute(status -> {
             Decision current = lock(operation);
-            if ("STARTED".equals(current.state())) {
+            if ("STARTED".equals(current.state()) && current.ledgerId() == null) {
                 jdbc.update("UPDATE transactions_service.movement_decisions SET state = 'ABORTED' WHERE operation_id = ?", operation);
-                return new Decision(operation, current.movement(), "ABORTED", false);
+                return new Decision(operation, current.movement(), "ABORTED", false, null);
             }
             return current;
         });
-        if (!decision.finalized()) {
-            accounts.applyMovement(operation, "COMMITTED".equals(decision.state()) ? Action.COMMIT : Action.COMPENSATE,
-                    decision.movement());
+        if (decision.finalized()) {
+            return decision.state();
+        }
+        accounts.applyMovement(operation, "COMMITTED".equals(decision.state()) ? Action.COMMIT : Action.COMPENSATE,
+                decision.movement());
+        if ("COMMITTED".equals(decision.state())) {
+            publish(operation);
+        } else {
             durable.executeWithoutResult(status -> jdbc.update(
                     "UPDATE transactions_service.movement_decisions SET finalized = TRUE WHERE operation_id = ?", operation));
         }
         return decision.state();
+    }
+
+    private void publish(UUID operation) {
+        durable.executeWithoutResult(status -> {
+            Decision current = lock(operation);
+            if (current.finalized()) {
+                return;
+            }
+            Transaction entry = ledger.findById(current.ledgerId()).orElseThrow();
+            if (entry.getStatus() != Transaction.TransactionStatus.COMPLETED) {
+                entry.setStatus(Transaction.TransactionStatus.COMPLETED);
+                entry.setProcessedAt(LocalDateTime.now());
+                ledger.saveAndFlush(entry);
+                outbox.enqueue(entry);
+            }
+            jdbc.update("""
+                    UPDATE transactions_service.movement_decisions
+                    SET state = 'COMMITTED', finalized = TRUE
+                    WHERE operation_id = ?
+                    """, operation);
+        });
     }
 
     private Decision lock(UUID operation) {
@@ -156,6 +180,7 @@ public class MovementCoordinator {
                 SELECT * FROM transactions_service.movement_decisions WHERE operation_id = ? FOR UPDATE
                 """, (rs, row) -> new Decision(operation, new Movement(rs.getLong("user_id"),
                 rs.getObject("from_account_id", Long.class), rs.getObject("to_account_id", Long.class),
-                rs.getBigDecimal("amount")), rs.getString("state"), rs.getBoolean("finalized")), operation);
+                rs.getBigDecimal("amount")), rs.getString("state"), rs.getBoolean("finalized"),
+                rs.getObject("ledger_id", Long.class)), operation);
     }
 }

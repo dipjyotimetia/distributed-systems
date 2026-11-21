@@ -50,6 +50,9 @@ jwt:
   secret: ${JWT_SECRET:banking-app-super-secret-key-change-this-in-production-256-bit}
   expiration: ${JWT_EXPIRATION:86400000}
 
+movement:
+  secret: ${MOVEMENT_SECRET:banking-movement-dev-secret-not-the-jwt}
+
 # Logging Configuration
 logging:
   level:

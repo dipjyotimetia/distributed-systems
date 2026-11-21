@@ -60,13 +60,17 @@ accounts:
   service:
     url: ${ACCOUNTS_SERVICE_URL:http://accounts-service:8080}
 
+movement:
+  secret: ${MOVEMENT_SECRET:banking-movement-dev-secret-not-the-jwt}
+
 
 kafka:
   topic:
     transactions: ${KAFKA_TOPIC:transaction-events}
 
 fraud:
-  fail-open: ${FRAUD_FAIL_OPEN:true}
+  fail-open: ${FRAUD_FAIL_OPEN:false}
+  client-secret: ${FRAUD_CLIENT_SECRET:banking-fraud-client-dev}
 
 transactions:
   outbox:

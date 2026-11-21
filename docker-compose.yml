@@ -43,6 +43,7 @@ services:
     environment:
       KAFKA_BROKERS: redpanda:9092
       MONGO_URI: mongodb://mongodb:27017
+      NOTIFICATION_READ_TOKEN: banking-notification-read-dev
 
   # Backend Services
   disputes-schema:
@@ -164,6 +165,7 @@ services:
       # JWT Configuration
       - JWT_SECRET=banking-app-super-secret-key-change-this-in-production-256-bit
       - JWT_EXPIRATION=86400000
+      - MOVEMENT_SECRET=banking-movement-dev-secret-not-the-jwt
       # OpenTelemetry Configuration
       - OTEL_SERVICE_NAME=accounts-service
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
@@ -248,11 +250,13 @@ services:
       # JWT Configuration
       - JWT_SECRET=banking-app-super-secret-key-change-this-in-production-256-bit
       - JWT_EXPIRATION=86400000
+      - MOVEMENT_SECRET=banking-movement-dev-secret-not-the-jwt
       # Service URLs
       - ACCOUNTS_SERVICE_URL=http://accounts-service:8080
       - FRAUD_SERVICE_HOST=fraud-service
       - FRAUD_SERVICE_PORT=8080
-      - FRAUD_FAIL_OPEN=${FRAUD_FAIL_OPEN:-true}
+      - FRAUD_CLIENT_SECRET=banking-fraud-client-dev
+      - FRAUD_FAIL_OPEN=${FRAUD_FAIL_OPEN:-false}
       - KAFKA_BROKERS=redpanda:9092
       # OpenTelemetry Configuration
       - OTEL_SERVICE_NAME=transactions-service
@@ -264,15 +268,12 @@ services:
       - OTEL_TRACES_SAMPLER=always_on
       - OTEL_PROPAGATORS=tracecontext
       - OTEL_RESOURCE_ATTRIBUTES=service.namespace=banking-app
-      - JAVA_TOOL_OPTIONS=-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
     ports:
       - "8083:8080"
-      - "5005:5005"
     networks:
       - banking-network
 
-  # Fraud detection (gRPC) — transactions-service calls this for every transaction.
-  # Without it the fraud gRPC call fails and the client fails open (no fraud checks).
+  # Fraud detection (gRPC). Transactions fail closed when this service is down.
   fraud-service:
     build:
       context: ./backend/fraud-service
@@ -281,6 +282,7 @@ services:
     environment:
       - GRPC_PORT=8080
       - METRICS_PORT=9091
+      - FRAUD_CLIENT_SECRET=banking-fraud-client-dev
     ports:
       - "8086:8080"
     networks:
@@ -371,7 +373,8 @@ services:
     environment:
       DATABASE_URL: postgres://postgres:password@postgres:5432/banking_app?sslmode=disable
       JWT_SECRET: banking-app-super-secret-key-change-this-in-production-256-bit
-      MOVEMENT_SECRET: banking-app-super-secret-key-change-this-in-production-256-bit
+      MOVEMENT_SECRET: banking-movement-dev-secret-not-the-jwt
+      FRAUD_CLIENT_SECRET: banking-fraud-client-dev
       ACCOUNTS_SERVICE_URL: http://accounts-service:8080
       KYC_GRPC_ADDR: kyc-service:8091
       FRAUD_GRPC_ADDR: fraud-service:8080

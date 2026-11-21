@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net"
 	"net/http"
@@ -32,10 +33,22 @@ func main() {
 
 	// ebpf observability: force connections to recycle after 1 minute so nettap can observe the connection
 	// start and allow rrpairs to be correctly identified and parsed
-	options := []grpc.ServerOption{grpc.KeepaliveParams(keepalive.ServerParameters{
-		MaxConnectionAge:      1 * time.Minute,
-		MaxConnectionAgeGrace: 5 * time.Second,
-	})}
+	clientSecret := os.Getenv("FRAUD_CLIENT_SECRET")
+	if clientSecret == "" {
+		log.Fatal("FRAUD_CLIENT_SECRET is required")
+	}
+	options := []grpc.ServerOption{
+		grpc.KeepaliveParams(keepalive.ServerParameters{
+			MaxConnectionAge:      1 * time.Minute,
+			MaxConnectionAgeGrace: 5 * time.Second,
+		}),
+		grpc.UnaryInterceptor(func(ctx context.Context, req any, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+			if err := fraud.Authorize(ctx, clientSecret); err != nil {
+				return nil, err
+			}
+			return handler(ctx, req)
+		}),
+	}
 	if os.Getenv("MTLS_ENABLED") == "true" {
 		certificate, err := tls.LoadX509KeyPair(os.Getenv("MTLS_CERT"), os.Getenv("MTLS_KEY"))
 		if err != nil {

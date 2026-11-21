@@ -5,6 +5,8 @@ import fraud.v1.Fraud.TransactionRequest;
 import fraud.v1.FraudCheckerGrpc;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
+import io.grpc.Metadata;
+import io.grpc.stub.MetadataUtils;
 import jakarta.annotation.PreDestroy;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
@@ -39,21 +41,30 @@ public class PaymentChecks {
     private final SecretKeySpec movementKey;
     private final ObjectMapper json;
 
+    private final String fraudSecret;
+
     public PaymentChecks(@Value("${FRAUD_SERVICE_ADDRESS}") String fraudAddress,
                          @Value("${PAYMENTS_COMPLIANCE_URL}") URI complianceUrl,
                          @Value("${PAYMENTS_COMPLIANCE_TOKEN}") String complianceToken,
                          @Value("${PAYMENTS_ACCOUNTS_URL}") String accountUrl,
-                         @Value("${MOVEMENT_SECRET}") String movementSecret, ObjectMapper json) {
+                         @Value("${MOVEMENT_SECRET}") String movementSecret,
+                         @Value("${FRAUD_CLIENT_SECRET:banking-fraud-client-dev}") String fraudSecret,
+                         ObjectMapper json) {
         this.fraud = ManagedChannelBuilder.forTarget(fraudAddress).usePlaintext().build();
         this.complianceUrl = complianceUrl;
         this.complianceToken = complianceToken;
         this.accountUrl = accountUrl.replaceAll("/+$", "");
         this.movementKey = new SecretKeySpec(movementSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+        this.fraudSecret = fraudSecret;
         this.json = json;
     }
 
     boolean approved(long customer, long account, long cents, String destination) {
-        FraudCheckResponse risk = FraudCheckerGrpc.newBlockingStub(fraud).withDeadlineAfter(4, TimeUnit.SECONDS)
+        Metadata headers = new Metadata();
+        headers.put(Metadata.Key.of("x-fraud-token", Metadata.ASCII_STRING_MARSHALLER), fraudSecret);
+        FraudCheckResponse risk = FraudCheckerGrpc.newBlockingStub(fraud)
+                .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(headers))
+                .withDeadlineAfter(4, TimeUnit.SECONDS)
                 .checkTransaction(TransactionRequest.newBuilder().setAccountId(Long.toString(account))
                         .setUserId(Long.toString(customer)).setAmount(BigDecimal.valueOf(cents, 2).doubleValue())
                         .setTransactionType("TRANSFER").setMerchantCategory("5812").build());

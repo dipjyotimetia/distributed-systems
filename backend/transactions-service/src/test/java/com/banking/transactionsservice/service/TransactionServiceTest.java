@@ -72,6 +72,7 @@ class TransactionServiceTest {
         // Fraud service approves all transactions by default in unit tests
         when(fraudServiceClient.checkTransaction(anyString(), anyString(), anyDouble(), anyString(), anyString()))
                 .thenReturn(FraudCheckResponse.newBuilder().setApproved(true).setRiskScore(0.0).setReason("OK").build());
+        when(httpServletRequest.getHeader("Idempotency-Key")).thenReturn("test-key");
 
         testTransaction = new Transaction();
         testTransaction.setId(1L);

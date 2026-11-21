@@ -24,7 +24,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -178,40 +177,6 @@ public class AccountController {
         } catch (Exception e) {
             span.recordException(e);
             logger.error("Error fetching account balance", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        } finally {
-            span.end();
-        }
-    }
-    
-    @PutMapping("/{accountId}/balance")
-    public ResponseEntity<Void> updateAccountBalance(
-            @PathVariable Long accountId,
-            @RequestBody Map<String, Object> requestBody) {
-        Span span = tracer.spanBuilder("update-account-balance").startSpan();
-        try {
-            Long userId = getUserIdFromAuthentication();
-            logger.info("Updating balance for account {} for user: {}", accountId, userId);
-            
-            Object balanceObj = requestBody.get("balance");
-            if (!(balanceObj instanceof Number)) {
-                return ResponseEntity.badRequest().build();
-            }
-            
-            BigDecimal newBalance = new BigDecimal(balanceObj.toString());
-            accountService.updateBalance(accountId, newBalance, userId);
-            
-            span.setAttribute("user.id", userId);
-            span.setAttribute("account.id", accountId);
-            
-            return ResponseEntity.ok().build();
-        } catch (RuntimeException e) {
-            span.recordException(e);
-            logger.error("Account not found or access denied", e);
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-        } catch (Exception e) {
-            span.recordException(e);
-            logger.error("Error updating account balance", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         } finally {
             span.end();

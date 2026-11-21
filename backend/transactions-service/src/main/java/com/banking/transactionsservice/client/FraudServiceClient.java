@@ -3,6 +3,8 @@ package com.banking.transactionsservice.client;
 import fraud.v1.Fraud.FraudCheckResponse;
 import fraud.v1.Fraud.TransactionRequest;
 import fraud.v1.FraudCheckerGrpc;
+import io.grpc.Metadata;
+import io.grpc.stub.MetadataUtils;
 import io.opentelemetry.api.trace.Span;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,13 +16,18 @@ public class FraudServiceClient {
 
     private static final Logger logger = LoggerFactory.getLogger(FraudServiceClient.class);
 
+    private static final Metadata.Key<String> FRAUD_TOKEN = Metadata.Key.of("x-fraud-token", Metadata.ASCII_STRING_MARSHALLER);
+
     private final FraudCheckerGrpc.FraudCheckerBlockingStub fraudCheckerStub;
     private final boolean failOpen;
+    private final String clientSecret;
 
     public FraudServiceClient(FraudCheckerGrpc.FraudCheckerBlockingStub fraudCheckerStub,
-                              @Value("${fraud.fail-open:true}") boolean failOpen) {
+                              @Value("${fraud.fail-open:false}") boolean failOpen,
+                              @Value("${fraud.client-secret:}") String clientSecret) {
         this.fraudCheckerStub = fraudCheckerStub;
         this.failOpen = failOpen;
+        this.clientSecret = clientSecret;
     }
 
     public FraudCheckResponse checkTransaction(String accountId, String userId, double amount, String transactionType, String merchantCategory) {
@@ -33,7 +40,14 @@ public class FraudServiceClient {
                     .setMerchantCategory(merchantCategory == null ? "" : merchantCategory)
                     .build();
 
-            FraudCheckResponse response = fraudCheckerStub.checkTransaction(request);
+            if (clientSecret == null || clientSecret.isBlank()) {
+                return unavailable(accountId, userId, new IllegalStateException("fraud client secret is not configured"));
+            }
+            Metadata headers = new Metadata();
+            headers.put(FRAUD_TOKEN, clientSecret);
+            FraudCheckResponse response = fraudCheckerStub
+                    .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(headers))
+                    .checkTransaction(request);
             logger.info("Fraud check for account={} user={} type={} amount={}: approved={} risk={} reason={}",
                     accountId, userId, transactionType, amount,
                     response.getApproved(), response.getRiskScore(), response.getReason());

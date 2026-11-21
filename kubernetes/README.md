@@ -4,15 +4,17 @@ Run these commands from the repository root with the target cluster selected.
 
 | Configuration | Purpose |
 |---|---|
-| `kubernetes/base` | Application, PostgreSQL, Redis, MongoDB, Redpanda and simulation client |
+| `kubernetes/overlays/full` | Banking product: base services plus disputes, statement export, KYC worker, and Temporal |
+| `kubernetes/base` | Shared manifests. KYC and disputes routes are not a complete install on their own |
 | `kubernetes/overlays/local` | Base resources plus a frontend NodePort, using the published images |
 | `kubernetes/observability` | Collector, Jaeger, Prometheus, Grafana and Loki |
 | `kubernetes/overlays/speedscale` | Base and observability resources with six replay responders |
 | `kubernetes/overlays/kafka-sasl` | [Redpanda SASL testing](overlays/kafka-sasl/README.md) |
 
-The local and Speedscale overlays omit the disputes service and both Temporal
-workers. Use Compose or the [integration stack](../tests/integration/README.md)
-for those journeys.
+Apply `kubernetes/overlays/full` for the same journeys Compose runs, other than
+outbound payments. The local and Speedscale overlays omit the disputes service
+and both Temporal workers. Use Compose or the [integration stack](../tests/integration/README.md)
+for those journeys when you are not using the full overlay.
 
 ## Local overlay
 

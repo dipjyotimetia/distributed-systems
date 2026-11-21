@@ -73,6 +73,11 @@ api_call() {
     if [ ! -z "$data" ]; then
         cmd="$cmd -H \"Content-Type: application/json\" -d '$data'"
     fi
+    case "$endpoint" in
+        /api/transactions|/api/transactions/*)
+            [ "$method" = "POST" ] && cmd="$cmd -H \"Idempotency-Key: $(openssl rand -hex 16)\""
+            ;;
+    esac
     if [ ! -z "$headers" ]; then
         cmd="$cmd $headers"
     fi
