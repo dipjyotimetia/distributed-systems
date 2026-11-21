@@ -156,7 +156,8 @@ class Journey:
         """))
 
     def booking(self, account, payment):
-        eventually(lambda: self.state(payment) == "SETTLED", "payment did not settle")
+        # Kind has to bring the worker and the broker back before clearing can reply.
+        eventually(lambda: self.state(payment) == "SETTLED", "payment did not settle", 150 if self.kind else 75)
         eventually(lambda: not self.pending(payment, "KAFKA"), "payment events stayed in the outbox")
         eventually(lambda: bool(self.notices(payment)), "settlement notification did not arrive")
         assert len(self.notices(payment)) == 1
