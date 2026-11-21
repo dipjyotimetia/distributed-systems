@@ -4,6 +4,7 @@
 !build.gradle.kts
 !gradle.properties
 !gradle/**
+!scripts/docker-bootjar.sh
 !backend/*/build.gradle.kts
 !backend/*/gradle.properties
 !backend/api-gateway/src/**
