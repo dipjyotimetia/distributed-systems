@@ -29,6 +29,15 @@ func (m *memory) InsertCard(_ context.Context, customer int64, card Card) error 
 	m.owner[card.Token] = customer
 	return nil
 }
+func (m *memory) ListCards(_ context.Context, customer int64) ([]Card, error) {
+	cards := make([]Card, 0)
+	for token, owner := range m.owner {
+		if owner == customer {
+			cards = append(cards, m.cards[token])
+		}
+	}
+	return cards, nil
+}
 func (m *memory) FindCard(_ context.Context, customer int64, token string) (Card, error) {
 	if m.owner[token] != customer {
 		return Card{}, status.Error(codes.NotFound, "missing")
@@ -103,6 +112,25 @@ func TestIssueRequiresKycAndAuthorizeIsIdempotent(t *testing.T) {
 	declined, err := server.Authorize(ctx, &cardsv1.AuthorizeRequest{CardToken: card.Token, IdempotencyKey: "other", Amount: "3.00", Merchant: "DECLINE"})
 	if err != nil || declined.Approved {
 		t.Fatal(err, declined)
+	}
+}
+
+func TestListCardsReturnsOnlyTheSignedInCustomer(t *testing.T) {
+	repo := &memory{cards: map[string]Card{}, auths: map[string]Authorization{}, owner: map[string]int64{}}
+	if err := repo.InsertCard(context.Background(), 7, Card{Token: "mine", AccountID: 4, LastFour: "1111"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.InsertCard(context.Background(), 8, Card{Token: "theirs", AccountID: 9, LastFour: "2222"}); err != nil {
+		t.Fatal(err)
+	}
+	server := &Server{Repo: repo, Secret: []byte("secret")}
+	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("authorization", "Bearer "+token(t)))
+	listed, err := server.ListCards(ctx, &cardsv1.ListCardsRequest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(listed.Cards) != 1 || listed.Cards[0].GetToken() != "mine" || listed.Cards[0].GetLastFour() != "1111" {
+		t.Fatalf("listed %+v", listed.Cards)
 	}
 }
 

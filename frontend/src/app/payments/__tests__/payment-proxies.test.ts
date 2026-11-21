@@ -26,6 +26,18 @@ function request(path: string, init?: ConstructorParameters<typeof NextRequest>[
   return new NextRequest('http://localhost' + path, init);
 }
 
+test('proxies the payment collection only when outbound payments are enabled', async () => {
+  process.env.OUTBOUND_PAYMENTS_ENABLED = 'false';
+  expect((await GET(request('/api/payments'), params())).status).toBe(404);
+  process.env.OUTBOUND_PAYMENTS_ENABLED = 'true';
+  expect((await GET(request('/api/payments'), params())).status).toBe(401);
+  mockFetch.mockResolvedValueOnce(new Response('[]', { status: 200, headers: { 'content-type': 'application/json' } }));
+  const result = await GET(request('/api/payments', { headers: auth }), params());
+  expect(result.status).toBe(200);
+  expect(await result.json()).toEqual([]);
+  expect(mockFetch).toHaveBeenCalledWith('http://localhost:8080/api/payments', expect.objectContaining({ method: 'GET' }));
+});
+
 test('validates feature access, ownership credentials, and path format before forwarding', async () => {
   process.env.OUTBOUND_PAYMENTS_ENABLED = 'false';
   expect((await GET(request('/api/payments/' + id), params([id]))).status).toBe(404);

@@ -16,6 +16,7 @@ const paymentId = '597a4c24-019f-4ed6-884f-bf7cf8486f65';
 beforeEach(() => {
   accounts.mockReset();
   fetchMock.mockReset();
+  fetchMock.mockResolvedValue(response(200, []));
   global.fetch = fetchMock;
 });
 afterAll(() => { global.fetch = originalFetch; });
@@ -30,7 +31,8 @@ it('submits from an AUD account and refreshes the settlement reference', async (
     { id: 12, currency: 'USD', status: 'ACTIVE' },
     { id: 13, currency: 'AUD', status: 'FROZEN' },
   ] } as Awaited<ReturnType<typeof accounts>>);
-  fetchMock.mockResolvedValueOnce(response(202, { id: paymentId, status: 'PENDING' }))
+  fetchMock.mockResolvedValueOnce(response(200, []))
+    .mockResolvedValueOnce(response(202, { id: paymentId, status: 'PENDING' }))
     .mockResolvedValueOnce(response(200, {
       id: paymentId, status: 'SETTLED', clearingReference: 'C00000000001', settlementBusinessDate: '2026-11-20',
     }));
@@ -41,7 +43,7 @@ it('submits from an AUD account and refreshes the settlement reference', async (
   fireEvent.change(screen.getByLabelText('Destination code'), { target: { value: 'DEST00000001' } });
   fireEvent.change(screen.getByLabelText('Amount in AUD cents'), { target: { value: '2500' } });
   fireEvent.click(screen.getByRole('button', { name: 'Submit payment' }));
-  expect(await screen.findByText(paymentId)).toBeInTheDocument();
+  expect(await screen.findAllByText(paymentId)).toHaveLength(2);
   expect(fetchMock).toHaveBeenCalledWith('/api/payments', expect.objectContaining({
     method: 'POST',
     body: JSON.stringify({ accountId: 11, destination: 'DEST00000001', amountMinor: 2500 }),
@@ -49,6 +51,21 @@ it('submits from an AUD account and refreshes the settlement reference', async (
   fireEvent.click(screen.getByRole('button', { name: 'Refresh status' }));
   expect(await screen.findByText('Clearing reference C00000000001')).toBeInTheDocument();
   expect(screen.getByText('Settlement date 2026-11-20')).toBeInTheDocument();
+});
+
+it('lists the customer payments and reports a history failure', async () => {
+  accounts.mockResolvedValue({ success: true, data: [] });
+  fetchMock.mockResolvedValueOnce(response(200, [{
+    id: paymentId, status: 'PENDING', instruction: { destination: 'DEST00000001', amountMinor: 2500 },
+  }]));
+  const { unmount } = render(<PaymentForm />);
+  expect(await screen.findByText(paymentId)).toBeInTheDocument();
+  expect(screen.getByText('To DEST00000001')).toBeInTheDocument();
+  unmount();
+
+  fetchMock.mockResolvedValueOnce(response(503, { message: 'unavailable' }));
+  render(<PaymentForm />);
+  expect(await screen.findByRole('alert')).toHaveTextContent('Payments could not be loaded.');
 });
 
 it('disables submission when no active AUD account exists', async () => {

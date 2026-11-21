@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file cards/cards.proto.
  */
 export const file_cards_cards: GenFile = /*@__PURE__*/
-  fileDesc("ChFjYXJkcy9jYXJkcy5wcm90bxIIY2FyZHMudjEiJgoQSXNzdWVDYXJkUmVxdWVzdBISCgphY2NvdW50X2lkGAEgASgDImEKEEF1dGhvcml6ZVJlcXVlc3QSEgoKY2FyZF90b2tlbhgBIAEoCRIXCg9pZGVtcG90ZW5jeV9rZXkYAiABKAkSDgoGYW1vdW50GAMgASgJEhAKCG1lcmNoYW50GAQgASgJIjwKBENhcmQSDQoFdG9rZW4YASABKAkSEgoKYWNjb3VudF9pZBgCIAEoAxIRCglsYXN0X2ZvdXIYAyABKAkicwoNQXV0aG9yaXphdGlvbhIKCgJpZBgBIAEoCRISCgpjYXJkX3Rva2VuGAIgASgJEhAKCGFwcHJvdmVkGAMgASgIEg4KBnJlYXNvbhgEIAEoCRIOCgZhbW91bnQYBSABKAkSEAoIbWVyY2hhbnQYBiABKAkyggEKBUNhcmRzEjcKCUlzc3VlQ2FyZBIaLmNhcmRzLnYxLklzc3VlQ2FyZFJlcXVlc3QaDi5jYXJkcy52MS5DYXJkEkAKCUF1dGhvcml6ZRIaLmNhcmRzLnYxLkF1dGhvcml6ZVJlcXVlc3QaFy5jYXJkcy52MS5BdXRob3JpemF0aW9uQllaV2dpdGh1Yi5jb20vZGlwanlvdGltZXRpYS9kaXN0cmlidXRlZC1zeXN0ZW1zL2JhY2tlbmQvY2FyZHMtc2VydmljZS9nZW4vY2FyZHMvdjE7Y2FyZHN2MWIGcHJvdG8z");
+  fileDesc("ChFjYXJkcy9jYXJkcy5wcm90bxIIY2FyZHMudjEiJgoQSXNzdWVDYXJkUmVxdWVzdBISCgphY2NvdW50X2lkGAEgASgDImEKEEF1dGhvcml6ZVJlcXVlc3QSEgoKY2FyZF90b2tlbhgBIAEoCRIXCg9pZGVtcG90ZW5jeV9rZXkYAiABKAkSDgoGYW1vdW50GAMgASgJEhAKCG1lcmNoYW50GAQgASgJIhIKEExpc3RDYXJkc1JlcXVlc3QiMgoRTGlzdENhcmRzUmVzcG9uc2USHQoFY2FyZHMYASADKAsyDi5jYXJkcy52MS5DYXJkIjwKBENhcmQSDQoFdG9rZW4YASABKAkSEgoKYWNjb3VudF9pZBgCIAEoAxIRCglsYXN0X2ZvdXIYAyABKAkicwoNQXV0aG9yaXphdGlvbhIKCgJpZBgBIAEoCRISCgpjYXJkX3Rva2VuGAIgASgJEhAKCGFwcHJvdmVkGAMgASgIEg4KBnJlYXNvbhgEIAEoCRIOCgZhbW91bnQYBSABKAkSEAoIbWVyY2hhbnQYBiABKAkyyAEKBUNhcmRzEjcKCUlzc3VlQ2FyZBIaLmNhcmRzLnYxLklzc3VlQ2FyZFJlcXVlc3QaDi5jYXJkcy52MS5DYXJkEkQKCUxpc3RDYXJkcxIaLmNhcmRzLnYxLkxpc3RDYXJkc1JlcXVlc3QaGy5jYXJkcy52MS5MaXN0Q2FyZHNSZXNwb25zZRJACglBdXRob3JpemUSGi5jYXJkcy52MS5BdXRob3JpemVSZXF1ZXN0GhcuY2FyZHMudjEuQXV0aG9yaXphdGlvbkJZWldnaXRodWIuY29tL2RpcGp5b3RpbWV0aWEvZGlzdHJpYnV0ZWQtc3lzdGVtcy9iYWNrZW5kL2NhcmRzLXNlcnZpY2UvZ2VuL2NhcmRzL3YxO2NhcmRzdjFiBnByb3RvMw");
 
 /**
  * @generated from message cards.v1.IssueCardRequest
@@ -62,6 +62,36 @@ export const AuthorizeRequestSchema: GenMessage<AuthorizeRequest> = /*@__PURE__*
   messageDesc(file_cards_cards, 1);
 
 /**
+ * @generated from message cards.v1.ListCardsRequest
+ */
+export type ListCardsRequest = Message<"cards.v1.ListCardsRequest"> & {
+};
+
+/**
+ * Describes the message cards.v1.ListCardsRequest.
+ * Use `create(ListCardsRequestSchema)` to create a new message.
+ */
+export const ListCardsRequestSchema: GenMessage<ListCardsRequest> = /*@__PURE__*/
+  messageDesc(file_cards_cards, 2);
+
+/**
+ * @generated from message cards.v1.ListCardsResponse
+ */
+export type ListCardsResponse = Message<"cards.v1.ListCardsResponse"> & {
+  /**
+   * @generated from field: repeated cards.v1.Card cards = 1;
+   */
+  cards: Card[];
+};
+
+/**
+ * Describes the message cards.v1.ListCardsResponse.
+ * Use `create(ListCardsResponseSchema)` to create a new message.
+ */
+export const ListCardsResponseSchema: GenMessage<ListCardsResponse> = /*@__PURE__*/
+  messageDesc(file_cards_cards, 3);
+
+/**
  * @generated from message cards.v1.Card
  */
 export type Card = Message<"cards.v1.Card"> & {
@@ -86,7 +116,7 @@ export type Card = Message<"cards.v1.Card"> & {
  * Use `create(CardSchema)` to create a new message.
  */
 export const CardSchema: GenMessage<Card> = /*@__PURE__*/
-  messageDesc(file_cards_cards, 2);
+  messageDesc(file_cards_cards, 4);
 
 /**
  * @generated from message cards.v1.Authorization
@@ -128,7 +158,7 @@ export type Authorization = Message<"cards.v1.Authorization"> & {
  * Use `create(AuthorizationSchema)` to create a new message.
  */
 export const AuthorizationSchema: GenMessage<Authorization> = /*@__PURE__*/
-  messageDesc(file_cards_cards, 3);
+  messageDesc(file_cards_cards, 5);
 
 /**
  * @generated from service cards.v1.Cards
@@ -141,6 +171,14 @@ export const Cards: GenService<{
     methodKind: "unary";
     input: typeof IssueCardRequestSchema;
     output: typeof CardSchema;
+  },
+  /**
+   * @generated from rpc cards.v1.Cards.ListCards
+   */
+  listCards: {
+    methodKind: "unary";
+    input: typeof ListCardsRequestSchema;
+    output: typeof ListCardsResponseSchema;
   },
   /**
    * @generated from rpc cards.v1.Cards.Authorize

@@ -23,6 +23,8 @@ const AccountDetailsPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [transactionsLoading, setTransactionsLoading] = useState(true);
+  const [statusError, setStatusError] = useState<string | null>(null);
+  const [statusPending, setStatusPending] = useState(false);
 
   const accountId = params.id as string;
 
@@ -132,6 +134,24 @@ const AccountDetailsPage: React.FC = () => {
     }
   };
 
+  const updateStatus = async (next: 'ACTIVE' | 'FROZEN' | 'CLOSED') => {
+    if (!account) return;
+    if (next === 'CLOSED' && !window.confirm('Close this account? Closed accounts stay closed.')) return;
+    setStatusPending(true);
+    setStatusError(null);
+    const response = next === 'FROZEN'
+      ? await AccountsAPI.freezeAccount(account.id)
+      : next === 'ACTIVE'
+        ? await AccountsAPI.unfreezeAccount(account.id)
+        : await AccountsAPI.closeAccount(account.id);
+    setStatusPending(false);
+    if (!response.success || !response.data) {
+      setStatusError(response.message || 'Could not update the account');
+      return;
+    }
+    setAccount(response.data);
+  };
+
   if (isLoading) {
     return (
       <ProtectedRoute requireAuth={true}>
@@ -190,12 +210,6 @@ const AccountDetailsPage: React.FC = () => {
                   </p>
                 </div>
                 <div className="flex space-x-3">
-                  <Button
-                    variant="primary"
-                    onClick={() => router.push(`/accounts/${account.id}/transactions/new`)}
-                  >
-                    New Transaction
-                  </Button>
                   <Link href="/accounts">
                     <Button variant="outline">
                       Back to Accounts
@@ -233,6 +247,23 @@ const AccountDetailsPage: React.FC = () => {
                   </span>
                 </div>
               </div>
+              {account.status !== 'CLOSED' && (
+                <div className="mt-6 flex flex-wrap gap-3">
+                  {account.status === 'FROZEN' ? (
+                    <Button type="button" variant="outline" disabled={statusPending} onClick={() => void updateStatus('ACTIVE')}>
+                      Unfreeze account
+                    </Button>
+                  ) : (
+                    <Button type="button" variant="outline" disabled={statusPending} onClick={() => void updateStatus('FROZEN')}>
+                      Freeze account
+                    </Button>
+                  )}
+                  <Button type="button" variant="outline" disabled={statusPending} onClick={() => void updateStatus('CLOSED')}>
+                    Close account
+                  </Button>
+                </div>
+              )}
+              {statusError && <p role="alert" className="mt-3 text-sm text-red-700">{statusError}</p>}
               <div className="mt-4 pt-4 border-t border-line">
                 <div className="flex justify-between text-sm text-ink/70">
                   <span>Account opened: {formatDate(account.createdAt)}</span>
@@ -309,9 +340,9 @@ const AccountDetailsPage: React.FC = () => {
                   <p className="text-ink/70 mb-4">This account has no transaction history.</p>
                   <Button
                     variant="primary"
-                    onClick={() => router.push(`/accounts/${account.id}/transactions/new`)}
+                    onClick={() => router.push(`/accounts/${account.id}/deposit`)}
                   >
-                    Create First Transaction
+                    Make a deposit
                   </Button>
                 </div>
               ) : (

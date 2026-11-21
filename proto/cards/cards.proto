@@ -6,6 +6,7 @@ option go_package = "github.com/dipjyotimetia/distributed-systems/backend/cards-
 
 service Cards {
   rpc IssueCard(IssueCardRequest) returns (Card);
+  rpc ListCards(ListCardsRequest) returns (ListCardsResponse);
   rpc Authorize(AuthorizeRequest) returns (Authorization);
 }
 
@@ -18,6 +19,12 @@ message AuthorizeRequest {
   string idempotency_key = 2;
   string amount = 3;
   string merchant = 4;
+}
+
+message ListCardsRequest {}
+
+message ListCardsResponse {
+  repeated Card cards = 1;
 }
 
 message Card {

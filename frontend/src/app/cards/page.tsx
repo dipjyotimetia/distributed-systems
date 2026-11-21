@@ -1,20 +1,56 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import AuthenticatedLayout from '@/components/layout/AuthenticatedLayout';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import PageHeader from '@/components/ui/PageHeader';
+
+type IssuedCard = { token: string; accountId: string | number; lastFour: string };
 
 export default function CardsPage() {
   return <ProtectedRoute><AuthenticatedLayout><Form /></AuthenticatedLayout></ProtectedRoute>;
 }
 
 function Form() {
+  const [cards, setCards] = useState<IssuedCard[]>([]);
+  const [listState, setListState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [token, setToken] = useState('');
   const [lastFour, setLastFour] = useState('');
   const [revealed, setRevealed] = useState(false);
   const [result, setResult] = useState('');
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    async function load() {
+      try {
+        const response = await fetch('/api/cards');
+        const body = await response.json();
+        if (!active) return;
+        if (!response.ok) {
+          setListState('error');
+          setError(body.message || 'Cards could not be loaded');
+          return;
+        }
+        setCards(Array.isArray(body.cards) ? body.cards : []);
+        setListState('ready');
+      } catch {
+        if (active) {
+          setListState('error');
+          setError('Cards could not be loaded');
+        }
+      }
+    }
+    void load();
+    return () => { active = false; };
+  }, []);
+
+  function selectCard(card: IssuedCard) {
+    setToken(card.token);
+    setLastFour(card.lastFour);
+    setRevealed(false);
+    setResult('');
+  }
 
   async function issue(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -25,7 +61,12 @@ function Form() {
     });
     const body = await response.json();
     if (!response.ok) setError(body.message || 'Card was not issued');
-    else { setToken(body.token); setLastFour(body.lastFour); setRevealed(false); }
+    else {
+      const card: IssuedCard = { token: body.token, accountId, lastFour: body.lastFour };
+      setCards((current) => [card, ...current.filter((item) => item.token !== card.token)]);
+      setListState('ready');
+      selectCard(card);
+    }
   }
 
   async function authorize(event: FormEvent<HTMLFormElement>) {
@@ -68,13 +109,37 @@ function Form() {
             <p>Token {revealed ? token : '••••••••'} · last four {lastFour}</p>
             <button
               type="button"
-              className="mt-2 text-sm font-medium text-brass hover:text-ink"
+              className="mt-2 text-sm font-medium text-brass hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brass"
               onClick={() => setRevealed((value) => !value)}
             >
               {revealed ? 'Hide token' : 'Reveal token'}
             </button>
           </div>
         )}
+        <section className="mt-6 rounded-3xl border border-line bg-surface p-5" aria-labelledby="issued-cards">
+          <h2 id="issued-cards" className="text-lg font-semibold text-ink">Issued cards</h2>
+          {listState === 'loading' && <p role="status" className="mt-3 text-sm text-ink/70">Loading cards…</p>}
+          {listState === 'ready' && cards.length === 0 && (
+            <p className="mt-3 text-sm text-ink/70">No virtual cards yet.</p>
+          )}
+          {listState === 'ready' && cards.length > 0 && (
+            <ul className="mt-3 space-y-2">
+              {cards.map((card) => (
+                <li key={card.token}>
+                  <button
+                    type="button"
+                    className="w-full rounded-2xl border border-line px-4 py-3 text-left text-sm hover:border-brass focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brass"
+                    aria-pressed={token === card.token}
+                    onClick={() => selectCard(card)}
+                  >
+                    Card ending {card.lastFour}
+                    <span className="mt-1 block text-ink/60">Account {String(card.accountId)}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       </div>
 
       <div className="space-y-6">
@@ -82,14 +147,14 @@ function Form() {
         <form onSubmit={issue} className="space-y-3 rounded-3xl border border-line bg-surface p-5">
           <h2 className="text-lg font-semibold text-ink">Issue</h2>
           <label className="block text-sm font-medium text-ink">Account id<input name="accountId" className={fieldClass} required /></label>
-          <button className="rounded-full bg-ink px-4 py-2 text-sm font-medium text-canvas" type="submit">Issue card</button>
+          <button className="rounded-full bg-ink px-4 py-2 text-sm font-medium text-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brass" type="submit">Issue card</button>
         </form>
         <form onSubmit={authorize} className="space-y-3 rounded-3xl border border-line bg-surface p-5">
           <h2 className="text-lg font-semibold text-ink">Authorize</h2>
           <label className="block text-sm font-medium text-ink">Amount<input name="amount" defaultValue="10.00" className={fieldClass} required /></label>
           <label className="block text-sm font-medium text-ink">Merchant<input name="merchant" defaultValue="Cafe" className={fieldClass} required /></label>
           <label className="block text-sm font-medium text-ink">Idempotency key<input name="idempotencyKey" defaultValue="card-demo" className={fieldClass} required /></label>
-          <button className="rounded-full bg-ink px-4 py-2 text-sm font-medium text-canvas disabled:opacity-50" type="submit" disabled={!token}>Authorize</button>
+          <button className="rounded-full bg-ink px-4 py-2 text-sm font-medium text-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brass disabled:opacity-50" type="submit" disabled={!token}>Authorize</button>
           {result && <p className="text-sm text-ink">{result}</p>}
         </form>
       </div>

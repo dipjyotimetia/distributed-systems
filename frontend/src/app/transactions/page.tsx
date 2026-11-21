@@ -4,7 +4,6 @@ import Link from 'next/link';
 import React, { useState, useEffect } from 'react';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import AuthenticatedLayout from '@/components/layout/AuthenticatedLayout';
-import { useAuth } from '@/lib/auth/context';
 import Button from '@/components/ui/Button';
 import { TransactionsAPI, Transaction } from '@/lib/api/transactions';
 
@@ -14,10 +13,10 @@ interface DisplayTransaction extends Transaction {
 }
 
 const TransactionsPage: React.FC = () => {
-  const { } = useAuth();
   const [transactions, setTransactions] = useState<DisplayTransaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [cancellingId, setCancellingId] = useState<number | null>(null);
   const [filterType, setFilterType] = useState<string>('ALL');
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
 
@@ -49,6 +48,22 @@ const TransactionsPage: React.FC = () => {
 
     fetchTransactions();
   }, []);
+
+  const cancelTransaction = async (transactionId: number) => {
+    setCancellingId(transactionId);
+    setError(null);
+    const response = await TransactionsAPI.cancelTransaction(transactionId);
+    setCancellingId(null);
+    if (!response.success) {
+      setError(response.message || 'Could not cancel the transaction');
+      return;
+    }
+    setTransactions((current) => current.map((transaction) => (
+      transaction.id === transactionId
+        ? { ...transaction, ...response.data, status: response.data?.status || 'CANCELLED' }
+        : transaction
+    )));
+  };
 
   const formatCurrency = (amount: number, currency?: string) => {
     return new Intl.NumberFormat('en-US', {
@@ -138,14 +153,6 @@ const TransactionsPage: React.FC = () => {
                   View and manage your transaction history
                 </p>
               </div>
-                <div className="flex space-x-3">
-                  <Button
-                    variant="primary"
-                    onClick={() => window.location.href = '/transactions/new'}
-                  >
-                    New Transaction
-                  </Button>
-                </div>
               </div>
 
             {/* Filters */}
@@ -217,12 +224,9 @@ const TransactionsPage: React.FC = () => {
                     : 'Create your first transaction to get started'
                   }
                 </p>
-                <Button
-                  variant="primary"
-                  onClick={() => window.location.href = '/transactions/new'}
-                >
-                  Create Transaction
-                </Button>
+                <Link href="/accounts" className="inline-flex rounded-full bg-ink px-4 py-2 text-sm font-medium text-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brass">
+                  Go to accounts
+                </Link>
               </div>
             )}
 
@@ -265,6 +269,17 @@ const TransactionsPage: React.FC = () => {
                             {transaction.type === 'DEPOSIT' ? '+' : '-'}
                             {formatCurrency(transaction.amount)}
                           </p>
+                          {transaction.status === 'PENDING' && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={cancellingId === transaction.id}
+                              onClick={() => void cancelTransaction(transaction.id)}
+                            >
+                              Cancel transaction
+                            </Button>
+                          )}
                           {transaction.type === 'TRANSFER' && transaction.status === 'COMPLETED' && (
                             <Link className="text-sm font-medium text-brass underline" href={`/disputes?transferId=${transaction.id}`}>
                               Dispute transfer

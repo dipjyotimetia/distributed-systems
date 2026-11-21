@@ -4,6 +4,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.OffsetDateTime;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.context.annotation.Profile;
@@ -54,6 +55,12 @@ public class PaymentStore {
             throw new ResponseStatusException(CONFLICT, "Idempotency key was used for a different request");
         }
         return stored;
+    }
+
+    public List<Payment> listOwned(long customer) {
+        return db.query("""
+                SELECT * FROM payments.payment WHERE customer_id = ? ORDER BY created_at DESC LIMIT 50
+                """, PaymentStore::read, customer);
     }
 
     public Payment findOwned(long customer, UUID id) {

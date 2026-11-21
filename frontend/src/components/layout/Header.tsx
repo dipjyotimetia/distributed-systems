@@ -13,8 +13,15 @@ const links = [
   { href: '/transactions', label: 'Transactions' },
   { href: '/payments', label: 'Payments' },
   { href: '/disputes', label: 'Disputes' },
+  { href: '/notifications', label: 'Notifications' },
   { href: '/ai-assistant', label: 'AI Assistant' },
   { href: '/profile', label: 'Profile' },
+];
+
+const operations = [
+  { href: '/operations/disputes', label: 'Dispute queue' },
+  { href: '/operations/kyc', label: 'KYC queue' },
+  { href: '/operations/payments', label: 'Payment reconciliation' },
 ];
 
 function isCurrent(pathname: string, href: string) {
@@ -90,6 +97,23 @@ const Header: React.FC = () => {
 
         <nav aria-label="Primary" className="flex-1 space-y-1 overflow-y-auto px-3">
           {links.map((link) => {
+            const current = isCurrent(pathname, link.href);
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                aria-current={current ? 'page' : undefined}
+                onClick={() => setOpen(false)}
+                className={`block rounded-xl px-3 py-2.5 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brass ${
+                  current ? 'bg-white/10 text-white' : 'text-canvas/75 hover:bg-white/5 hover:text-white'
+                }`}
+              >
+                {link.label}
+              </Link>
+            );
+          })}
+          <p className="px-3 pb-2 pt-6 text-xs uppercase tracking-[0.16em] text-[#d7b56a]">Operations</p>
+          {operations.map((link) => {
             const current = isCurrent(pathname, link.href);
             return (
               <Link
