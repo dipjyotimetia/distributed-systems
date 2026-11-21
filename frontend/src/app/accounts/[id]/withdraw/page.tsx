@@ -46,8 +46,15 @@ const WithdrawPage: React.FC = () => {
     }
   }, [accountId]);
 
+  const movementLocked = account != null && account.status !== 'ACTIVE';
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (movementLocked) {
+      setError(`This account is ${account?.status.toLowerCase()} and cannot move money.`);
+      return;
+    }
     
     if (!amount || parseFloat(amount) <= 0) {
       setError('Please enter a valid amount');
@@ -209,6 +216,11 @@ const WithdrawPage: React.FC = () => {
                 <h3 className="text-lg font-medium text-ink">Withdrawal Details</h3>
               </div>
               <form onSubmit={handleSubmit} className="p-6 space-y-6">
+                {movementLocked && (
+                  <p role="alert" className="rounded-2xl border border-line bg-[#f6f1e6] px-4 py-3 text-sm text-ink">
+                    This account is {account?.status.toLowerCase()} and cannot accept a withdrawal.
+                  </p>
+                )}
                 {error && (
                   <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                     <div className="flex">
@@ -272,7 +284,7 @@ const WithdrawPage: React.FC = () => {
                   <Button
                     variant="primary"
                     type="submit"
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || movementLocked}
                     className="min-w-[120px]"
                   >
                     {isSubmitting ? (
