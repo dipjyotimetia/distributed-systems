@@ -40,8 +40,6 @@ const DashboardPage: React.FC = () => {
 
       if (accountsResponse.success && Array.isArray(accountsResponse.data)) {
         setAccounts(accountsResponse.data);
-      } else if (accountsResponse.success && accountsResponse.data && Array.isArray((accountsResponse.data as { content?: Account[] }).content)) {
-        setAccounts((accountsResponse.data as { content: Account[] }).content);
       } else {
         setError(accountsResponse.message || 'Failed to load accounts');
       }
