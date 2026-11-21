@@ -3,15 +3,17 @@ module github.com/dipjyotimetia/distributed-systems/backend/notification-service
 go 1.27.4
 
 require (
-	github.com/gorilla/mux v1.8.1
+	github.com/oapi-codegen/runtime v1.1.1
 	github.com/prometheus/client_golang v1.25.0
 	github.com/twmb/franz-go v1.22.3
 	go.mongodb.org/mongo-driver/v2 v2.10.0
 )
 
 require (
+	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
+	github.com/google/uuid v1.6.0 // indirect
 	github.com/klauspost/compress v1.20.3 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect

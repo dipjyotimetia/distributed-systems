@@ -1,0 +1,118 @@
+openapi: 3.0.3
+info:
+  title: Notification Service
+  description: Recently consumed transaction notifications.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8086
+    description: Local development server
+paths:
+  /notifications:
+    get:
+      tags: [notifications]
+      operationId: listNotifications
+      summary: List the latest notifications
+      parameters:
+        - $ref: '#/components/parameters/limit'
+      responses:
+        '200':
+          description: Notifications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Notification'
+        '503':
+          description: Notification storage unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /notifications/{user_id}:
+    get:
+      tags: [notifications]
+      operationId: listUserNotifications
+      summary: List notifications for one user
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/limit'
+      responses:
+        '200':
+          description: Notifications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Notification'
+        '503':
+          description: Notification storage unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /health:
+    get:
+      tags: [notifications]
+      operationId: notificationHealth
+      summary: Liveness
+      responses:
+        '200':
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status:
+                    type: string
+components:
+  parameters:
+    limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 1000
+        default: 20
+  schemas:
+    Notification:
+      type: object
+      properties:
+        transaction_id:
+          type: string
+        payment_id:
+          type: string
+        event_id:
+          type: string
+        currency:
+          type: string
+        amount_minor:
+          type: integer
+          format: int64
+        account_id:
+          type: string
+          nullable: true
+        user_id:
+          type: string
+        amount:
+          type: number
+        transaction_type:
+          type: string
+        status:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string

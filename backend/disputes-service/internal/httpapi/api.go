@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -17,6 +16,10 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/dipjyotimetia/distributed-systems/backend/disputes-service/internal/cases"
+	transactionsv1 "github.com/dipjyotimetia/distributed-systems/backend/disputes-service/gen/transactions/v1"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 )
 
 type caseStore interface {
@@ -32,16 +35,41 @@ type caseStore interface {
 	SaveAiDraft(context.Context, int64, json.RawMessage) (cases.Case, error)
 }
 
+type TransferView struct {
+	ID     int64
+	UserID int64
+	Type   string
+	Status string
+}
+
+type TransferLookup interface {
+	Lookup(ctx context.Context, authorization string, id int64) (TransferView, error)
+}
+
+type Query struct {
+	Client transactionsv1.TransactionQueryClient
+}
+
+func (q Query) Lookup(ctx context.Context, authorization string, id int64) (TransferView, error) {
+	ctx = metadata.AppendToOutgoingContext(ctx, "authorization", authorization)
+	view, err := q.Client.GetTransaction(ctx, &transactionsv1.GetTransactionRequest{Id: id})
+	if err != nil {
+		return TransferView{}, err
+	}
+	return TransferView{ID: view.Id, UserID: view.UserId, Type: view.Type, Status: view.Status}, nil
+}
+
 type API struct {
 	caseStore
-	db              *sql.DB
-	secret          []byte
-	operators       map[int64]bool
-	transactionsURL string
-	client          *http.Client
-	delay           time.Duration
-	internalToken   string
+	db            *sql.DB
+	secret        []byte
+	operators     map[int64]bool
+	transfers     TransferLookup
+	delay         time.Duration
+	internalToken string
 }
+
+var ErrInternalAuth = errors.New("internal token required")
 
 type claims struct {
 	UserID string `json:"userId"`
@@ -91,62 +119,32 @@ func (a API) authorized(operations bool, next signedHandler) http.HandlerFunc {
 
 func (a API) Routes() *http.ServeMux {
 	mux := HealthRoutes(a.db)
-	mux.HandleFunc("POST /api/disputes", a.authorized(false, a.file))
-	mux.HandleFunc("GET /api/disputes", a.authorized(false, a.customerList))
-	mux.HandleFunc("GET /api/disputes/{id}", a.authorized(false, a.customerRead))
-	mux.HandleFunc("GET /api/operations/disputes", a.authorized(true, a.queue))
-	mux.HandleFunc("POST /api/operations/disputes/{id}/resolve", a.authorized(true, a.resolveCase))
-	mux.HandleFunc("POST /api/operations/disputes/{id}/evidence-requests", a.authorized(true, a.evidence))
-	mux.HandleFunc("POST /api/disputes/{id}/evidence-requests/{requestId}/response", a.authorized(false, a.evidence))
-	mux.HandleFunc("GET /internal/disputes/{id}/context", a.internal(a.internalContext))
-	mux.HandleFunc("POST /internal/disputes/{id}/ai-draft", a.internal(a.internalSaveDraft))
+	HandlerFromMux(contractAPI{a}, mux)
 	return mux
 }
 
-func (a API) internal(next func(http.ResponseWriter, *http.Request)) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "no-store")
-		if a.internalToken == "" || r.Header.Get("X-Internal-Token") != a.internalToken {
-			fail(w, http.StatusUnauthorized, "Internal token required")
-			return
-		}
-		next(w, r)
+func (a API) authorizeInternal(token string) error {
+	if a.internalToken == "" || token != a.internalToken {
+		return ErrInternalAuth
 	}
+	return nil
 }
 
-func (a API) internalContext(w http.ResponseWriter, r *http.Request) {
-	id, err := positiveID(r.PathValue("id"))
-	if err != nil {
-		storeError(w, sql.ErrNoRows)
-		return
+func (a API) ResearchContext(ctx context.Context, token string, id int64) (cases.Case, error) {
+	if err := a.authorizeInternal(token); err != nil {
+		return cases.Case{}, err
 	}
-	c, err := a.ByIDInternal(r.Context(), id)
-	if err != nil {
-		storeError(w, err)
-		return
-	}
-	respond(w, 200, c)
+	return a.ByIDInternal(ctx, id)
 }
 
-func (a API) internalSaveDraft(w http.ResponseWriter, r *http.Request) {
-	id, err := positiveID(r.PathValue("id"))
-	if err != nil {
-		storeError(w, sql.ErrNoRows)
-		return
+func (a API) ResearchDraft(ctx context.Context, token string, id int64, draft json.RawMessage) (cases.Case, error) {
+	if err := a.authorizeInternal(token); err != nil {
+		return cases.Case{}, err
 	}
-	var input struct {
-		Draft json.RawMessage `json:"draft"`
+	if len(draft) == 0 || !json.Valid(draft) || draft[0] != '{' {
+		return cases.Case{}, errors.New("draft object is required")
 	}
-	if !decode(w, r, &input) || len(input.Draft) == 0 {
-		fail(w, 400, "draft object is required")
-		return
-	}
-	c, err := a.SaveAiDraft(r.Context(), id, input.Draft)
-	if err != nil {
-		storeError(w, err)
-		return
-	}
-	respond(w, 200, c)
+	return a.SaveAiDraft(ctx, id, draft)
 }
 
 func respond(w http.ResponseWriter, status int, value any) {
@@ -229,30 +227,19 @@ func (a API) file(w http.ResponseWriter, r *http.Request, customer int64) {
 }
 
 func (a API) eligible(ctx context.Context, auth string, customer, id int64) int {
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/api/transactions/%d", a.transactionsURL, id), nil)
+	if a.transfers == nil {
+		return 502
+	}
+	transfer, err := a.transfers.Lookup(ctx, auth, id)
 	if err != nil {
-		return 502
+		switch status.Code(err) {
+		case codes.NotFound, codes.PermissionDenied:
+			return 404
+		default:
+			return 502
+		}
 	}
-	request.Header.Set("Authorization", auth)
-	response, err := a.client.Do(request)
-	if err != nil {
-		return 502
-	}
-	defer response.Body.Close()
-	switch response.StatusCode {
-	case 404, 403:
-		return 404
-	case 200:
-	default:
-		return 502
-	}
-	var transfer struct {
-		ID     int64
-		UserID int64
-		Type   string
-		Status string
-	}
-	if json.NewDecoder(io.LimitReader(response.Body, 65536)).Decode(&transfer) != nil || transfer.ID != id {
+	if transfer.ID != id {
 		return 502
 	}
 	if transfer.UserID != customer {
@@ -367,12 +354,12 @@ func OperatorIDs(value string) (map[int64]bool, error) {
 	return ids, nil
 }
 
-func New(db *sql.DB, store caseStore, secret []byte, operators map[int64]bool, transactionsURL string, client *http.Client, delay time.Duration) API {
-	return NewWithInternal(db, store, secret, operators, transactionsURL, client, delay, os.Getenv("DISPUTES_INTERNAL_TOKEN"))
+func New(db *sql.DB, store caseStore, secret []byte, operators map[int64]bool, transfers TransferLookup, delay time.Duration) API {
+	return NewWithInternal(db, store, secret, operators, transfers, delay, os.Getenv("DISPUTES_INTERNAL_TOKEN"))
 }
 
-func NewWithInternal(db *sql.DB, store caseStore, secret []byte, operators map[int64]bool, transactionsURL string, client *http.Client, delay time.Duration, internalToken string) API {
-	return API{caseStore: store, db: db, secret: secret, operators: operators, transactionsURL: transactionsURL, client: client, delay: delay, internalToken: internalToken}
+func NewWithInternal(db *sql.DB, store caseStore, secret []byte, operators map[int64]bool, transfers TransferLookup, delay time.Duration, internalToken string) API {
+	return API{caseStore: store, db: db, secret: secret, operators: operators, transfers: transfers, delay: delay, internalToken: internalToken}
 }
 
 func (a API) evidence(w http.ResponseWriter, r *http.Request, actor int64) {

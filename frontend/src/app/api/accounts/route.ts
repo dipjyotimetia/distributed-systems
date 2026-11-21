@@ -1,5 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { context, propagation, trace } from '@opentelemetry/api';
+import { AccountsApi, Configuration, ResponseError } from '@/gen/openapi/accounts/src';
+
+async function upstream(request: Promise<{ raw: Response }>): Promise<Response> {
+  try {
+    return (await request).raw;
+  } catch (error) {
+    if (error instanceof ResponseError) return error.response;
+    throw error;
+  }
+}
 
 // Force Node.js runtime for OpenTelemetry compatibility
 export const runtime = 'nodejs';
@@ -30,15 +40,23 @@ export async function GET(request: NextRequest) {
     const traceHeaders: Record<string, string> = {};
     propagation.inject(trace.setSpan(parent, span), traceHeaders);
 
-    const response = await fetch(`${API_GATEWAY_URL}/api/accounts?${searchParams}`, {
-      method: 'GET',
+    const api = new AccountsApi(new Configuration({
+      basePath: API_GATEWAY_URL,
       headers: {
         'Content-Type': 'application/json',
-        ...(authHeader && { 'Authorization': authHeader }),
+        ...(authHeader && { Authorization: authHeader }),
         traceparent: createTraceParent(),
         ...traceHeaders,
       },
-    });
+    }));
+    const page = searchParams.get('page');
+    const response = await upstream(api.listAccountsRaw({
+      ...(page != null && { page: Number(page) }),
+      ...(searchParams.get('size') != null && { size: Number(searchParams.get('size')) }),
+      ...(searchParams.get('sort') != null && { sort: searchParams.get('sort')! }),
+      ...(searchParams.get('type') != null && { type: searchParams.get('type') as 'CHECKING' }),
+      ...(searchParams.get('status') != null && { status: searchParams.get('status') as 'ACTIVE' }),
+    }));
 
     const contentType = response.headers.get('content-type');
     return new NextResponse(response.body, {
@@ -61,15 +79,15 @@ export async function POST(request: NextRequest) {
     const authHeader = request.headers.get('authorization');
     const body = await request.json();
     
-    const response = await fetch(`${API_GATEWAY_URL}/api/accounts`, {
-      method: 'POST',
+    const api = new AccountsApi(new Configuration({
+      basePath: API_GATEWAY_URL,
       headers: {
         'Content-Type': 'application/json',
-        ...(authHeader && { 'Authorization': authHeader }),
-        'traceparent': createTraceParent(),
+        ...(authHeader && { Authorization: authHeader }),
+        traceparent: createTraceParent(),
       },
-      body: JSON.stringify(body),
-    });
+    }));
+    const response = await upstream(api.createAccountRaw({ accountCreateRequest: body }));
 
     const contentType = response.headers.get('content-type');
     return new NextResponse(response.body, {

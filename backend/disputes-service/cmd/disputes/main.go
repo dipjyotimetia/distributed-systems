@@ -4,18 +4,23 @@ import (
 	"github.com/dipjyotimetia/distributed-systems/backend/disputes-service/internal/httpapi"
 	"github.com/dipjyotimetia/distributed-systems/backend/disputes-service/internal/postgres"
 	"github.com/dipjyotimetia/distributed-systems/backend/disputes-service/internal/temporal"
+	researchv1 "github.com/dipjyotimetia/distributed-systems/backend/disputes-service/gen/disputes/research/v1"
+	transactionsv1 "github.com/dipjyotimetia/distributed-systems/backend/disputes-service/gen/transactions/v1"
 
 	"context"
 	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
@@ -82,9 +87,9 @@ func run(ctx context.Context, mode string) error {
 		return temporal.Run(ctx, db, s, serve)
 	case "", "api":
 		secret := os.Getenv("JWT_SECRET")
-		transactionsURL := strings.TrimRight(os.Getenv("TRANSACTIONS_SERVICE_URL"), "/")
-		if len(secret) < 32 || transactionsURL == "" {
-			return errors.New("JWT_SECRET of at least 32 bytes and TRANSACTIONS_SERVICE_URL are required")
+		transactionsAddress := os.Getenv("TRANSACTIONS_GRPC_ADDRESS")
+		if len(secret) < 32 || transactionsAddress == "" {
+			return errors.New("JWT_SECRET of at least 32 bytes and TRANSACTIONS_GRPC_ADDRESS are required")
 		}
 		operators, err := httpapi.OperatorIDs(os.Getenv("DISPUTES_OPERATOR_IDS"))
 		if err != nil {
@@ -97,11 +102,15 @@ func run(ctx context.Context, mode string) error {
 		if _, err := db.ExecContext(startup, "SELECT 1 FROM disputes.cases, disputes.workflow_outbox, disputes.signal_outbox LIMIT 0"); err != nil {
 			return fmt.Errorf("check dispute schema: %w", err)
 		}
-		a := httpapi.New(db, s, []byte(secret), operators, transactionsURL, &http.Client{
-			Timeout:       5 * time.Second,
-			Transport:     otelhttp.NewTransport(http.DefaultTransport),
-			CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
-		}, delay)
+		conn, err := grpc.NewClient(transactionsAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		if err != nil {
+			return err
+		}
+		defer conn.Close()
+		a := httpapi.New(db, s, []byte(secret), operators, httpapi.Query{Client: transactionsv1.NewTransactionQueryClient(conn)}, delay)
+		if err := serveResearch(ctx, a); err != nil {
+			return err
+		}
 		return serve(ctx, a.Routes())
 	default:
 		return errors.New("invalid DISPUTES_MODE")
@@ -117,6 +126,29 @@ func escalationDelay(value string) (time.Duration, error) {
 		return 0, errors.New("DISPUTES_TEST_ESCALATION_DELAY must be a positive duration")
 	}
 	return delay, nil
+}
+
+func serveResearch(ctx context.Context, api httpapi.API) error {
+	port := os.Getenv("DISPUTES_GRPC_PORT")
+	if port == "" {
+		port = "9096"
+	}
+	listener, err := net.Listen("tcp", ":"+port)
+	if err != nil {
+		return err
+	}
+	server := grpc.NewServer()
+	researchv1.RegisterDisputeResearchServer(server, httpapi.ResearchServer{API: api})
+	go func() {
+		<-ctx.Done()
+		server.GracefulStop()
+	}()
+	go func() {
+		if err := server.Serve(listener); err != nil {
+			slog.Error("Dispute research gRPC stopped", "error", err)
+		}
+	}()
+	return nil
 }
 
 func serve(ctx context.Context, mux *http.ServeMux) error {

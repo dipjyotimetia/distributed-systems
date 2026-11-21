@@ -37,6 +37,8 @@ spec:
         ports:
         - containerPort: 8080
           name: http
+        - containerPort: 9095
+          name: grpc
         env:
         - name: DB_PASSWORD
           valueFrom:
@@ -48,6 +50,10 @@ spec:
             secretKeyRef:
               name: banking-jwt-secret
               key: secret
+        - name: ACCOUNTS_GRPC_ADDRESS
+          value: banking-accounts:9092
+        - name: TRANSACTIONS_GRPC_PORT
+          value: "9095"
         - name: JAVA_OPTS
           value: "-Xms128m -Xmx384m -XX:MaxMetaspaceSize=192m -XX:ReservedCodeCacheSize=32m -XX:MaxDirectMemorySize=16m -XX:+UseSerialGC -XX:+UseStringDeduplication -XX:+UseContainerSupport -Djava.security.egd=file:/dev/./urandom -Dspring.main.lazy-initialization=true"
         envFrom:

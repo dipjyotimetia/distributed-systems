@@ -31,7 +31,7 @@ class StatementJobsControllerTest {
         when(store.list(42, 7, 0)).thenReturn(List.of(job));
         when(store.find(42, 7, id)).thenReturn(Optional.of(job));
         when(store.download(42, 7, id)).thenReturn(Optional.of(new byte[] {'{', '}'}));
-        var api = MockMvcBuilders.standaloneSetup(new StatementJobsController(new StatementJobs(accounts, store))).build();
+        var api = MockMvcBuilders.standaloneSetup(new StatementJobsController(new StatementJobs(accounts, store), new com.banking.accountsservice.contract.ContractJson())).build();
         var owner = identity(7);
         var stranger = identity(8);
         String base = "/api/accounts/42/statement-jobs";

@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# Regenerate checked-in internal gRPC stubs and Go OpenAPI servers, then diff.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+generated="$(mktemp -d)"
+mkdir -p "$generated/cards" "$generated/disputes" "$generated/ai"
+export PATH="$(go env GOPATH)/bin:$PATH"
+
+protoc -I proto/ledger \
+  --go_out="$generated/cards" --go_opt=module=github.com/dipjyotimetia/distributed-systems/backend/cards-service \
+  --go-grpc_out="$generated/cards" --go-grpc_opt=module=github.com/dipjyotimetia/distributed-systems/backend/cards-service \
+  proto/ledger/ledger.proto
+diff -ru backend/cards-service/gen/ledger "$generated/cards/gen/ledger"
+
+protoc -I proto/transactions \
+  --go_out="$generated/disputes" --go_opt=module=github.com/dipjyotimetia/distributed-systems/backend/disputes-service \
+  --go-grpc_out="$generated/disputes" --go-grpc_opt=module=github.com/dipjyotimetia/distributed-systems/backend/disputes-service \
+  proto/transactions/query.proto
+protoc -I proto/disputes \
+  --go_out="$generated/disputes" --go_opt=module=github.com/dipjyotimetia/distributed-systems/backend/disputes-service \
+  --go-grpc_out="$generated/disputes" --go-grpc_opt=module=github.com/dipjyotimetia/distributed-systems/backend/disputes-service \
+  proto/disputes/research.proto
+diff -ru backend/disputes-service/gen "$generated/disputes/gen"
+
+python3 -m grpc_tools.protoc -I proto/disputes \
+  --python_out="$generated/ai" --grpc_python_out="$generated/ai" proto/disputes/research.proto
+python3 - <<PY
+from pathlib import Path
+path = Path("$generated/ai/research_pb2_grpc.py")
+path.write_text(path.read_text().replace("import research_pb2 as research__pb2", "from gen import research_pb2 as research__pb2"))
+PY
+diff -ru backend/ai-service/gen/research_pb2.py "$generated/ai/research_pb2.py"
+diff -ru backend/ai-service/gen/research_pb2_grpc.py "$generated/ai/research_pb2_grpc.py"
+
+oapi-codegen -generate types,std-http-server -package api -o "$generated/notifications.go" contracts/openapi/notifications.yaml
+python3 - <<PY
+from pathlib import Path
+path = Path("$generated/notifications.go")
+text = path.read_text()
+for old, new in {
+    "func Handler(": "func OpenAPIHandler(",
+    "return HandlerWithOptions": "return OpenAPIHandlerWithOptions",
+    "func HandlerFromMux(": "func OpenAPIHandlerFromMux(",
+    "func HandlerFromMuxWithBaseURL(": "func OpenAPIHandlerFromMuxWithBaseURL(",
+    "func HandlerWithOptions(": "func OpenAPIHandlerWithOptions(",
+}.items():
+    text = text.replace(old, new)
+path.write_text(text)
+PY
+diff -ru backend/notification-service/internal/api/openapi.gen.go "$generated/notifications.go"
+oapi-codegen -generate types,std-http-server -package httpapi -o "$generated/disputes.go" contracts/openapi/disputes.yaml
+diff -ru backend/disputes-service/internal/httpapi/openapi.gen.go "$generated/disputes.go"
+echo "contract stubs match"

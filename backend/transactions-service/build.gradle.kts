@@ -6,6 +6,7 @@ plugins {
     id("io.spring.dependency-management")
     id("com.google.protobuf")
     id("org.flywaydb.flyway")
+    id("org.openapi.generator")
 }
 
 group = "com.banking"
@@ -62,8 +63,37 @@ tasks.jar { enabled = false }
 
 tasks.bootJar { archiveFileName.set("application.jar") }
 
+openApiGenerate {
+    generatorName.set("spring")
+    inputSpec.set(rootProject.file("contracts/openapi/transactions.yaml").absolutePath)
+    outputDir.set(layout.buildDirectory.dir("generated/openapi").get().asFile.absolutePath)
+    apiPackage.set("com.banking.transactionsservice.contract")
+    modelPackage.set("com.banking.transactionsservice.contract.model")
+    configOptions.set(mapOf(
+        "interfaceOnly" to "true",
+        "useSpringBoot3" to "true",
+        "useTags" to "true",
+        "skipDefaultInterface" to "true",
+        "openApiNullable" to "false",
+        "documentationProvider" to "none",
+        "annotationLibrary" to "none",
+        "useBeanValidation" to "false",
+        "dateLibrary" to "java8",
+        "hideGenerationTimestamp" to "true",
+        "useResponseEntity" to "true",
+        "requestMappingMode" to "api_interface",
+    ))
+}
+
 sourceSets.main {
     proto.srcDir(rootProject.file("proto/fraud"))
+    proto.srcDir(rootProject.file("proto/ledger"))
+    proto.srcDir(rootProject.file("proto/transactions"))
+    java.srcDir(layout.buildDirectory.dir("generated/openapi/src/main/java"))
+}
+
+tasks.compileJava {
+    dependsOn(tasks.named("openApiGenerate"))
 }
 
 protobuf {

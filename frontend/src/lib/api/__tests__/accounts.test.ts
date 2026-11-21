@@ -1,314 +1,98 @@
 import { AccountsAPI } from '../accounts'
-import { apiClient } from '../client'
 
-// Mock the API client
-jest.mock('../client', () => ({
-  apiClient: {
-    get: jest.fn(),
-    post: jest.fn(),
-    put: jest.fn(),
-    delete: jest.fn(),
-    patch: jest.fn(),
-  },
-}))
+jest.mock('@/gen/openapi/accounts/src', () => {
+  const methods = {
+    listAccounts: jest.fn(),
+    getAccount: jest.fn(),
+    createAccount: jest.fn(),
+    updateAccount: jest.fn(),
+    closeAccount: jest.fn(),
+    summarizeAccounts: jest.fn(),
+    getAccountBalance: jest.fn(),
+    updateAccountStatus: jest.fn(),
+    searchAccounts: jest.fn(),
+  }
+  return { Configuration: jest.fn(), AccountsApi: jest.fn(() => methods), methods }
+})
 
-const mockApiClient = apiClient as jest.Mocked<typeof apiClient>
+const { methods } = jest.requireMock('@/gen/openapi/accounts/src') as {
+  methods: Record<string, jest.Mock>
+}
 
 describe('AccountsAPI', () => {
-  beforeEach(() => {
-    jest.clearAllMocks()
+  beforeEach(() => jest.clearAllMocks())
+
+  it('lists accounts through the generated client', async () => {
+    const data = [{ id: 1, accountNumber: '1234567890', accountType: 'CHECKING' as const, balance: 1000 }]
+    methods.listAccounts.mockResolvedValue(data)
+    await expect(AccountsAPI.getAccounts()).resolves.toEqual({ success: true, data })
+    expect(methods.listAccounts).toHaveBeenCalledWith()
   })
 
-  describe('getAccounts', () => {
-    it('should fetch all accounts for the current user', async () => {
-      const mockResponse = {
-        success: true,
-        data: [
-          { id: 1, accountNumber: '1234567890', accountType: 'CHECKING' as const, balance: 1000 },
-          { id: 2, accountNumber: '1234567891', accountType: 'SAVINGS' as const, balance: 5000 },
-        ],
-      }
-      mockApiClient.get.mockResolvedValue(mockResponse)
-
-      const result = await AccountsAPI.getAccounts()
-
-      expect(mockApiClient.get).toHaveBeenCalledWith('/api/accounts')
-      expect(result).toEqual(mockResponse)
-    })
-
-    it('should handle errors when fetching accounts', async () => {
-      const mockError = {
-        success: false,
-        message: 'Failed to fetch accounts',
-        errors: ['Network error'],
-      }
-      mockApiClient.get.mockResolvedValue(mockError)
-
-      const result = await AccountsAPI.getAccounts()
-
-      expect(result).toEqual(mockError)
-    })
+  it('passes pagination to the generated client', async () => {
+    methods.listAccounts.mockResolvedValue({ content: [] })
+    await AccountsAPI.getAccountsPaginated()
+    expect(methods.listAccounts).toHaveBeenCalledWith({ page: 0, size: 10, sort: 'createdAt,desc' })
+    await AccountsAPI.getAccountsPaginated(2, 5, 'balance,asc')
+    expect(methods.listAccounts).toHaveBeenCalledWith({ page: 2, size: 5, sort: 'balance,asc' })
   })
 
-  describe('getAccountsPaginated', () => {
-    it('should fetch paginated accounts with default parameters', async () => {
-      const mockResponse = {
-        success: true,
-        data: {
-          content: [{ id: 1, accountNumber: '1234567890', accountType: 'CHECKING' as const }],
-          totalElements: 1,
-          totalPages: 1,
-        },
-      }
-      mockApiClient.get.mockResolvedValue(mockResponse)
+  it('reads, creates, updates, and closes an account', async () => {
+    methods.getAccount.mockResolvedValue({ id: 1 })
+    await expect(AccountsAPI.getAccount(1)).resolves.toEqual({ success: true, data: { id: 1 } })
+    expect(methods.getAccount).toHaveBeenCalledWith({ accountId: 1 })
 
-      const result = await AccountsAPI.getAccountsPaginated()
+    const accountData = { accountType: 'CHECKING' as const, initialBalance: 1000, currency: 'USD' }
+    methods.createAccount.mockResolvedValue({ id: 1, ...accountData })
+    await AccountsAPI.createAccount(accountData)
+    expect(methods.createAccount).toHaveBeenCalledWith({ accountCreateRequest: accountData })
 
-      expect(mockApiClient.get).toHaveBeenCalledWith('/api/accounts?page=0&size=10&sort=createdAt%2Cdesc')
-      expect(result).toEqual(mockResponse)
-    })
+    methods.updateAccount.mockResolvedValue({ id: 1, accountType: 'SAVINGS' })
+    await AccountsAPI.updateAccount(1, { accountType: 'SAVINGS' })
+    expect(methods.updateAccount).toHaveBeenCalledWith({ accountId: 1, accountUpdateRequest: { accountType: 'SAVINGS' } })
 
-    it('should fetch paginated accounts with custom parameters', async () => {
-      const mockResponse = { success: true, data: { content: [] } }
-      mockApiClient.get.mockResolvedValue(mockResponse)
+    methods.closeAccount.mockResolvedValue(undefined)
+    await expect(AccountsAPI.deleteAccount(1)).resolves.toEqual({ success: true, data: undefined })
+    expect(methods.closeAccount).toHaveBeenCalledWith({ accountId: 1 })
+  })
 
-      await AccountsAPI.getAccountsPaginated(2, 5, 'balance,asc')
-
-      expect(mockApiClient.get).toHaveBeenCalledWith('/api/accounts?page=2&size=5&sort=balance%2Casc')
+  it('returns the client error message when creation fails', async () => {
+    methods.createAccount.mockRejectedValue(new Error('Validation error'))
+    await expect(AccountsAPI.createAccount({ accountType: 'CHECKING', initialBalance: -100 })).resolves.toEqual({
+      success: false,
+      message: 'Validation error',
     })
   })
 
-  describe('getAccount', () => {
-    it('should fetch a specific account by ID', async () => {
-      const mockResponse = {
-        success: true,
-        data: { id: 1, accountNumber: '1234567890', accountType: 'CHECKING' as const, balance: 1000 },
-      }
-      mockApiClient.get.mockResolvedValue(mockResponse)
+  it('reads summary and balance and changes status', async () => {
+    methods.summarizeAccounts.mockResolvedValue({ totalAccounts: 2 })
+    await AccountsAPI.getAccountSummary()
+    expect(methods.summarizeAccounts).toHaveBeenCalled()
 
-      const result = await AccountsAPI.getAccount(1)
+    methods.getAccountBalance.mockResolvedValue({ balance: 1000, currency: 'USD' })
+    await AccountsAPI.getAccountBalance(1)
+    expect(methods.getAccountBalance).toHaveBeenCalledWith({ accountId: 1 })
 
-      expect(mockApiClient.get).toHaveBeenCalledWith('/api/accounts/1')
-      expect(result).toEqual(mockResponse)
-    })
+    methods.updateAccountStatus.mockResolvedValue({ id: 1, status: 'FROZEN' })
+    await AccountsAPI.freezeAccount(1)
+    await AccountsAPI.unfreezeAccount(1)
+    await AccountsAPI.closeAccount(1)
+    expect(methods.updateAccountStatus).toHaveBeenNthCalledWith(1, { accountId: 1, statusUpdateRequest: { status: 'FROZEN' } })
+    expect(methods.updateAccountStatus).toHaveBeenNthCalledWith(2, { accountId: 1, statusUpdateRequest: { status: 'ACTIVE' } })
+    expect(methods.updateAccountStatus).toHaveBeenNthCalledWith(3, { accountId: 1, statusUpdateRequest: { status: 'CLOSED' } })
   })
 
-  describe('createAccount', () => {
-    it('should create a new account', async () => {
-      const accountData = {
-        accountType: 'CHECKING' as const,
-        initialBalance: 1000,
-        currency: 'USD',
-      }
-      const mockResponse = {
-        success: true,
-        data: { id: 1, ...accountData, accountNumber: '1234567890' },
-      }
-      mockApiClient.post.mockResolvedValue(mockResponse)
+  it('filters and searches through the generated client', async () => {
+    methods.listAccounts.mockResolvedValue([])
+    await AccountsAPI.getAccountsByType('CHECKING')
+    await AccountsAPI.getAccountsByStatus('ACTIVE')
+    expect(methods.listAccounts).toHaveBeenCalledWith({ type: 'CHECKING' })
+    expect(methods.listAccounts).toHaveBeenCalledWith({ status: 'ACTIVE' })
 
-      const result = await AccountsAPI.createAccount(accountData)
-
-      expect(mockApiClient.post).toHaveBeenCalledWith('/api/accounts', accountData)
-      expect(result).toEqual(mockResponse)
-    })
-
-    it('should handle validation errors when creating account', async () => {
-      const accountData = {
-        accountType: 'CHECKING' as const,
-        initialBalance: -100, // Invalid balance
-      }
-      const mockError = {
-        success: false,
-        message: 'Validation error',
-        errors: ['Initial balance cannot be negative'],
-      }
-      mockApiClient.post.mockResolvedValue(mockError)
-
-      const result = await AccountsAPI.createAccount(accountData)
-
-      expect(result).toEqual(mockError)
-    })
-  })
-
-  describe('updateAccount', () => {
-    it('should update an existing account', async () => {
-      const accountData = { accountType: 'SAVINGS' as const }
-      const mockResponse = {
-        success: true,
-        data: { id: 1, accountNumber: '1234567890', accountType: 'SAVINGS' as const, balance: 1000 },
-      }
-      mockApiClient.put.mockResolvedValue(mockResponse)
-
-      const result = await AccountsAPI.updateAccount(1, accountData)
-
-      expect(mockApiClient.put).toHaveBeenCalledWith('/api/accounts/1', accountData)
-      expect(result).toEqual(mockResponse)
-    })
-  })
-
-  describe('deleteAccount', () => {
-    it('should delete an account', async () => {
-      const mockResponse = { success: true }
-      mockApiClient.delete.mockResolvedValue(mockResponse)
-
-      const result = await AccountsAPI.deleteAccount(1)
-
-      expect(mockApiClient.delete).toHaveBeenCalledWith('/api/accounts/1')
-      expect(result).toEqual(mockResponse)
-    })
-  })
-
-  describe('getAccountSummary', () => {
-    it('should fetch account summary', async () => {
-      const mockResponse = {
-        success: true,
-        data: {
-          totalAccounts: 2,
-          totalBalance: 6000,
-          activeAccounts: 2,
-          accountsByType: {
-            CHECKING: 1,
-            SAVINGS: 1,
-            CREDIT: 0,
-            INVESTMENT: 0,
-          },
-        },
-      }
-      mockApiClient.get.mockResolvedValue(mockResponse)
-
-      const result = await AccountsAPI.getAccountSummary()
-
-      expect(mockApiClient.get).toHaveBeenCalledWith('/api/accounts/summary')
-      expect(result).toEqual(mockResponse)
-    })
-  })
-
-  describe('getAccountBalance', () => {
-    it('should fetch account balance', async () => {
-      const mockResponse = {
-        success: true,
-        data: { balance: 1000, currency: 'USD' },
-      }
-      mockApiClient.get.mockResolvedValue(mockResponse)
-
-      const result = await AccountsAPI.getAccountBalance(1)
-
-      expect(mockApiClient.get).toHaveBeenCalledWith('/api/accounts/1/balance')
-      expect(result).toEqual(mockResponse)
-    })
-  })
-
-  describe('updateAccountStatus', () => {
-    it('should update account status', async () => {
-      const mockResponse = {
-        success: true,
-        data: { id: 1, accountNumber: '1234567890', status: 'FROZEN' as const },
-      }
-      mockApiClient.patch.mockResolvedValue(mockResponse)
-
-      const result = await AccountsAPI.updateAccountStatus(1, 'FROZEN')
-
-      expect(mockApiClient.patch).toHaveBeenCalledWith('/api/accounts/1/status', { status: 'FROZEN' })
-      expect(result).toEqual(mockResponse)
-    })
-  })
-
-  describe('freezeAccount', () => {
-    it('should freeze an account', async () => {
-      const mockResponse = {
-        success: true,
-        data: { id: 1, accountNumber: '1234567890', status: 'FROZEN' as const },
-      }
-      mockApiClient.patch.mockResolvedValue(mockResponse)
-
-      const result = await AccountsAPI.freezeAccount(1)
-
-      expect(mockApiClient.patch).toHaveBeenCalledWith('/api/accounts/1/status', { status: 'FROZEN' })
-      expect(result).toEqual(mockResponse)
-    })
-  })
-
-  describe('unfreezeAccount', () => {
-    it('should unfreeze an account', async () => {
-      const mockResponse = {
-        success: true,
-        data: { id: 1, accountNumber: '1234567890', status: 'ACTIVE' as const },
-      }
-      mockApiClient.patch.mockResolvedValue(mockResponse)
-
-      const result = await AccountsAPI.unfreezeAccount(1)
-
-      expect(mockApiClient.patch).toHaveBeenCalledWith('/api/accounts/1/status', { status: 'ACTIVE' })
-      expect(result).toEqual(mockResponse)
-    })
-  })
-
-  describe('closeAccount', () => {
-    it('should close an account', async () => {
-      const mockResponse = {
-        success: true,
-        data: { id: 1, accountNumber: '1234567890', status: 'CLOSED' as const },
-      }
-      mockApiClient.patch.mockResolvedValue(mockResponse)
-
-      const result = await AccountsAPI.closeAccount(1)
-
-      expect(mockApiClient.patch).toHaveBeenCalledWith('/api/accounts/1/status', { status: 'CLOSED' })
-      expect(result).toEqual(mockResponse)
-    })
-  })
-
-  describe('getAccountsByType', () => {
-    it('should fetch accounts by type', async () => {
-      const mockResponse = {
-        success: true,
-        data: [{ id: 1, accountNumber: '1234567890', accountType: 'CHECKING' as const }],
-      }
-      mockApiClient.get.mockResolvedValue(mockResponse)
-
-      const result = await AccountsAPI.getAccountsByType('CHECKING')
-
-      expect(mockApiClient.get).toHaveBeenCalledWith('/api/accounts?type=CHECKING')
-      expect(result).toEqual(mockResponse)
-    })
-  })
-
-  describe('getAccountsByStatus', () => {
-    it('should fetch accounts by status', async () => {
-      const mockResponse = {
-        success: true,
-        data: [{ id: 1, accountNumber: '1234567890', status: 'ACTIVE' as const }],
-      }
-      mockApiClient.get.mockResolvedValue(mockResponse)
-
-      const result = await AccountsAPI.getAccountsByStatus('ACTIVE')
-
-      expect(mockApiClient.get).toHaveBeenCalledWith('/api/accounts?status=ACTIVE')
-      expect(result).toEqual(mockResponse)
-    })
-  })
-
-  describe('searchAccounts', () => {
-    it('should search accounts with default parameters', async () => {
-      const mockResponse = {
-        success: true,
-        data: { content: [{ id: 1, accountNumber: '1234567890' }] },
-      }
-      mockApiClient.get.mockResolvedValue(mockResponse)
-
-      const result = await AccountsAPI.searchAccounts('checking')
-
-      expect(mockApiClient.get).toHaveBeenCalledWith('/api/accounts/search?q=checking&page=0&size=10')
-      expect(result).toEqual(mockResponse)
-    })
-
-    it('should search accounts with custom parameters', async () => {
-      const mockResponse = { success: true, data: { content: [] } }
-      mockApiClient.get.mockResolvedValue(mockResponse)
-
-      await AccountsAPI.searchAccounts('savings', 1, 5)
-
-      expect(mockApiClient.get).toHaveBeenCalledWith('/api/accounts/search?q=savings&page=1&size=5')
-    })
+    methods.searchAccounts.mockResolvedValue({ content: [] })
+    await AccountsAPI.searchAccounts('checking')
+    await AccountsAPI.searchAccounts('savings', 1, 5)
+    expect(methods.searchAccounts).toHaveBeenCalledWith({ q: 'checking', page: 0, size: 10 })
+    expect(methods.searchAccounts).toHaveBeenCalledWith({ q: 'savings', page: 1, size: 5 })
   })
 })

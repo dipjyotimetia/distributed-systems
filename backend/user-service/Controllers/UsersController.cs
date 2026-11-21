@@ -1,12 +1,12 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
+using UserServiceDotnet.Generated.Controllers;
+using UserServiceDotnet.Generated.Models;
 using UserServiceDotnet.Services;
 
 namespace UserServiceDotnet.Controllers;
 
-[ApiController]
-[Route("api/users")]
-public class UsersController : ControllerBase
+public class UsersController : UsersApiController
 {
     private readonly UserService _userService;
     private readonly ILogger<UsersController> _logger;
@@ -17,11 +17,7 @@ public class UsersController : ControllerBase
         _logger = logger;
     }
 
-    public record RegisterRequest(string Username, string Email, string Password, bool? SeedAccountData);
-    public record LoginRequest(string UsernameOrEmail, string Password);
-
-    [HttpPost("register")]
-    public async Task<IActionResult> Register([FromBody] RegisterRequest request)
+    public override async Task<IActionResult> Register(RegisterRequest request)
     {
         try
         {
@@ -51,8 +47,7 @@ public class UsersController : ControllerBase
         }
     }
 
-    [HttpPost("login")]
-    public async Task<IActionResult> Login([FromBody] LoginRequest request)
+    public override async Task<IActionResult> Login(LoginRequest request)
     {
         try
         {
@@ -82,8 +77,7 @@ public class UsersController : ControllerBase
         }
     }
 
-    [HttpGet("profile")]
-    public async Task<IActionResult> GetProfile()
+    public override async Task<IActionResult> GetProfile()
     {
         var authHeader = Request.Headers.Authorization.ToString();
         if (string.IsNullOrEmpty(authHeader) || !authHeader.StartsWith("Bearer "))
@@ -126,8 +120,7 @@ public class UsersController : ControllerBase
         }
     }
 
-    [HttpGet("check-username")]
-    public async Task<IActionResult> CheckUsername([FromQuery] string username)
+    public override async Task<IActionResult> CheckUsername(string username)
     {
         _logger.LogDebug("Checking username availability: {Username}", username);
         var exists = await _userService.UsernameExists(username);
@@ -140,8 +133,7 @@ public class UsersController : ControllerBase
         });
     }
 
-    [HttpGet("check-email")]
-    public async Task<IActionResult> CheckEmail([FromQuery] string email)
+    public override async Task<IActionResult> CheckEmail(string email)
     {
         _logger.LogDebug("Checking email availability: {Email}", email);
         var exists = await _userService.EmailExists(email);

@@ -1,59 +1,64 @@
 package com.banking.accountsservice.statements.api;
 
+import com.banking.accountsservice.contract.ContractJson;
+import com.banking.accountsservice.contract.StatementJobsApi;
+import com.banking.accountsservice.contract.model.StatementJob;
+import com.banking.accountsservice.contract.model.StatementJobPage;
 import com.banking.accountsservice.security.UserAuthenticationDetails;
 import com.banking.accountsservice.statements.application.StatementJobs;
-import com.banking.accountsservice.statements.persistence.StatementJobStore.Job;
 import java.net.URI;
 import java.util.UUID;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.MissingRequestHeaderException;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.server.ResponseStatusException;
 
 @RestController
-@RequestMapping("/api/accounts/{accountId}/statement-jobs")
-public class StatementJobsController {
+public class StatementJobsController implements StatementJobsApi {
     private final StatementJobs jobs;
+    private final ContractJson contractJson;
 
-    public StatementJobsController(StatementJobs jobs) {
+    public StatementJobsController(StatementJobs jobs, ContractJson contractJson) {
         this.jobs = jobs;
+        this.contractJson = contractJson;
     }
 
-    @PostMapping
-    public ResponseEntity<Job> create(@PathVariable long accountId,
-            @RequestHeader("Idempotency-Key") String key, Authentication authentication) {
-        Job job = jobs.create(accountId, customer(authentication), key);
+    @Override
+    public ResponseEntity<StatementJob> createStatementJob(Long accountId, String idempotencyKey) {
+        var job = jobs.create(accountId, customer(), idempotencyKey);
         return ResponseEntity.accepted().cacheControl(CacheControl.noStore())
-                .location(URI.create("/api/accounts/" + accountId + "/statement-jobs/" + job.id())).body(job);
+                .location(URI.create("/api/accounts/" + accountId + "/statement-jobs/" + job.id()))
+                .body(contractJson.convert(job, StatementJob.class));
     }
 
-    @GetMapping
-    public ResponseEntity<StatementJobs.Page> list(@PathVariable long accountId,
-            @RequestParam(defaultValue = "1") int page, Authentication authentication) {
+    @Override
+    public ResponseEntity<StatementJobPage> listStatementJobs(Long accountId, Integer page) {
+        int requested = page == null ? 1 : page;
         return ResponseEntity.ok().cacheControl(CacheControl.noStore())
-                .body(jobs.list(accountId, customer(authentication), page));
+                .body(contractJson.convert(jobs.list(accountId, customer(), requested), StatementJobPage.class));
     }
 
-    @GetMapping("/{jobId}")
-    public ResponseEntity<Job> status(@PathVariable long accountId, @PathVariable UUID jobId,
-            Authentication authentication) {
+    @Override
+    public ResponseEntity<StatementJob> getStatementJob(Long accountId, UUID jobId) {
         return ResponseEntity.ok().cacheControl(CacheControl.noStore())
-                .body(jobs.status(accountId, customer(authentication), jobId));
+                .body(contractJson.convert(jobs.status(accountId, customer(), jobId), StatementJob.class));
     }
 
-    @GetMapping("/{jobId}/download")
-    public ResponseEntity<byte[]> download(@PathVariable long accountId, @PathVariable UUID jobId,
-            Authentication authentication) {
+    @Override
+    public ResponseEntity<org.springframework.core.io.Resource> downloadStatementJob(Long accountId, UUID jobId) {
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).contentType(MediaType.APPLICATION_JSON)
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"statement-" + jobId + ".json\"")
-                .body(jobs.download(accountId, customer(authentication), jobId));
+                .body(new ByteArrayResource(jobs.download(accountId, customer(), jobId)));
     }
 
     @ExceptionHandler(ResponseStatusException.class)
@@ -67,7 +72,8 @@ public class StatementJobsController {
                 .body(ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Invalid statement job request"));
     }
 
-    private static long customer(Authentication authentication) {
+    private static long customer() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         return ((UserAuthenticationDetails) authentication.getDetails()).getUserId();
     }
 }

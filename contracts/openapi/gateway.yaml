@@ -1,0 +1,71 @@
+openapi: 3.0.3
+info:
+  title: API Gateway
+  description: Health endpoints served by the gateway process. Banking routes are proxied and described by the other contracts.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+paths:
+  /health:
+    get:
+      tags: [gateway]
+      operationId: health
+      summary: Process health
+      responses:
+        '200':
+          description: Health
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthReport'
+  /health/ready:
+    get:
+      tags: [gateway]
+      operationId: readiness
+      summary: Readiness
+      responses:
+        '200':
+          description: Ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthReport'
+  /health/live:
+    get:
+      tags: [gateway]
+      operationId: liveness
+      summary: Liveness
+      responses:
+        '200':
+          description: Alive
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthReport'
+  /api/healthz:
+    get:
+      tags: [gateway]
+      operationId: healthz
+      summary: Public health alias rewritten to /health
+      responses:
+        '200':
+          description: Health
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthReport'
+components:
+  schemas:
+    HealthReport:
+      type: object
+      additionalProperties: true
+      properties:
+        status:
+          type: string
+        service:
+          type: string
+        timestamp:
+          type: string
+        version:
+          type: string

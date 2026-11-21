@@ -2,7 +2,6 @@ package httpapi
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -10,6 +9,8 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 var testKey = []byte("synthetic-test-signing-key-for-disputes")
@@ -74,30 +75,38 @@ func TestAuthorization(t *testing.T) {
 	}
 }
 
+type scriptedLookup struct {
+	view TransferView
+	err  error
+	auth string
+}
+
+func (s scriptedLookup) Lookup(_ context.Context, authorization string, _ int64) (TransferView, error) {
+	if s.auth != "" && authorization != s.auth {
+		return TransferView{}, s.err
+	}
+	return s.view, s.err
+}
+
 func TestTransferEligibility(t *testing.T) {
+	completed := TransferView{ID: 17, UserID: 7, Type: "TRANSFER", Status: "COMPLETED"}
 	for _, tc := range []struct {
-		code int
-		body string
+		view TransferView
+		err  error
 		want int
 	}{
-		{200, `{"id":17,"userId":7,"type":"TRANSFER","status":"COMPLETED"}`, 200},
-		{200, `{"id":17,"userId":8,"type":"TRANSFER","status":"COMPLETED"}`, 404},
-		{200, `{"id":18,"userId":7,"type":"TRANSFER","status":"COMPLETED"}`, 502},
-		{200, `{"id":17,"userId":7,"type":"TRANSFER","status":"PENDING"}`, 422},
-		{200, `{"id":17,"userId":7,"type":"DEPOSIT","status":"COMPLETED"}`, 422},
-		{200, `bad response`, 502}, {404, "", 404}, {403, "", 404}, {500, "", 502},
+		{completed, nil, 200},
+		{TransferView{ID: 17, UserID: 8, Type: "TRANSFER", Status: "COMPLETED"}, nil, 404},
+		{TransferView{ID: 18, UserID: 7, Type: "TRANSFER", Status: "COMPLETED"}, nil, 502},
+		{TransferView{ID: 17, UserID: 7, Type: "TRANSFER", Status: "PENDING"}, nil, 422},
+		{TransferView{ID: 17, UserID: 7, Type: "DEPOSIT", Status: "COMPLETED"}, nil, 422},
+		{TransferView{}, status.Error(codes.NotFound, "missing"), 404},
+		{TransferView{}, status.Error(codes.PermissionDenied, "denied"), 404},
+		{TransferView{}, status.Error(codes.Internal, "down"), 502},
 	} {
-		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.Method != "GET" || r.URL.Path != "/api/transactions/17" || r.Header.Get("Authorization") != "Bearer test" {
-				t.Error("incorrect transaction read")
-			}
-			w.WriteHeader(tc.code)
-			fmt.Fprint(w, tc.body)
-		}))
-		a := API{transactionsURL: upstream.URL, client: upstream.Client()}
+		a := API{transfers: scriptedLookup{view: tc.view, err: tc.err, auth: "Bearer test"}}
 		if got := a.eligible(context.Background(), "Bearer test", 7, 17); got != tc.want {
-			t.Errorf("upstream %d %s: got %d, want %d", tc.code, tc.body, got, tc.want)
+			t.Errorf("%+v %v: got %d, want %d", tc.view, tc.err, got, tc.want)
 		}
-		upstream.Close()
 	}
 }

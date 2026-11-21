@@ -4,10 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"strconv"
 
 	"github.com/dipjyotimetia/distributed-systems/backend/notification-service/internal/consumer"
-	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -25,28 +23,23 @@ type Handler struct {
 
 func NewHandler(events EventReader) http.Handler {
 	h := &Handler{events: events}
-	r := mux.NewRouter()
-	r.HandleFunc("/health", h.health).Methods(http.MethodGet)
-	r.Handle("/metrics", promhttp.Handler()).Methods(http.MethodGet)
-	r.HandleFunc("/notifications", h.list).Methods(http.MethodGet)
-	r.HandleFunc("/notifications/{user_id}", h.byUser).Methods(http.MethodGet)
-	return r
+	root := http.NewServeMux()
+	root.Handle("/metrics", promhttp.Handler())
+	OpenAPIHandlerFromMux(h, root)
+	return root
 }
 
-func (h *Handler) health(w http.ResponseWriter, _ *http.Request) {
+func (h *Handler) NotificationHealth(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
-func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
-	limit := parseLimit(r, defaultLimit)
-	events, err := h.events.Latest(r.Context(), limit)
+func (h *Handler) ListNotifications(w http.ResponseWriter, r *http.Request, params ListNotificationsParams) {
+	events, err := h.events.Latest(r.Context(), boundedLimit(params.Limit))
 	writeEvents(w, events, err)
 }
 
-func (h *Handler) byUser(w http.ResponseWriter, r *http.Request) {
-	userID := mux.Vars(r)["user_id"]
-	limit := parseLimit(r, defaultLimit)
-	events, err := h.events.ForUser(r.Context(), userID, limit)
+func (h *Handler) ListUserNotifications(w http.ResponseWriter, r *http.Request, userID string, params ListUserNotificationsParams) {
+	events, err := h.events.ForUser(r.Context(), userID, boundedLimit(params.Limit))
 	writeEvents(w, events, err)
 }
 
@@ -61,13 +54,11 @@ func writeEvents(w http.ResponseWriter, events []*consumer.TransactionEvent, err
 	writeJSON(w, http.StatusOK, events)
 }
 
-func parseLimit(r *http.Request, def int) int {
-	if s := r.URL.Query().Get("limit"); s != "" {
-		if n, err := strconv.Atoi(s); err == nil && n > 0 {
-			return min(n, 1000)
-		}
+func boundedLimit(limit *Limit) int {
+	if limit == nil || *limit <= 0 {
+		return defaultLimit
 	}
-	return def
+	return min(*limit, 1000)
 }
 
 func writeJSON(w http.ResponseWriter, code int, v any) {

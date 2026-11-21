@@ -67,7 +67,8 @@ services:
     environment:
       DATABASE_URL: postgres://disputes_service_user:disputes_service_pass@postgres:5432/banking_app?sslmode=disable
       JWT_SECRET: banking-app-super-secret-key-change-this-in-production-256-bit
-      TRANSACTIONS_SERVICE_URL: http://transactions-service:8080
+      TRANSACTIONS_GRPC_ADDRESS: transactions-service:9095
+      DISPUTES_GRPC_PORT: "9096"
       DISPUTES_OPERATOR_IDS: ${DISPUTES_OPERATOR_IDS:-}
       DISPUTES_INTERNAL_TOKEN: local-disputes-internal
       OTEL_SERVICE_NAME: disputes-service
@@ -201,6 +202,7 @@ services:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
       OTEL_EXPORTER_OTLP_PROTOCOL: grpc
       OTEL_RESOURCE_ATTRIBUTES: service.namespace=banking-app
+      LEDGER_GRPC_ENABLED: "false"
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8080/actuator/health"]
       interval: 5s
@@ -250,7 +252,8 @@ services:
       - JWT_SECRET=banking-app-super-secret-key-change-this-in-production-256-bit
       - JWT_EXPIRATION=86400000
       # Service URLs
-      - ACCOUNTS_SERVICE_URL=http://accounts-service:8080
+      - ACCOUNTS_GRPC_ADDRESS=accounts-service:9092
+      - TRANSACTIONS_GRPC_PORT=9095
       - FRAUD_SERVICE_HOST=fraud-service
       - FRAUD_SERVICE_PORT=8080
       - FRAUD_FAIL_OPEN=${FRAUD_FAIL_OPEN:-true}
@@ -373,7 +376,7 @@ services:
       DATABASE_URL: postgres://postgres:password@postgres:5432/banking_app?sslmode=disable
       JWT_SECRET: banking-app-super-secret-key-change-this-in-production-256-bit
       MOVEMENT_SECRET: banking-app-super-secret-key-change-this-in-production-256-bit
-      ACCOUNTS_SERVICE_URL: http://accounts-service:8080
+      ACCOUNTS_GRPC_ADDRESS: accounts-service:9092
       KYC_GRPC_ADDR: kyc-service:8091
       FRAUD_GRPC_ADDR: fraud-service:8080
       GRPC_PORT: "8092"
@@ -401,6 +404,7 @@ services:
       - AI_MODE=api
       - TEMPORAL_ADDRESS=disputes-temporal:7233
       - DISPUTES_SERVICE_URL=http://disputes-service:8080
+      - DISPUTES_GRPC_ADDRESS=disputes-service:9096
       - DISPUTES_INTERNAL_TOKEN=local-disputes-internal
       - ACCOUNTS_SERVICE_URL=http://accounts-service:8080
       - TRANSACTIONS_SERVICE_URL=http://transactions-service:8080
@@ -431,6 +435,7 @@ services:
       - AI_MODE=worker
       - TEMPORAL_ADDRESS=disputes-temporal:7233
       - DISPUTES_SERVICE_URL=http://disputes-service:8080
+      - DISPUTES_GRPC_ADDRESS=disputes-service:9096
       - DISPUTES_INTERNAL_TOKEN=local-disputes-internal
       - ACCOUNTS_SERVICE_URL=http://accounts-service:8080
       - TRANSACTIONS_SERVICE_URL=http://transactions-service:8080

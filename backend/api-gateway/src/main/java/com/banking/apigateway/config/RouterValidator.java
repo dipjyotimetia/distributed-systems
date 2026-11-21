@@ -9,7 +9,7 @@ import java.util.function.Predicate;
 @Component
 public class RouterValidator {
 
-    public static final List<String> openApiEndpoints = List.of(
+    public static final List<String> publicEndpoints = List.of(
             "/api/users/register",
             "/api/users/login",
             "/api/users/check-username",
@@ -17,7 +17,7 @@ public class RouterValidator {
     );
 
     public Predicate<ServerHttpRequest> requiresAuthentication =
-            request -> openApiEndpoints
+            request -> publicEndpoints
                     .stream()
                     .noneMatch(uri -> request.getURI().getPath().contains(uri));
 }

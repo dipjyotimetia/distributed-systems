@@ -21,6 +21,8 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	enumspb "go.temporal.io/api/enums/v1"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"go.temporal.io/api/serviceerror"
 
 	disputesv1 "github.com/dipjyotimetia/distributed-systems/backend/disputes-service/internal/generated/disputes/v1"
@@ -79,6 +81,24 @@ func (f workflowStartFunc) ExecuteWorkflow(ctx context.Context, options client.S
 	return f(ctx, options, workflow, args...)
 }
 
+type lifecycleTransfers struct{ customer string }
+
+func (s lifecycleTransfers) Lookup(_ context.Context, authorization string, id int64) (httpapi.TransferView, error) {
+	switch id {
+	case 18:
+		return httpapi.TransferView{}, status.Error(codes.NotFound, "missing")
+	case 19:
+		return httpapi.TransferView{ID: 19, UserID: 7, Type: "TRANSFER", Status: "PENDING"}, nil
+	case 20:
+		return httpapi.TransferView{}, status.Error(codes.Unavailable, "down")
+	default:
+		if authorization != s.customer {
+			return httpapi.TransferView{}, status.Error(codes.NotFound, "missing")
+		}
+		return httpapi.TransferView{ID: id, UserID: 7, Type: "TRANSFER", Status: "COMPLETED"}, nil
+	}
+}
+
 func TestDisputeLifecycle(t *testing.T) {
 	dsn := os.Getenv("DISPUTES_TEST_DATABASE_URL")
 	if dsn == "" {
@@ -92,27 +112,9 @@ func TestDisputeLifecycle(t *testing.T) {
 	ctx := context.Background()
 	migrateTestDatabase(t, db)
 	customer, stranger, operator := signed(t, "7"), signed(t, "9"), signed(t, "8")
-	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		id := strings.TrimPrefix(r.URL.Path, "/api/transactions/")
-		switch id {
-		case "18":
-			w.WriteHeader(404)
-		case "19":
-			fmt.Fprint(w, `{"id":19,"userId":7,"type":"TRANSFER","status":"PENDING"}`)
-		case "20":
-			w.WriteHeader(503)
-		default:
-			if r.Header.Get("Authorization") != customer {
-				w.WriteHeader(404)
-				return
-			}
-			fmt.Fprintf(w, `{"id":%s,"userId":7,"type":"TRANSFER","status":"COMPLETED"}`, id)
-		}
-	}))
-	defer upstream.Close()
 	s := postgres.New(db)
 	const delay = 24 * time.Hour
-	a := httpapi.New(db, s, testKey, map[int64]bool{8: true}, upstream.URL, upstream.Client(), delay)
+	a := httpapi.New(db, s, testKey, map[int64]bool{8: true}, lifecycleTransfers{customer: customer}, delay)
 	routes := a.Routes()
 	const cases = "/api/disputes"
 	const queue = "/api/operations/disputes"
@@ -322,7 +324,7 @@ func TestRuntime(t *testing.T) {
 	migrateTestDatabase(t, db)
 	t.Setenv("DATABASE_URL", dsn)
 	t.Setenv("JWT_SECRET", string(testKey))
-	t.Setenv("TRANSACTIONS_SERVICE_URL", "http://transactions-service")
+	t.Setenv("TRANSACTIONS_GRPC_ADDRESS", "transactions-service:9095")
 	t.Setenv("DISPUTES_OPERATOR_IDS", "8")
 	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
 	t.Setenv("DISPUTES_TEST_ESCALATION_DELAY", "")
@@ -349,7 +351,7 @@ func TestRuntime(t *testing.T) {
 
 	db.Close()
 	expect(t, call(httpapi.HealthRoutes(db), "GET", "/health", "", ""), 503)
-	expect(t, call(httpapi.New(db, postgres.New(db), testKey, nil, "", nil, 0).Routes(), "GET", "/api/disputes", signed(t, "7"), ""), 500)
+	expect(t, call(httpapi.New(db, postgres.New(db), testKey, nil, nil, 0).Routes(), "GET", "/api/disputes", signed(t, "7"), ""), 500)
 }
 
 func waitUntil(t *testing.T, check func() bool) {
@@ -462,8 +464,7 @@ func TestAiDraftInternalAPI(t *testing.T) {
 	migrateTestDatabase(t, db)
 	store := postgres.New(db)
 	const token = "test-internal-token"
-	a := httpapi.NewWithInternal(db, store, testKey, map[int64]bool{8: true}, "http://example.invalid", http.DefaultClient, time.Hour, token)
-	routes := a.Routes()
+	a := httpapi.NewWithInternal(db, store, testKey, map[int64]bool{8: true}, nil, time.Hour, token)
 
 	c, created, err := store.Create(ctx, 7, time.Now().UnixNano(), "Need AI draft", time.Hour)
 	if err != nil || !created {
@@ -482,37 +483,19 @@ func TestAiDraftInternalAPI(t *testing.T) {
 		t.Fatalf("NeedsAiDraft=%v %v", needed, err)
 	}
 
-	contextPath := fmt.Sprintf("/internal/disputes/%d/context", c.ID)
-	draftPath := fmt.Sprintf("/internal/disputes/%d/ai-draft", c.ID)
-	expect(t, call(routes, "GET", contextPath, "", ""), 401)
-
-	req := httptest.NewRequest("GET", contextPath, nil)
-	req.Header.Set("X-Internal-Token", token)
-	res := httptest.NewRecorder()
-	routes.ServeHTTP(res, req)
-	expect(t, res, 200)
-	loaded := parse[casesmodel.Case](t, res)
-	if loaded.ID != c.ID || loaded.Status != "ESCALATED" {
-		t.Fatalf("unexpected context: %+v", loaded)
+	if _, err := a.ResearchContext(ctx, "", c.ID); !errors.Is(err, httpapi.ErrInternalAuth) {
+		t.Fatalf("missing token: %v", err)
 	}
-
-	bad := httptest.NewRequest("POST", draftPath, strings.NewReader(`{}`))
-	bad.Header.Set("X-Internal-Token", token)
-	bad.Header.Set("Content-Type", "application/json")
-	badRes := httptest.NewRecorder()
-	routes.ServeHTTP(badRes, bad)
-	expect(t, badRes, 400)
-
-	body := `{"draft":{"reasonCode":"UNAUTHORIZED","summary":"Looks fraudulent","recommendedAction":"REQUEST_EVIDENCE","confidence":0.9}}`
-	save := httptest.NewRequest("POST", draftPath, strings.NewReader(body))
-	save.Header.Set("X-Internal-Token", token)
-	save.Header.Set("Content-Type", "application/json")
-	saveRes := httptest.NewRecorder()
-	routes.ServeHTTP(saveRes, save)
-	expect(t, saveRes, 200)
-	saved := parse[casesmodel.Case](t, saveRes)
-	if saved.AiDraft == nil {
-		t.Fatal("expected ai draft on response")
+	loaded, err := a.ResearchContext(ctx, token, c.ID)
+	if err != nil || loaded.ID != c.ID || loaded.Status != "ESCALATED" {
+		t.Fatalf("unexpected context: %+v %v", loaded, err)
+	}
+	if _, err := a.ResearchDraft(ctx, token, c.ID, json.RawMessage(`{}`)); err == nil {
+		t.Fatal("empty draft accepted")
+	}
+	saved, err := a.ResearchDraft(ctx, token, c.ID, json.RawMessage(`{"reasonCode":"UNAUTHORIZED","summary":"Looks fraudulent","recommendedAction":"REQUEST_EVIDENCE","confidence":0.9}`))
+	if err != nil || saved.AiDraft == nil {
+		t.Fatalf("expected ai draft, %+v %v", saved, err)
 	}
 	needed, err = store.NeedsAiDraft(ctx, c.ID)
 	if err != nil || needed {

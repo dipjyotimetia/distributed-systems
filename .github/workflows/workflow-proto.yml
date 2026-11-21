@@ -72,11 +72,17 @@ jobs:
       - name: Install frontend protobuf plugin
         working-directory: frontend
         run: npm ci
+      - name: Verify internal gRPC and OpenAPI server stubs
+        run: |
+          python3 -m pip install --user 'grpcio-tools==1.83.2'
+          go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.5.0
+          bash scripts/check-contract-drift.sh
       - name: Verify frontend gRPC clients
         run: |
           generated="$(mktemp -d)"
           bash scripts/frontend-proto.sh "$generated"
-          diff -ru frontend/src/gen "$generated/frontend/src/gen"
+          diff -ru frontend/src/gen/kyc "$generated/frontend/src/gen/kyc"
+          diff -ru frontend/src/gen/cards "$generated/frontend/src/gen/cards"
       - name: Check compatibility with PR base
         if: github.event_name == 'pull_request'
         env:

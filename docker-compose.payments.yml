@@ -47,7 +47,7 @@ services:
       MQ_USERNAME: app
       MQ_PASSWORD: ${BANKING_MQ_APP_PASSWORD:?Set the local queue manager application password}
       PAYMENTS_KAFKA_BROKERS: redpanda:9092
-      PAYMENTS_ACCOUNTS_URL: http://accounts-service:8080
+      ACCOUNTS_GRPC_ADDRESS: accounts-service:9092
       FRAUD_SERVICE_ADDRESS: fraud-service:8080
       MOVEMENT_SECRET: ${BANKING_PAYMENTS_MOVEMENT_SECRET:?Set the account movement secret}
       PAYMENTS_COMPLIANCE_URL: ${BANKING_PAYMENTS_COMPLIANCE_URL:?Set the compliance searches endpoint}

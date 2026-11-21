@@ -4,78 +4,86 @@ info:
   description: API for managing financial transactions.
   version: 1.0.0
 servers:
-  - url: http://localhost:8083/api
-    description: Local development server
+- url: http://localhost:8083
+  description: Local development server
 paths:
-  /transactions:
+  /api/transactions:
     get:
       summary: Get all transactions for the authenticated user
       security:
-        - bearerAuth: []
+      - bearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/accountId'
-        - $ref: '#/components/parameters/type'
-        - $ref: '#/components/parameters/status'
-        - $ref: '#/components/parameters/startDate'
-        - $ref: '#/components/parameters/endDate'
-        - $ref: '#/components/parameters/minAmount'
-        - $ref: '#/components/parameters/maxAmount'
-        - $ref: '#/components/parameters/description'
-        - $ref: '#/components/parameters/page'
-        - $ref: '#/components/parameters/size'
-        - $ref: '#/components/parameters/sort'
+      - $ref: '#/components/parameters/accountId'
+      - $ref: '#/components/parameters/type'
+      - $ref: '#/components/parameters/status'
+      - $ref: '#/components/parameters/startDate'
+      - $ref: '#/components/parameters/endDate'
+      - $ref: '#/components/parameters/minAmount'
+      - $ref: '#/components/parameters/maxAmount'
+      - $ref: '#/components/parameters/description'
+      - $ref: '#/components/parameters/page'
+      - $ref: '#/components/parameters/size'
+      - $ref: '#/components/parameters/sort'
       responses:
         '200':
           description: Transaction array or a page when page or size is supplied
           content:
             application/json:
               schema:
-                oneOf:
-                  - $ref: '#/components/schemas/TransactionList'
-                  - $ref: '#/components/schemas/TransactionPage'
+                description: Transaction array or a page when page or size is supplied
+                nullable: true
+                x-java-type: java.lang.Object
         '404':
           description: Account not found
-  /transactions/search:
+      tags:
+      - transactions
+      operationId: listTransactions
+  /api/transactions/search:
     get:
       summary: Search owned transactions
       security:
-        - bearerAuth: []
+      - bearerAuth: []
       parameters:
-        - name: q
-          in: query
-          schema:
-            type: string
-        - $ref: '#/components/parameters/accountId'
-        - $ref: '#/components/parameters/type'
-        - $ref: '#/components/parameters/status'
-        - $ref: '#/components/parameters/startDate'
-        - $ref: '#/components/parameters/endDate'
-        - $ref: '#/components/parameters/minAmount'
-        - $ref: '#/components/parameters/maxAmount'
-        - $ref: '#/components/parameters/description'
-        - $ref: '#/components/parameters/page'
-        - $ref: '#/components/parameters/size'
-        - $ref: '#/components/parameters/sort'
+      - name: q
+        in: query
+        schema:
+          type: string
+      - $ref: '#/components/parameters/accountId'
+      - $ref: '#/components/parameters/type'
+      - $ref: '#/components/parameters/status'
+      - $ref: '#/components/parameters/startDate'
+      - $ref: '#/components/parameters/endDate'
+      - $ref: '#/components/parameters/minAmount'
+      - $ref: '#/components/parameters/maxAmount'
+      - $ref: '#/components/parameters/description'
+      - $ref: '#/components/parameters/page'
+      - $ref: '#/components/parameters/size'
+      - $ref: '#/components/parameters/sort'
       responses:
         '200':
           description: Matching transaction page
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TransactionPage'
-  /transactions/recent:
+                description: Matching transaction page
+                nullable: true
+                x-java-type: java.lang.Object
+      tags:
+      - transactions
+      operationId: searchTransactions
+  /api/transactions/recent:
     get:
       summary: Read the newest owned transactions
       security:
-        - bearerAuth: []
+      - bearerAuth: []
       parameters:
-        - name: limit
-          in: query
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 100
-            default: 10
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 10
       responses:
         '200':
           description: Newest transactions
@@ -83,13 +91,16 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TransactionList'
-  /transactions/summary:
+      tags:
+      - transactions
+      operationId: recentTransactions
+  /api/transactions/summary:
     get:
       summary: Count owned transactions by type and status
       security:
-        - bearerAuth: []
+      - bearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/accountId'
+      - $ref: '#/components/parameters/accountId'
       responses:
         '200':
           description: Transaction counts
@@ -99,25 +110,31 @@ paths:
                 $ref: '#/components/schemas/TransactionSummary'
         '404':
           description: Account not found
-  /transactions/{id}:
+      tags:
+      - transactions
+      operationId: summarizeTransactions
+  /api/transactions/{id}:
     parameters:
-      - $ref: '#/components/parameters/TransactionId'
+    - $ref: '#/components/parameters/TransactionId'
     get:
       summary: Read an owned transaction
       security:
-        - bearerAuth: []
+      - bearerAuth: []
       responses:
         '200':
           $ref: '#/components/responses/TransactionRecord'
         '404':
           description: Transaction not found
-  /transactions/{id}/cancel:
+      tags:
+      - transactions
+      operationId: getTransaction
+  /api/transactions/{id}/cancel:
     parameters:
-      - $ref: '#/components/parameters/TransactionId'
+    - $ref: '#/components/parameters/TransactionId'
     patch:
       summary: Cancel an owned pending transaction
       security:
-        - bearerAuth: []
+      - bearerAuth: []
       responses:
         '200':
           $ref: '#/components/responses/TransactionRecord'
@@ -125,18 +142,24 @@ paths:
           description: Transaction not found
         '409':
           description: Transaction has already settled
-  /transactions/create:
+      tags:
+      - transactions
+      operationId: cancelTransaction
+  /api/transactions/create:
     post:
       summary: Dispatch a generic transaction by type
       security:
-        - bearerAuth: []
+      - bearerAuth: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [accountId, type, amount]
+              required:
+              - accountId
+              - type
+              - amount
               properties:
                 accountId:
                   type: integer
@@ -146,7 +169,10 @@ paths:
                   format: int64
                 type:
                   type: string
-                  enum: [DEPOSIT, WITHDRAWAL, TRANSFER]
+                  enum:
+                  - DEPOSIT
+                  - WITHDRAWAL
+                  - TRANSFER
                 amount:
                   type: number
                 description:
@@ -156,11 +182,14 @@ paths:
           $ref: '#/components/responses/TransactionRecord'
         '400':
           description: Rejected request. Confirmed insufficient funds include the INSUFFICIENT_FUNDS code.
-  /transactions/deposit:
+      tags:
+      - transactions
+      operationId: createTransaction
+  /api/transactions/deposit:
     post:
       summary: Deposit funds into an account
       security:
-        - bearerAuth: []
+      - bearerAuth: []
       requestBody:
         required: true
         content:
@@ -174,11 +203,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TransactionResponse'
-  /transactions/withdraw:
+      tags:
+      - transactions
+      operationId: deposit
+  /api/transactions/withdraw:
     post:
       summary: Withdraw funds from an account
       security:
-        - bearerAuth: []
+      - bearerAuth: []
       requestBody:
         required: true
         content:
@@ -198,18 +230,24 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [code, message]
+                required:
+                - code
+                - message
                 properties:
                   code:
                     type: string
-                    enum: [INSUFFICIENT_FUNDS]
+                    enum:
+                    - INSUFFICIENT_FUNDS
                   message:
                     type: string
-  /transactions/transfer:
+      tags:
+      - transactions
+      operationId: withdraw
+  /api/transactions/transfer:
     post:
       summary: Transfer funds between accounts
       security:
-        - bearerAuth: []
+      - bearerAuth: []
       requestBody:
         required: true
         content:
@@ -229,14 +267,19 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [code, message]
+                required:
+                - code
+                - message
                 properties:
                   code:
                     type: string
-                    enum: [INSUFFICIENT_FUNDS]
+                    enum:
+                    - INSUFFICIENT_FUNDS
                   message:
                     type: string
-
+      tags:
+      - transactions
+      operationId: transfer
 components:
   parameters:
     accountId:
@@ -244,6 +287,7 @@ components:
       in: query
       schema:
         type: integer
+        format: int64
     type:
       name: type
       in: query
@@ -320,7 +364,18 @@ components:
         $ref: '#/components/schemas/TransactionResponse'
     TransactionPage:
       type: object
-      required: [content, pageable, last, totalPages, totalElements, size, number, sort, first, numberOfElements, empty]
+      required:
+      - content
+      - pageable
+      - last
+      - totalPages
+      - totalElements
+      - size
+      - number
+      - sort
+      - first
+      - numberOfElements
+      - empty
       properties:
         content:
           $ref: '#/components/schemas/TransactionList'
@@ -403,8 +458,8 @@ components:
     DepositRequest:
       type: object
       required:
-        - accountId
-        - amount
+      - accountId
+      - amount
       properties:
         accountId:
           type: integer
@@ -414,8 +469,8 @@ components:
     WithdrawRequest:
       type: object
       required:
-        - accountId
-        - amount
+      - accountId
+      - amount
       properties:
         accountId:
           type: integer
@@ -425,9 +480,9 @@ components:
     TransferRequest:
       type: object
       required:
-        - fromAccountId
-        - toAccountId
-        - amount
+      - fromAccountId
+      - toAccountId
+      - amount
       properties:
         fromAccountId:
           type: integer

@@ -6,9 +6,9 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"time"
 
 	cardsv1 "github.com/dipjyotimetia/distributed-systems/backend/cards-service/gen/cards/v1"
+	ledgerv1 "github.com/dipjyotimetia/distributed-systems/backend/cards-service/gen/ledger/v1"
 	"github.com/dipjyotimetia/distributed-systems/backend/cards-service/internal/ledger"
 	"github.com/dipjyotimetia/distributed-systems/backend/cards-service/internal/mtls"
 	"github.com/dipjyotimetia/distributed-systems/backend/cards-service/internal/service"
@@ -34,6 +34,11 @@ func main() {
 		log.Fatal(err)
 	}
 	defer kycConn.Close()
+	accountsConn, err := dial(env("ACCOUNTS_GRPC_ADDRESS", "accounts-service:9092"), "accounts-service")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer accountsConn.Close()
 	fraudConn, err := dial(env("FRAUD_GRPC_ADDR", "fraud-service:8080"), "fraud-service")
 	if err != nil {
 		log.Fatal(err)
@@ -51,7 +56,7 @@ func main() {
 	secret := env("JWT_SECRET", "")
 	cardsv1.RegisterCardsServer(server, &service.Server{
 		Repo: db, Secret: []byte(secret),
-		Ledger: ledger.Client{Base: env("ACCOUNTS_SERVICE_URL", "http://accounts-service:8080"), Secret: env("MOVEMENT_SECRET", secret), HTTP: &http.Client{Timeout: 4 * time.Second}},
+		Ledger: ledger.Client{Ledger: ledgerv1.NewAccountLedgerClient(accountsConn), Secret: env("MOVEMENT_SECRET", secret)},
 		Fraud:  fraudv1.NewFraudCheckerClient(fraudConn),
 		Kyc:    kycv1.NewKycClient(kycConn),
 	})

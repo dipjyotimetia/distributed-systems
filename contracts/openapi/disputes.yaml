@@ -1,0 +1,429 @@
+openapi: 3.0.3
+info:
+  title: Disputes Service
+  description: Customer disputes and the operations queue.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8087
+    description: Local development server
+paths:
+  /api/disputes:
+    post:
+      tags: [disputes]
+      operationId: fileDispute
+      summary: File a dispute for a completed transfer
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FileDisputeRequest'
+      responses:
+        '200':
+          description: Existing dispute for the transfer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DisputeCase'
+        '201':
+          description: Dispute created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DisputeCase'
+        '400':
+          description: Invalid dispute request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMessage'
+        '401':
+          description: Sign in required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMessage'
+        '404':
+          description: Transfer not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMessage'
+        '422':
+          description: Transfer is not eligible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMessage'
+    get:
+      tags: [disputes]
+      operationId: listDisputes
+      summary: List the caller's disputes
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Dispute cases
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DisputeCase'
+        '401':
+          description: Sign in required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMessage'
+  /api/disputes/{id}:
+    get:
+      tags: [disputes]
+      operationId: getDispute
+      summary: Read one of the caller's disputes
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      responses:
+        '200':
+          description: Dispute case
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DisputeCase'
+        '401':
+          description: Sign in required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMessage'
+        '404':
+          description: Dispute not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMessage'
+  /api/disputes/{id}/evidence-requests/{requestId}/response:
+    post:
+      tags: [disputes]
+      operationId: respondToEvidence
+      summary: Respond to an evidence request
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+        - $ref: '#/components/parameters/requestId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EvidenceText'
+      responses:
+        '200':
+          description: Updated dispute
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DisputeCase'
+        '400':
+          description: Invalid evidence
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMessage'
+        '401':
+          description: Sign in required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMessage'
+        '404':
+          description: Dispute not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMessage'
+        '409':
+          description: Command conflicts with the current case
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMessage'
+  /api/operations/disputes:
+    get:
+      tags: [disputes]
+      operationId: operationsQueue
+      summary: List the operations dispute queue
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+      responses:
+        '200':
+          description: Queue page
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DisputePage'
+        '400':
+          description: Invalid page
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMessage'
+        '401':
+          description: Sign in required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMessage'
+        '403':
+          description: Operations access is required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMessage'
+  /api/operations/disputes/{id}/resolve:
+    post:
+      tags: [disputes]
+      operationId: resolveDispute
+      summary: Resolve a dispute
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResolutionRequest'
+      responses:
+        '200':
+          description: Resolved dispute
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DisputeCase'
+        '400':
+          description: Invalid resolution
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMessage'
+        '401':
+          description: Sign in required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMessage'
+        '403':
+          description: Operations access is required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMessage'
+        '404':
+          description: Dispute not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMessage'
+        '409':
+          description: Command conflicts with the current case
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMessage'
+  /api/operations/disputes/{id}/evidence-requests:
+    post:
+      tags: [disputes]
+      operationId: requestEvidence
+      summary: Ask the customer for evidence
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/id'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EvidenceText'
+      responses:
+        '200':
+          description: Updated dispute
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DisputeCase'
+        '400':
+          description: Invalid evidence request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMessage'
+        '401':
+          description: Sign in required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMessage'
+        '403':
+          description: Operations access is required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMessage'
+        '404':
+          description: Dispute not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMessage'
+        '409':
+          description: Command conflicts with the current case
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMessage'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    id:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    requestId:
+      name: requestId
+      in: path
+      required: true
+      schema:
+        type: string
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+  schemas:
+    FileDisputeRequest:
+      type: object
+      required: [transferId, reason]
+      properties:
+        transferId:
+          type: integer
+          format: int64
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+    EvidenceText:
+      type: object
+      required: [text]
+      properties:
+        text:
+          type: string
+          minLength: 1
+          maxLength: 2000
+    ResolutionRequest:
+      type: object
+      required: [resolution]
+      properties:
+        resolution:
+          type: string
+          minLength: 1
+          maxLength: 2000
+    ErrorMessage:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+    DisputePage:
+      type: object
+      required: [items, hasMore]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/DisputeCase'
+        hasMore:
+          type: boolean
+    EvidenceRequest:
+      type: object
+      properties:
+        id:
+          type: string
+        prompt:
+          type: string
+        requestedBy:
+          type: integer
+          format: int64
+        requestedAt:
+          type: string
+          format: date-time
+        response:
+          type: string
+        respondedBy:
+          type: integer
+          format: int64
+        respondedAt:
+          type: string
+          format: date-time
+        deadline:
+          type: string
+          format: date-time
+        closedAt:
+          type: string
+          format: date-time
+    DisputeCase:
+      type: object
+      properties:
+        evidenceEnabled:
+          type: boolean
+        investigationStage:
+          type: string
+        evidenceRequest:
+          $ref: '#/components/schemas/EvidenceRequest'
+        id:
+          type: integer
+          format: int64
+        transferId:
+          type: integer
+          format: int64
+        reason:
+          type: string
+        status:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        escalatedAt:
+          type: string
+          format: date-time
+        resolvedAt:
+          type: string
+          format: date-time
+        resolution:
+          type: string
+        aiDraft:
+          nullable: true

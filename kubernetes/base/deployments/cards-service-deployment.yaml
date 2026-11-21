@@ -30,8 +30,8 @@ spec:
           value: "9093"
         - name: DATABASE_URL
           value: postgres://postgres:password@banking-postgres:5432/banking_app?sslmode=disable
-        - name: ACCOUNTS_SERVICE_URL
-          value: http://banking-accounts:8080
+        - name: ACCOUNTS_GRPC_ADDRESS
+          value: banking-accounts:9092
         - name: KYC_GRPC_ADDR
           value: banking-kyc:8091
         - name: FRAUD_GRPC_ADDR

@@ -1,5 +1,7 @@
 version: v2
 inputs:
+  # Browser stubs are KYC and cards only. Internal ledger, transaction query,
+  # and dispute research protos stay out of the frontend.
   - directory: proto
     paths:
       - proto/kyc
