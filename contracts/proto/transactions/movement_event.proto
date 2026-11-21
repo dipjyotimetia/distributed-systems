@@ -7,7 +7,9 @@ import "google/protobuf/timestamp.proto";
 option java_package = "transactions.v1";
 option java_multiple_files = true;
 
-// Published using the protobuf JSON mapping on movement-lifecycle-v1.
+// Domain model for movement lifecycle. Kafka topic movement-lifecycle-v1
+// carries Confluent Avro (contracts/avro/movement-lifecycle-event.avsc);
+// the outbox still stores protobuf JSON before encode-at-publish.
 // The event ID is stable across retries and redeliveries.
 message MovementLifecycleEvent {
   enum Type {

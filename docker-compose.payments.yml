@@ -47,6 +47,8 @@ services:
       MQ_USERNAME: app
       MQ_PASSWORD: ${BANKING_MQ_APP_PASSWORD:?Set the local queue manager application password}
       PAYMENTS_KAFKA_BROKERS: redpanda:9092
+      SCHEMA_REGISTRY_URL: http://redpanda:8081
+      KAFKA_VALUE_FORMAT: avro
       ACCOUNTS_GRPC_ADDRESS: accounts-service:9092
       FRAUD_SERVICE_ADDRESS: fraud-service:8080
       MOVEMENT_SECRET: ${BANKING_PAYMENTS_MOVEMENT_SECRET:?Set the account movement secret}
@@ -104,11 +106,13 @@ services:
           (rpk topic describe payment-events.v1 -X brokers=redpanda:9092 >/dev/null 2>&1 ||
            rpk topic create payment-events.v1 --partitions 1 --replicas 1 -X brokers=redpanda:9092) &&
           (rpk topic describe movement-lifecycle-v1 -X brokers=redpanda:9092 >/dev/null 2>&1 ||
-           rpk topic create movement-lifecycle-v1 --partitions 1 --replicas 1 -X brokers=redpanda:9092)
+           rpk topic create movement-lifecycle-v1 --partitions 1 --replicas 1 -X brokers=redpanda:9092) &&
+          rpk registry mode get -X registry.hosts=127.0.0.1:8081 >/dev/null
 
   notification-service:
     environment:
       PAYMENT_KAFKA_TOPIC: payment-events.v1
+      SCHEMA_REGISTRY_URL: http://redpanda:8081
 
   api-gateway:
     environment:

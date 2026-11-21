@@ -16,7 +16,7 @@ class TransactionsServiceApplicationTests {
     private FraudServiceClient fraudServiceClient;
 
     @MockitoBean
-    private KafkaTemplate<String, String> kafkaTemplate;
+    private KafkaTemplate<String, byte[]> kafkaTemplate;
 
     @Test
     void contextLoads() {

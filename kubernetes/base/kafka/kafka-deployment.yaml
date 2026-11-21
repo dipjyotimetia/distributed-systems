@@ -29,6 +29,8 @@ spec:
         ports:
         - containerPort: 9092
           name: plaintext
+        - containerPort: 8081
+          name: schema-reg
         args:
         - redpanda
         - start
@@ -36,6 +38,7 @@ spec:
         - --smp=1
         - --kafka-addr=0.0.0.0:9092
         - --advertise-kafka-addr=banking-kafka:9092
+        - --schema-registry-addr=0.0.0.0:8081
         - --set
         - redpanda.auto_create_topics_enabled=true
         resources:

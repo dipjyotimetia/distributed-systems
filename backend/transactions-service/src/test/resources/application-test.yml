@@ -30,6 +30,10 @@ transactions:
   outbox:
     publish-enabled: false
 
+# Unit tests do not run a Schema Registry; keep outbox publish off and force JSON.
+SCHEMA_REGISTRY_URL: ""
+KAFKA_VALUE_FORMAT: json
+
 fraud:
   fail-open: true
 

@@ -14,6 +14,10 @@ spec:
     targetPort: 9092
     protocol: TCP
     name: plaintext
+  - port: 8081
+    targetPort: 8081
+    protocol: TCP
+    name: schema-reg
   selector:
     app: banking-kafka
     app.kubernetes.io/name: banking-app

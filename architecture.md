@@ -36,7 +36,8 @@ The application backend services are `api-gateway`, `user-service`,
 `kyc-service`, `cards-service`, `notification-service`,
 `disputes-service`, `ai-service`, and the optional `payments-service`.
 MongoDB provides infrastructure
-for notification event storage. Kafka carries transaction events and
+for notification event storage. Kafka carries transaction and payment events
+(Confluent Avro via Redpanda Schema Registry by default; set `KAFKA_VALUE_FORMAT=json` for UTF-8 JSON) and
 PostgreSQL stores identity, account, transaction, dispute, and payment data.
 
 Local Compose uses one PostgreSQL database with a schema per service

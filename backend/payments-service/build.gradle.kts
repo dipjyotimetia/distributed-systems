@@ -17,6 +17,8 @@ dependencyManagement {
     }
 }
 
+val avroTools by configurations.creating
+
 dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter")
     testImplementation("org.springframework:spring-test")
@@ -34,6 +36,7 @@ dependencies {
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.13.0")
     implementation("org.apache.activemq:artemis-jakarta-client:2.44.0")
     implementation("org.apache.kafka:kafka-clients")
+    implementation("org.apache.avro:avro:1.12.1")
     implementation("io.temporal:temporal-sdk:1.41.1")
     implementation("io.grpc:grpc-netty-shaded:1.85.1")
     implementation("io.grpc:grpc-protobuf:1.85.1")
@@ -43,6 +46,7 @@ dependencies {
     implementation("software.amazon.awssdk:s3:2.59.4")
     implementation("io.micrometer:micrometer-registry-prometheus")
     implementation("io.opentelemetry.instrumentation:opentelemetry-spring-boot-starter:2.34.0")
+    avroTools("org.apache.avro:avro-tools:1.12.1") { isTransitive = false }
 }
 
 openApiGenerate {
@@ -67,22 +71,32 @@ openApiGenerate {
     ))
 }
 
+val generateAvroJava by tasks.registering(JavaExec::class) {
+    group = "build"
+    description = "Generate Java SpecificRecords from contracts/avro"
+    classpath = avroTools
+    mainClass.set("org.apache.avro.tool.Main")
+    val outDir = layout.buildDirectory.dir("generated/avro/java")
+    outputs.dir(outDir)
+    inputs.dir(rootProject.file("contracts/avro"))
+    doFirst { outDir.get().asFile.mkdirs() }
+    args("compile", "schema", rootProject.file("contracts/avro").absolutePath, outDir.get().asFile.absolutePath)
+}
+
 sourceSets.main {
     java.srcDir(layout.buildDirectory.dir("generated/openapi/src/main/java"))
+    java.srcDir(layout.buildDirectory.dir("generated/avro/java"))
+    proto.srcDir(rootProject.file("contracts/proto/fraud"))
+    proto.srcDir(rootProject.file("contracts/proto/ledger"))
 }
 
 tasks.compileJava {
-    dependsOn(tasks.named("openApiGenerate"))
+    dependsOn(tasks.named("openApiGenerate"), generateAvroJava)
 }
 
 tasks.jar { enabled = false }
 
 tasks.bootJar { archiveFileName.set("application.jar") }
-
-sourceSets.main {
-    proto.srcDir(rootProject.file("contracts/proto/fraud"))
-    proto.srcDir(rootProject.file("contracts/proto/ledger"))
-}
 
 protobuf {
     protoc { artifact = "com.google.protobuf:protoc:4.36.2" }

@@ -48,8 +48,11 @@ spring:
   kafka:
     bootstrap-servers: ${KAFKA_BROKERS:banking-kafka:9092}
     producer:
+      acks: all
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.ByteArraySerializer
+      properties:
+        enable.idempotence: true
 
 # JWT Configuration
 jwt:

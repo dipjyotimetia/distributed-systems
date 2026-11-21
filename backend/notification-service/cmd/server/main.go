@@ -37,8 +37,9 @@ func main() {
 	go mongoStore.RunDeliveries(ctx)
 
 	paymentTopic := os.Getenv("PAYMENT_KAFKA_TOPIC")
+	schemaRegistry := envOrDefault("SCHEMA_REGISTRY_URL", "http://banking-kafka:8081")
 	newConsumer := func() (*consumer.Consumer, error) {
-		return consumer.NewWithAuth(brokers, topic, "notification-service", mongoStore, kafkaAuth, paymentTopic)
+		return consumer.NewWithAuth(brokers, topic, "notification-service", mongoStore, kafkaAuth, paymentTopic, schemaRegistry)
 	}
 	c, err := newConsumer()
 	if err != nil {
