@@ -28,12 +28,13 @@ class TransactionResponse(BaseModel):
     TransactionResponse
     """ # noqa: E501
     id: Optional[StrictInt] = None
+    user_id: Optional[StrictInt] = Field(default=None, alias="userId")
     from_account_id: Optional[StrictInt] = Field(default=None, alias="fromAccountId")
     to_account_id: Optional[StrictInt] = Field(default=None, alias="toAccountId")
     amount: Optional[Union[StrictFloat, StrictInt]] = None
     type: Optional[StrictStr] = None
     timestamp: Optional[datetime] = None
-    __properties: ClassVar[List[str]] = ["id", "fromAccountId", "toAccountId", "amount", "type", "timestamp"]
+    __properties: ClassVar[List[str]] = ["id", "userId", "fromAccountId", "toAccountId", "amount", "type", "timestamp"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -97,6 +98,7 @@ class TransactionResponse(BaseModel):
 
         _obj = cls.model_validate({
             "id": obj.get("id"),
+            "userId": obj.get("userId"),
             "fromAccountId": obj.get("fromAccountId"),
             "toAccountId": obj.get("toAccountId"),
             "amount": obj.get("amount"),

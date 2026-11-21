@@ -164,6 +164,12 @@ export interface TransactionResponse {
      * @type {number}
      * @memberof TransactionResponse
      */
+    userId?: number;
+    /**
+     * 
+     * @type {number}
+     * @memberof TransactionResponse
+     */
     fromAccountId?: number | null;
     /**
      * 
