@@ -60,7 +60,8 @@ public class MovementReservations {
         }
         int scale = java.util.Currency.getInstance(currency).getDefaultFractionDigits();
         if (scale < 0 || scale > 2) throw new IllegalArgumentException("Unsupported currency scale");
-        movement.amount().setScale(scale, RoundingMode.UNNECESSARY);
+        BigDecimal amount = movement.amount().setScale(scale, RoundingMode.UNNECESSARY);
+        movement = new Movement(movement.userId(), movement.fromAccountId(), movement.toAccountId(), amount);
         apply(operation, action, movement, currency, currency, outbound ? "OUTBOUND" : "INTERNAL");
     }
 

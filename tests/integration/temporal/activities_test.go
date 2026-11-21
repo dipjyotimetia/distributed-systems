@@ -40,6 +40,7 @@ func TestTransferRejectionShapes(t *testing.T) {
 	}{
 		{"insufficient funds", `{"code":"INSUFFICIENT_FUNDS","message":"short"}`, "application/json", true},
 		{"validation map", `{"amount":"must be greater than 0"}`, "application/json", false},
+		{"non-schema json", `{"code":1}`, "application/json", false},
 		{"empty fraud body", "", "", false},
 	} {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -60,6 +61,19 @@ func TestTransferRejectionShapes(t *testing.T) {
 		}
 		if check.payload == "" && (len(result.Body) != 0 || result.JSON400 != nil) {
 			t.Fatalf("fraud rejection was not an empty 400: %s", result.Body)
+		}
+		if check.name == "validation map" && (result.JSON400 == nil || !fieldErrors(result.JSON400)) {
+			t.Fatalf("validation map was not classified as field errors")
+		}
+		if check.name == "non-schema json" && result.JSON400 != nil {
+			t.Fatalf("non-schema 400 was parsed as a rejection: %s", result.Body)
+		}
+		if err = rejectionError("transfer", result.StatusCode(), result.Body, result.JSON400); check.funds {
+			if err != nil {
+				t.Fatalf("insufficient funds classified as %v", err)
+			}
+		} else if err == nil || (check.name == "validation map" && err.Error() != "transfer rejection returned field errors") {
+			t.Fatalf("%s classification %v", check.name, err)
 		}
 	}
 }

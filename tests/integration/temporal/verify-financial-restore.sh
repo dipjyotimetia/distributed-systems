@@ -32,10 +32,7 @@ dump() {
 }
 dump "$banking" postgres banking_app > "$work/banking.dump"
 dump "$payments" payments payments > "$work/payments.dump"
-backup_docker exec -i "$restore" psql -qAt -v ON_ERROR_STOP=1 -U postgres -d banking_app \
-  < "$(dirname "$0")/legacy-ledger-audit.sql" > "${report%.json}-legacy-audit.json"
-
-completed="$(date +%s)"
+backup_completed="$(date +%s)"
 
 image="$(docker inspect -f '{{.Image}}' "$banking")"
 # Isolate the restore network and use local socket access only.

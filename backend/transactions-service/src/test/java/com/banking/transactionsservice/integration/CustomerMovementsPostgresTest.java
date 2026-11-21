@@ -87,10 +87,31 @@ class CustomerMovementsPostgresTest {
         assertEquals(1, pendingEvents(id));
         verify(accounts, times(1)).applyExact(eq(id), eq(Action.RESERVE), any(), eq("AUD"));
         verify(accounts, times(2)).applyExact(eq(id), eq(Action.COMMIT), any(), eq("AUD"));
+        assertEquals(1, legacyRows(id));
+
+        jdbc.update("""
+                UPDATE transactions_service.customer_movements
+                SET stage = 'POST', next_attempt = clock_timestamp() WHERE id = ?
+                """, id);
+        movements.recover();
+        assertEquals(MovementOutcome.StatusEnum.POSTED, movements.get(USER, id).getStatus());
+        assertEquals(1, legacyRows(id));
+        assertEquals(1, pendingEvents(id));
+        assertEquals(0, jdbc.queryForObject("""
+                SELECT count(*) FROM transactions_service.transactions
+                WHERE movement_id = ? AND amount <> 25.50
+                """, Integer.class, id));
+        verify(accounts, times(3)).applyExact(eq(id), eq(Action.COMMIT), any(), eq("AUD"));
     }
 
     private void retry(UUID id) {
         jdbc.update("UPDATE transactions_service.customer_movements SET next_attempt = clock_timestamp() WHERE id = ?", id);
+    }
+
+    private int legacyRows(UUID id) {
+        return jdbc.queryForObject("""
+                SELECT count(*) FROM transactions_service.transactions WHERE movement_id = ?
+                """, Integer.class, id);
     }
 
     private int pendingEvents(UUID id) {

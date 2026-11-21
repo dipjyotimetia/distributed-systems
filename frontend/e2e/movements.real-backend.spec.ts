@@ -35,6 +35,7 @@ test('reload recovers the same intent after the response is lost', async ({ page
   });
   await page.goto('/accounts/' + account + '/withdraw');
   await page.getByLabel('Amount').fill('25.50');
+  await page.getByLabel('Description').fill('ATM withdrawal');
   await page.getByRole('button', { name: /withdraw/i }).click();
   await expect.poll(() => accepted?.id).not.toBeUndefined();
 

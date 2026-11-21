@@ -191,10 +191,7 @@ func (a *Activities) Reject(ctx context.Context, input Input, t Transfer) error 
 	if err != nil {
 		return err
 	}
-	if result.StatusCode() != http.StatusBadRequest || !insufficientFunds(result.JSON400) {
-		return fmt.Errorf("transfer rejection did not return INSUFFICIENT_FUNDS")
-	}
-	return nil
+	return rejectionError("transfer", result.StatusCode(), result.Body, result.JSON400)
 }
 
 func (a *Activities) verify(ctx context.Context, token string, t Transfer) error {

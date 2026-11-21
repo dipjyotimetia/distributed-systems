@@ -388,7 +388,7 @@ public class TransactionService {
             transaction.getUserId(),
             transaction.getFromAccountId(),
             transaction.getToAccountId(),
-            transaction.getAmount(),
+            transaction.getAmount().doubleValue(),
             transaction.getType(),
             transaction.getDescription(),
             transaction.getStatus(),

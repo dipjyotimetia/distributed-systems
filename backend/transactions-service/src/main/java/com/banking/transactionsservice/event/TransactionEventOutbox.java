@@ -49,9 +49,10 @@ public class TransactionEventOutbox {
     public void enqueueMovement(UUID movementId, MovementLifecycleEvent event) {
         try {
             jdbc.update("""
-                    INSERT INTO transactions_service.event_outbox (movement_id, topic, payload)
-                    VALUES (?, 'movement-lifecycle-v1', ?)
-                    """, movementId, JsonFormat.printer().omittingInsignificantWhitespace().print(event));
+                    INSERT INTO transactions_service.event_outbox (movement_id, topic, payload, event_key)
+                    VALUES (?, 'movement-lifecycle-v1', ?, ?)
+                    ON CONFLICT (event_key) DO NOTHING
+                    """, movementId, JsonFormat.printer().omittingInsignificantWhitespace().print(event), event.getEventId());
         } catch (InvalidProtocolBufferException invalid) {
             throw new IllegalStateException("Unable to serialize movement event", invalid);
         }
@@ -103,7 +104,7 @@ public class TransactionEventOutbox {
         return "{\"transaction_id\":" + transaction.getId()
                 + ",\"account_id\":" + accountId
                 + ",\"user_id\":" + transaction.getUserId()
-                + ",\"amount\":" + transaction.getAmount()
+                + ",\"amount\":" + transaction.getAmount().toPlainString()
                 + ",\"transaction_type\":\"" + transaction.getType().name()
                 + "\",\"status\":\"" + transaction.getStatus().name()
                 + "\",\"timestamp\":\"" + timestamp + "\"}";

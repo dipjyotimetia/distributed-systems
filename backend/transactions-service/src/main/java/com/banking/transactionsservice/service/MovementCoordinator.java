@@ -47,7 +47,7 @@ public class MovementCoordinator {
         if (java.util.Objects.equals(transaction.getFromAccountId(), transaction.getToAccountId())) {
             throw new IllegalArgumentException("Movement requires distinct accounts");
         }
-        BigDecimal amount = BigDecimal.valueOf(transaction.getAmount()).setScale(2, RoundingMode.UNNECESSARY);
+        BigDecimal amount = transaction.getAmount().setScale(2, RoundingMode.UNNECESSARY);
         if (amount.signum() <= 0 || amount.precision() > 19) {
             throw new IllegalArgumentException("Invalid movement amount");
         }

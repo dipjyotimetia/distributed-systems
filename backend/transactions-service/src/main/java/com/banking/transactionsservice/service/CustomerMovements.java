@@ -6,7 +6,6 @@ import com.banking.transactionsservice.contract.model.MovementIntent;
 import com.banking.transactionsservice.contract.model.MovementOutcome;
 import com.banking.transactionsservice.entity.Transaction;
 import com.banking.transactionsservice.event.TransactionEventOutbox;
-import com.banking.transactionsservice.repository.TransactionRepository;
 import com.banking.transactionsservice.service.MovementCoordinator.Action;
 import com.banking.transactionsservice.service.MovementCoordinator.Movement;
 import com.google.protobuf.Timestamp;
@@ -73,7 +72,6 @@ public class CustomerMovements {
     private final AccountsServiceClient accounts;
     private final FraudServiceClient fraud;
     private final PaymentComplianceService compliance;
-    private final TransactionRepository legacyLedger;
     private final TransactionEventOutbox outbox;
     private final AtomicReference<Double> oldestPendingSeconds = new AtomicReference<>(0.0);
     private final Timer postingLatency;
@@ -81,13 +79,12 @@ public class CustomerMovements {
 
     public CustomerMovements(JdbcTemplate jdbc, PlatformTransactionManager manager, AccountsServiceClient accounts,
                              FraudServiceClient fraud, PaymentComplianceService compliance,
-                             TransactionRepository legacyLedger, TransactionEventOutbox outbox, MeterRegistry metrics) {
+                             TransactionEventOutbox outbox, MeterRegistry metrics) {
         this.jdbc = jdbc;
         transaction = new TransactionTemplate(manager);
         this.accounts = accounts;
         this.fraud = fraud;
         this.compliance = compliance;
-        this.legacyLedger = legacyLedger;
         this.outbox = outbox;
         postingLatency = metrics.timer("transactions.movements.accepted.to.posted");
         screeningOutages = metrics.counter("transactions.movements.screening.outages");
@@ -210,11 +207,28 @@ public class CustomerMovements {
         }
         Intent intent = entry.intent();
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-        Transaction legacy = new Transaction(entry.userId(), intent.from(), intent.to(), intent.amount().doubleValue(),
-                Transaction.TransactionType.valueOf(intent.type().name()), intent.description());
-        legacy.setStatus(Transaction.TransactionStatus.COMPLETED);
-        legacy.setProcessedAt(now.toLocalDateTime());
-        outbox.enqueue(legacyLedger.saveAndFlush(legacy));
+        jdbc.update("""
+                INSERT INTO transactions_service.transactions
+                    (user_id, from_account_id, to_account_id, amount, type, description, status, processed_at,
+                     movement_posting, movement_id)
+                VALUES (?, ?, ?, ?, ?, ?, 'COMPLETED', ?, TRUE, ?)
+                ON CONFLICT (movement_id) DO NOTHING
+                """, entry.userId(), intent.from(), intent.to(), intent.amount(), intent.type().name(),
+                intent.description(), now.toLocalDateTime(), entry.id());
+        Long ledgerId = jdbc.queryForObject("""
+                SELECT id FROM transactions_service.transactions WHERE movement_id = ?
+                """, Long.class, entry.id());
+        Integer queued = jdbc.queryForObject("""
+                SELECT count(*) FROM transactions_service.event_outbox WHERE transaction_id = ?
+                """, Integer.class, ledgerId);
+        if (queued == null || queued == 0) {
+            Transaction legacy = new Transaction(entry.userId(), intent.from(), intent.to(), intent.amount(),
+                    Transaction.TransactionType.valueOf(intent.type().name()), intent.description());
+            legacy.setId(ledgerId);
+            legacy.setStatus(Transaction.TransactionStatus.COMPLETED);
+            legacy.setProcessedAt(now.toLocalDateTime());
+            outbox.enqueue(legacy);
+        }
 
         enqueueLifecycle(entry, MovementLifecycleEvent.Status.POSTED, now);
         jdbc.update("""

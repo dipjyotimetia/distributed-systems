@@ -2292,11 +2292,9 @@ func ParseDepositHTTP(rsp *http.Response) (*DepositHTTP, error) {
 		response.JSON201 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest Rejection
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
+		if parsed, ok := modeledRejection(bodyBytes); ok {
+			response.JSON400 = parsed
 		}
-		response.JSON400 = &dest
 
 	}
 
@@ -2403,11 +2401,9 @@ func ParseTransferHTTP(rsp *http.Response) (*TransferHTTP, error) {
 		response.JSON201 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest Rejection
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
+		if parsed, ok := modeledRejection(bodyBytes); ok {
+			response.JSON400 = parsed
 		}
-		response.JSON400 = &dest
 
 	}
 
@@ -2436,11 +2432,9 @@ func ParseWithdrawHTTP(rsp *http.Response) (*WithdrawHTTP, error) {
 		response.JSON201 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest Rejection
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
+		if parsed, ok := modeledRejection(bodyBytes); ok {
+			response.JSON400 = parsed
 		}
-		response.JSON400 = &dest
 
 	}
 

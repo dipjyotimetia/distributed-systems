@@ -5,7 +5,10 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import org.hibernate.annotations.CreationTimestamp;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Entity
 @Table(name = "transactions", schema = "transactions_service")
@@ -27,8 +30,8 @@ public class Transaction {
     
     @NotNull
     @Positive
-    @Column(name = "amount", nullable = false)
-    private Double amount;
+    @Column(name = "amount", nullable = false, precision = 19, scale = 2)
+    private BigDecimal amount;
     
     @NotNull
     @Enumerated(EnumType.STRING)
@@ -58,13 +61,22 @@ public class Transaction {
     @Column(name = "movement_posting", nullable = false)
     private boolean movementPosting;
 
+    @Column(name = "movement_id", unique = true)
+    private UUID movementId;
+
     public void setMovementPosting(boolean movementPosting) {
         this.movementPosting = movementPosting;
     }
 
     public Transaction() {}
     
-    public Transaction(Long userId, Long fromAccountId, Long toAccountId, Double amount, 
+    public Transaction(Long userId, Long fromAccountId, Long toAccountId, Double amount,
+                      TransactionType type, String description) {
+        this(userId, fromAccountId, toAccountId, amount == null ? null
+                : BigDecimal.valueOf(amount).setScale(2, RoundingMode.HALF_UP), type, description);
+    }
+
+    public Transaction(Long userId, Long fromAccountId, Long toAccountId, BigDecimal amount,
                       TransactionType type, String description) {
         this.userId = userId;
         this.fromAccountId = fromAccountId;
@@ -108,12 +120,24 @@ public class Transaction {
         this.toAccountId = toAccountId;
     }
     
-    public Double getAmount() {
+    public BigDecimal getAmount() {
         return amount;
     }
-    
+
     public void setAmount(Double amount) {
+        this.amount = amount == null ? null : BigDecimal.valueOf(amount).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    public void setAmount(BigDecimal amount) {
         this.amount = amount;
+    }
+
+    public UUID getMovementId() {
+        return movementId;
+    }
+
+    public void setMovementId(UUID movementId) {
+        this.movementId = movementId;
     }
     
     public TransactionType getType() {
