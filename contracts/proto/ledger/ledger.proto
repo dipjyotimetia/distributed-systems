@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package ledger.v1;
+
+option java_package = "ledger.v1";
+option java_multiple_files = true;
+option go_package = "github.com/dipjyotimetia/distributed-systems/backend/cards-service/gen/ledger/v1;ledgerv1";
+
+// Internal account ledger. Money movement keeps the HTTP HMAC canonical string
+// in the x-movement-signature metadata. GetAccount forwards the caller JWT in
+// the authorization metadata.
+service AccountLedger {
+  rpc ApplyMovement(MovementRequest) returns (MovementResult);
+  rpc ApplyOutboundAud(MovementRequest) returns (MovementResult);
+  rpc GetAccount(GetAccountRequest) returns (GetAccountResponse);
+}
+
+message MovementRequest {
+  string operation_id = 1;
+  string action = 2;
+  int64 user_id = 3;
+  optional int64 from_account_id = 4;
+  optional int64 to_account_id = 5;
+  string amount = 6;
+}
+
+message MovementResult {}
+
+message GetAccountRequest {
+  int64 account_id = 1;
+}
+
+message GetAccountResponse {
+  int64 account_id = 1;
+  int64 user_id = 2;
+  string account_number = 3;
+}

@@ -35,8 +35,8 @@ func IdentityJourney(ctx workflow.Context, input Input) ([]BoundaryEvidence, err
 
 func (a *Activities) AssertAvailability(ctx context.Context, input Input, available bool) error {
 	for _, path := range []string{
-		"/api/users/check-username?username=" + url.QueryEscape(input.User),
-		"/api/users/check-email?email=" + url.QueryEscape(input.email()),
+		"/api/v1/users/check-username?username=" + url.QueryEscape(input.User),
+		"/api/v1/users/check-email?email=" + url.QueryEscape(input.email()),
 	} {
 		var result struct {
 			Success   bool
@@ -66,7 +66,7 @@ func (a *Activities) AssertLoginAndProfile(ctx context.Context, input Input, id 
 			Username, Email string
 		}
 	}
-	if err := call(ctx, a.Frontend, "/api/users/profile", token, nil, 200, &profile); err != nil {
+	if err := call(ctx, a.Frontend, "/api/v1/users/profile", token, nil, 200, &profile); err != nil {
 		return err
 	}
 	if !profile.Success || profile.Data.ID != id || profile.Data.Username != input.User || profile.Data.Email != input.email() {
@@ -84,7 +84,7 @@ func (a *Activities) AssertIdentityConflicts(ctx context.Context, input Input) e
 			Success bool
 			Message string
 		}
-		if err := call(ctx, a.Frontend, "/api/users/register", "", credentials, 409, &conflict); err != nil {
+		if err := call(ctx, a.Frontend, "/api/v1/users/register", "", credentials, 409, &conflict); err != nil {
 			return err
 		}
 		if conflict.Success || conflict.Message == "" {
@@ -92,5 +92,5 @@ func (a *Activities) AssertIdentityConflicts(ctx context.Context, input Input) e
 		}
 	}
 	payload := map[string]string{"usernameOrEmail": input.User, "password": "invalid-" + a.Password}
-	return call(ctx, a.Frontend, "/api/users/login", "", payload, 401, nil)
+	return call(ctx, a.Frontend, "/api/v1/users/login", "", payload, 401, nil)
 }

@@ -34,7 +34,7 @@ cleanup() {
 trap cleanup EXIT
 
 build_services=(frontend api-gateway user-service accounts-service transactions-service fraud-service provider-fixtures
-  payments-service payments-worker clearing-simulator payments-reconciliation notification-service)
+  payments-service payments-worker clearing-simulator payments-reconciliation notification-service ai-service)
 if ! "${compose[@]}" build "${build_services[@]}"; then
   sleep 5
   "${compose[@]}" build "${build_services[@]}"
@@ -44,7 +44,7 @@ fi
 read -r BANKING_SETTLEMENT_CUTOFF BANKING_SETTLEMENT_BUSINESS_DATE < <(python3 - <<'PY'
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
-end = datetime.now(ZoneInfo("Australia/Sydney")) + timedelta(minutes=4)
+end = datetime.now(ZoneInfo("Australia/Sydney")) + timedelta(minutes=6)
 print(end.strftime("%H:%M"), end.date().isoformat())
 PY
 )

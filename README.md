@@ -17,7 +17,7 @@ open http://localhost:16686     # Jaeger
 ```
 
 Docker with the Compose plugin is sufficient for the container workflow.
-Register a local user, then sign in and create an account. `scripts/demo/walkthrough.sh` does that path against the frontend, including a retried transfer, a dispute, a statement job, KYC approval, a virtual card purchase, and fixture AI chat. Cards and KYC are Go gRPC services. The Next.js server calls them with TypeScript generated from `proto/kyc/kyc.proto` and `proto/cards/cards.proto`. `scripts/certs/dev-ca.sh` and `docker compose -f docker-compose.yml -f docker-compose.mtls.yml up` enable mutual TLS for those calls. `scripts/demo/failure-scenarios.sh` pauses Kafka, stops fraud, and points at the Grafana outbox panel. Outbound payments stay on the optional Compose overlay. If the gateway
+Register a local user, then sign in and create an account. `scripts/demo/walkthrough.sh` does that path against the frontend, including a retried transfer, a dispute, a statement job, KYC approval, a virtual card purchase, and fixture AI chat. Cards and KYC are Go gRPC services. The Next.js server calls them with TypeScript generated from `contracts/proto/kyc/kyc.proto` and `contracts/proto/cards/cards.proto`. `scripts/certs/dev-ca.sh` and `docker compose -f docker-compose.yml -f docker-compose.mtls.yml up` enable mutual TLS for those calls. `scripts/demo/failure-scenarios.sh` pauses Kafka, stops fraud, and points at the Grafana outbox panel. Outbound payments stay on the optional Compose overlay. If the gateway
 exits with an OpenTelemetry `ContainerAttributes` error, apply the
 [local gateway workaround](TROUBLESHOOTING.md#gateway-exits-during-opentelemetry-startup).
 
@@ -175,7 +175,7 @@ npm run build          # Production build
 npm test               # Run tests
 ```
 
-`proto/` is the only protobuf contract. From the repository root, `bash scripts/frontend-proto.sh` regenerates the checked-in clients in `frontend/src/gen` with Buf 1.75.0 and `protoc-gen-es` 2.16.0 (`npm ci` in `frontend/` installs the plugin). CI fails if those files drift from the protos.
+`contracts/proto/` is the protobuf contract, next to the OpenAPI files in `contracts/openapi/`. From the repository root, `bash scripts/frontend-proto.sh` regenerates the checked-in clients in `frontend/src/gen` with Buf 1.75.0 and `protoc-gen-es` 2.16.0 (`npm ci` in `frontend/` installs the plugin). CI fails if those files drift from the protos.
 
 ### Database Operations
 
@@ -319,7 +319,7 @@ With the default Compose stack running, use `docker compose ps` for service
 status and these HTTP checks for published endpoints:
 
 ```bash
-curl -fsS http://localhost:3000/api/healthz
+curl -fsS http://localhost:3000/api/v1/healthz
 curl -fsS http://localhost:8080/actuator/health
 curl -fsS http://localhost:8081/actuator/health
 curl -fsS http://localhost:8082/actuator/health

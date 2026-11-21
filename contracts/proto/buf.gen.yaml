@@ -1,0 +1,12 @@
+version: v2
+inputs:
+  # Browser stubs are KYC and cards only. Internal ledger, transaction query,
+  # and dispute research protos stay out of the frontend.
+  - directory: contracts/proto
+    paths:
+      - contracts/proto/kyc
+      - contracts/proto/cards
+plugins:
+  - local: protoc-gen-es
+    out: frontend/src/gen
+    opt: target=ts

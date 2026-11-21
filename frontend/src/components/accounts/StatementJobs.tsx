@@ -18,7 +18,7 @@ const labels: Record<Job['status'], string> = {
 };
 
 export default function StatementJobs({ accountId }: { accountId: number }) {
-  const path = `/api/accounts/${accountId}/statement-jobs`;
+  const path = `/api/v1/accounts/${accountId}/statement-jobs`;
   const [jobs, setJobs] = useState<Job[]>([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);

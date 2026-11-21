@@ -14,6 +14,10 @@ spec:
     targetPort: 8080
     protocol: TCP
     name: http
+  - port: 9092
+    targetPort: 9092
+    protocol: TCP
+    name: grpc
   selector:
     app: banking-accounts
     app.kubernetes.io/name: banking-app

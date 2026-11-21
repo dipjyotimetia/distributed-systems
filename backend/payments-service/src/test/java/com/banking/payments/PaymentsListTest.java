@@ -1,9 +1,14 @@
 package com.banking.payments;
 
+import com.banking.payments.contract.ContractJson;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -20,6 +25,11 @@ import static org.mockito.Mockito.when;
 class PaymentsListTest {
     private static final String SECRET = "synthetic-payments-smoke-test-key-123456789";
 
+    @AfterEach
+    void clearRequest() {
+        RequestContextHolder.resetRequestAttributes();
+    }
+
     @Test
     void listsOnlyTheAuthenticatedCustomer() {
         PaymentStore store = mock(PaymentStore.class);
@@ -28,12 +38,23 @@ class PaymentsListTest {
                 "PENDING", null, OffsetDateTime.parse("2026-11-21T00:00:00Z"), null);
         when(store.listOwned(71)).thenReturn(List.of(owned));
         when(store.listOwned(72)).thenReturn(List.of());
-        var controller = new PaymentsController(store, mock(JdbcTemplate.class), SECRET, "");
+        var controller = new PaymentsController(store, mock(JdbcTemplate.class), new ContractJson(), SECRET, "");
 
-        assertEquals(List.of(owned), controller.list("Bearer " + token(71)).getBody());
-        assertEquals(List.of(), controller.list("Bearer " + token(72)).getBody());
+        asCustomer(71);
+        var first = controller.listPayments().getBody();
+        asCustomer(72);
+        var second = controller.listPayments().getBody();
+
+        assertEquals(List.of(id), first.stream().map(payment -> payment.getId()).toList());
+        assertEquals(List.of(), second);
         verify(store).listOwned(71);
         verify(store).listOwned(72);
+    }
+
+    private static void asCustomer(long id) {
+        var request = new MockHttpServletRequest();
+        request.addHeader("Authorization", "Bearer " + token(id));
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
     }
 
     private static String token(long id) {

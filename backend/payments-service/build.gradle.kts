@@ -5,6 +5,7 @@ plugins {
     id("org.springframework.boot")
     id("io.spring.dependency-management")
     id("com.google.protobuf")
+    id("org.openapi.generator")
 }
 
 group = "com.banking"
@@ -18,7 +19,11 @@ dependencyManagement {
 
 dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter")
+    testImplementation("org.springframework:spring-test")
     implementation("org.springframework.boot:spring-boot-starter-web")
+    implementation("org.springframework.boot:spring-boot-starter-validation")
+    implementation("com.fasterxml.jackson.core:jackson-databind")
+    implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
     implementation("org.springframework.boot:spring-boot-starter-jdbc")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-flyway")
@@ -40,12 +45,43 @@ dependencies {
     implementation("io.opentelemetry.instrumentation:opentelemetry-spring-boot-starter:2.34.0")
 }
 
+openApiGenerate {
+    generatorName.set("spring")
+    inputSpec.set(rootProject.file("contracts/openapi/payments.yaml").absolutePath)
+    outputDir.set(layout.buildDirectory.dir("generated/openapi").get().asFile.absolutePath)
+    apiPackage.set("com.banking.payments.contract")
+    modelPackage.set("com.banking.payments.contract.model")
+    configOptions.set(mapOf(
+        "interfaceOnly" to "true",
+        "useSpringBoot3" to "true",
+        "useTags" to "true",
+        "skipDefaultInterface" to "true",
+        "openApiNullable" to "false",
+        "documentationProvider" to "none",
+        "annotationLibrary" to "none",
+        "useBeanValidation" to "false",
+        "dateLibrary" to "java8",
+        "hideGenerationTimestamp" to "true",
+        "useResponseEntity" to "true",
+        "requestMappingMode" to "api_interface",
+    ))
+}
+
+sourceSets.main {
+    java.srcDir(layout.buildDirectory.dir("generated/openapi/src/main/java"))
+}
+
+tasks.compileJava {
+    dependsOn(tasks.named("openApiGenerate"))
+}
+
 tasks.jar { enabled = false }
 
 tasks.bootJar { archiveFileName.set("application.jar") }
 
 sourceSets.main {
-    proto.srcDir(rootProject.file("proto/fraud"))
+    proto.srcDir(rootProject.file("contracts/proto/fraud"))
+    proto.srcDir(rootProject.file("contracts/proto/ledger"))
 }
 
 protobuf {

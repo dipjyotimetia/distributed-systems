@@ -2,6 +2,8 @@ package com.banking.payments;
 
 import com.banking.payments.PaymentStore.Instruction;
 import com.banking.payments.PaymentStore.Payment;
+import com.banking.payments.contract.ContractJson;
+import com.banking.payments.contract.PaymentsApi;
 import com.banking.payments.clearing.ClearingRecord;
 import io.jsonwebtoken.JwtException;
 import io.opentelemetry.api.trace.Span;
@@ -22,7 +24,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.CacheControl;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.server.ResponseStatusException;
 
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
@@ -31,7 +35,7 @@ import static org.springframework.http.HttpStatus.FORBIDDEN;
 
 @Profile("!clearing & !payment-worker & !reconciliation")
 @RestController
-public class PaymentsController {
+public class PaymentsController implements PaymentsApi {
     private static final Pattern IDEMPOTENCY_KEY = Pattern.compile("[A-Za-z0-9._:-]{1,128}");
     private static final Pattern DESTINATION = Pattern.compile("[A-Z0-9]{12}");
 
@@ -39,21 +43,24 @@ public class PaymentsController {
     private final JwtParser jwt;
     private final JdbcTemplate db;
     private final Set<Long> operators;
+    private final ContractJson contractJson;
 
-    public PaymentsController(PaymentStore store, JdbcTemplate db, @Value("${JWT_SECRET}") String secret,
+    public PaymentsController(PaymentStore store, JdbcTemplate db, ContractJson contractJson, @Value("${JWT_SECRET}") String secret,
                               @Value("${PAYMENTS_OPERATOR_IDS:}") String operatorIds) {
         this.store = store;
         this.db = db;
+        this.contractJson = contractJson;
         this.operators = Set.copyOf(Arrays.stream(operatorIds.split(",")).map(String::trim).filter(value -> !value.isEmpty())
                 .map(Long::valueOf).toList());
         this.jwt = Jwts.parser().verifyWith(Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8)))
                 .sig().clear().add(Jwts.SIG.HS256).and().build();
     }
 
-    @PostMapping("/api/payments")
-    public ResponseEntity<Payment> initiate(@RequestHeader(value = "Authorization", required = false) String auth,
-            @RequestHeader("Idempotency-Key") String key, @RequestBody Instruction instruction) {
-        long customer = customer(auth);
+    @Override
+    public ResponseEntity<com.banking.payments.contract.model.Payment> initiatePayment(String key,
+            com.banking.payments.contract.model.PaymentInstruction paymentInstruction) {
+        Instruction instruction = contractJson.convert(paymentInstruction, Instruction.class);
+        long customer = customer(authorization());
         if (!IDEMPOTENCY_KEY.matcher(key).matches() || instruction.accountId() < 1
                 || instruction.destination() == null || !DESTINATION.matcher(instruction.destination()).matches()
                 || instruction.amountMinor() < 1 || instruction.amountMinor() > ClearingRecord.MAX_AMOUNT_MINOR) {
@@ -61,38 +68,46 @@ public class PaymentsController {
         }
         Payment payment = store.initiate(customer, key, instruction);
         Span.current().setAttribute("payment.id", payment.id().toString());
-        return ResponseEntity.accepted().location(URI.create("/api/payments/" + payment.id()))
-                .cacheControl(CacheControl.noStore()).body(payment);
+        return ResponseEntity.accepted().location(URI.create("/api/v1/payments/" + payment.id()))
+                .cacheControl(CacheControl.noStore()).body(contractJson.convert(payment, com.banking.payments.contract.model.Payment.class));
     }
 
-    @GetMapping("/api/payments")
-    public ResponseEntity<List<Payment>> list(@RequestHeader(value = "Authorization", required = false) String auth) {
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(store.listOwned(customer(auth)));
+    @Override
+    public ResponseEntity<List<com.banking.payments.contract.model.Payment>> listPayments() {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(store.listOwned(customer(authorization())).stream()
+                        .map(payment -> contractJson.convert(payment, com.banking.payments.contract.model.Payment.class))
+                        .toList());
     }
 
-    @GetMapping("/api/payments/{id}")
-    public ResponseEntity<Payment> get(@RequestHeader(value = "Authorization", required = false) String auth,
-            @PathVariable UUID id) {
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(store.findOwned(customer(auth), id));
+    @Override
+    public ResponseEntity<com.banking.payments.contract.model.Payment> getPayment(UUID id) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(contractJson.convert(store.findOwned(customer(authorization()), id), com.banking.payments.contract.model.Payment.class));
     }
 
     public record Discrepancy(java.time.LocalDate businessDate, int recordNumber, UUID paymentId, String outcome,
                               Long expectedAmountMinor, Long observedAmountMinor, String observedReference) {}
 
-    @GetMapping("/api/operations/payments/reconciliation")
-    public ResponseEntity<List<Discrepancy>> discrepancies(
-            @RequestHeader(value = "Authorization", required = false) String auth,
-            @RequestParam(defaultValue = "0") int offset) {
-        if (!operators.contains(customer(auth))) throw new ResponseStatusException(FORBIDDEN);
-        if (offset < 0) throw new ResponseStatusException(BAD_REQUEST);
+    @Override
+    public ResponseEntity<List<com.banking.payments.contract.model.Discrepancy>> listDiscrepancies(Integer offset) {
+        int start = offset == null ? 0 : offset;
+        if (!operators.contains(customer(authorization()))) throw new ResponseStatusException(FORBIDDEN);
+        if (start < 0) throw new ResponseStatusException(BAD_REQUEST);
         var results = db.query("""
                 SELECT business_date, record_number, payment_id, outcome, expected_amount_minor,
                        observed_amount_minor, observed_reference FROM payments.reconciliation_result
                 WHERE outcome <> 'MATCHED' ORDER BY business_date DESC, record_number LIMIT 100 OFFSET ?
                 """, (row, index) -> new Discrepancy(row.getObject(1, java.time.LocalDate.class), row.getInt(2),
                 row.getObject(3, UUID.class), row.getString(4), row.getObject(5, Long.class),
-                row.getObject(6, Long.class), row.getString(7)), offset);
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(results);
+                row.getObject(6, Long.class), row.getString(7)), start);
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(results.stream()
+                .map(row -> contractJson.convert(row, com.banking.payments.contract.model.Discrepancy.class)).toList());
+    }
+
+    private static String authorization() {
+        var attributes = (ServletRequestAttributes) RequestContextHolder.currentRequestAttributes();
+        return attributes.getRequest().getHeader("Authorization");
     }
 
     private long customer(String authorization) {

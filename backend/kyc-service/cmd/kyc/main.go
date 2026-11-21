@@ -61,7 +61,7 @@ func runAPI(cases *store.Store) {
 	kycv1.RegisterKycServer(server, &rpc.Server{Store: cases, Secret: []byte(env("JWT_SECRET", "")), Operators: operators(), Temporal: temporal})
 	go func() {
 		mux := http.NewServeMux()
-		mux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
+		mux.HandleFunc("/api/v1/health", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
 		mux.Handle("/metrics", promhttp.Handler())
 		log.Println("kyc metrics", env("METRICS_PORT", "9092"))
 		log.Fatal(http.ListenAndServe(":"+env("METRICS_PORT", "9092"), mux))

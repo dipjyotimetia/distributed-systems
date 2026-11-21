@@ -56,24 +56,24 @@ public class GatewayConfig {
     public RouteLocator routes(RouteLocatorBuilder builder) {
         var routes = builder.routes()
                 // API Gateway health check route
-                .route("api-gateway-health", r -> r.path("/api/healthz")
-                        .filters(f -> f.rewritePath("/api/healthz", "/health"))
+                .route("api-gateway-health", r -> r.path("/api/v1/healthz")
+                        .filters(f -> f.rewritePath("/api/v1/healthz", "/api/v1/health"))
                         .uri("http://localhost:8080"))
                 // Health check routes (no authentication required)
-                .route("user-service-health", r -> r.path("/api/user-service/health")
-                        .filters(f -> f.rewritePath("/api/user-service/health", "/actuator/health"))
+                .route("user-service-health", r -> r.path("/api/v1/user-service/health")
+                        .filters(f -> f.rewritePath("/api/v1/user-service/health", "/actuator/health"))
                         .uri(userServiceUrl))
-                .route("accounts-service-health", r -> r.path("/api/accounts-service/health")
-                        .filters(f -> f.rewritePath("/api/accounts-service/health", "/actuator/health"))
+                .route("accounts-service-health", r -> r.path("/api/v1/accounts-service/health")
+                        .filters(f -> f.rewritePath("/api/v1/accounts-service/health", "/actuator/health"))
                         .uri(accountsServiceUrl))
-                .route("transactions-service-health", r -> r.path("/api/transactions-service/health")
-                        .filters(f -> f.rewritePath("/api/transactions-service/health", "/actuator/health"))
+                .route("transactions-service-health", r -> r.path("/api/v1/transactions-service/health")
+                        .filters(f -> f.rewritePath("/api/v1/transactions-service/health", "/actuator/health"))
                         .uri(transactionsServiceUrl))
                 // Main API routes with authentication and rate limiting
-                .route("user-service", r -> r.path("/api/users/**")
+                .route("user-service", r -> r.path("/api/v1/users/**")
                         .filters(f -> f.filter(authFilter))
                         .uri(userServiceUrl))
-                .route("accounts-service", r -> r.path("/api/accounts/**")
+                .route("accounts-service", r -> r.path("/api/v1/accounts/**")
                         .filters(f -> {
                             f.filter(authFilter);
                             if (rateLimiterEnabled) {
@@ -82,7 +82,7 @@ public class GatewayConfig {
                             return f;
                         })
                         .uri(accountsServiceUrl))
-                .route("transactions-service", r -> r.path("/api/transactions/**")
+                .route("transactions-service", r -> r.path("/api/v1/transactions/**")
                         .filters(f -> {
                             f.filter(authFilter);
                             if (rateLimiterEnabled) {
@@ -91,7 +91,7 @@ public class GatewayConfig {
                             return f;
                         })
                         .uri(transactionsServiceUrl))
-                .route("disputes-service", r -> r.path("/api/disputes/**", "/api/operations/disputes/**")
+                .route("disputes-service", r -> r.path("/api/v1/disputes/**", "/api/v1/operations/disputes/**")
                         .filters(f -> {
                             f.filter(authFilter);
                             if (rateLimiterEnabled) {
@@ -101,7 +101,7 @@ public class GatewayConfig {
                         })
                         .uri(disputesServiceUrl));
         if (paymentsServiceUrl != null && !paymentsServiceUrl.isBlank()) {
-            routes.route("payments-service", r -> r.path("/api/payments", "/api/payments/**", "/api/operations/payments/reconciliation")
+            routes.route("payments-service", r -> r.path("/api/v1/payments", "/api/v1/payments/**", "/api/v1/operations/payments/reconciliation")
                     .filters(f -> {
                         f.filter(authFilter);
                         if (rateLimiterEnabled) {

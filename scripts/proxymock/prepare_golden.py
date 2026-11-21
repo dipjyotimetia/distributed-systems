@@ -38,7 +38,7 @@ Usage:
   prepare_golden.py --golden <recorded-golden-dir>
                     [--downstream-dir banking-user ...]       # default: auto-detect
                     [--known-gap-pattern 'http:queryparams:accountId is' ...]
-                    [--known-gap-status /api/transactions:503 ...]
+                    [--known-gap-status /api/v1/transactions:503 ...]
                     [--check]   # verify the golden is already normalized (idempotent);
                                 # make no changes and exit non-zero if any would be made.
 """

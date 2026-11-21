@@ -50,7 +50,7 @@ spec:
             cpu: "200m"
         livenessProbe:
           httpGet:
-            path: /api/healthz
+            path: /api/v1/healthz
             port: 3000
           initialDelaySeconds: 30
           periodSeconds: 30
@@ -58,7 +58,7 @@ spec:
           failureThreshold: 3
         readinessProbe:
           httpGet:
-            path: /api/healthz
+            path: /api/v1/healthz
             port: 3000
           initialDelaySeconds: 15
           periodSeconds: 10

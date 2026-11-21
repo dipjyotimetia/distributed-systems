@@ -49,7 +49,7 @@ function Form() {
     let active = true;
     async function loadPayments() {
       try {
-        const response = await fetch('/api/payments', { cache: 'no-store' });
+        const response = await fetch('/api/v1/payments', { cache: 'no-store' });
         if (!active) return;
         if (!response.ok) {
           setPaymentsError(true);
@@ -69,7 +69,7 @@ function Form() {
     setPending(true);
     setError('');
     try {
-      const response = await fetch(id ? '/api/payments/' + id : '/api/payments', {
+      const response = await fetch(id ? '/api/v1/payments/' + id : '/api/v1/payments', {
         cache: 'no-store',
         ...(submission && {
           method: 'POST', body: submission.body,

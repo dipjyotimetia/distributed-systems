@@ -1,0 +1,197 @@
+openapi: 3.0.3
+info:
+  title: AI Service
+  description: Banking assistant chat and dispute research entry points.
+  version: v1
+servers:
+  - url: http://localhost:8090
+    description: Local development server
+paths:
+  /api/v1/chat:
+    post:
+      tags: [ai]
+      operationId: chat
+      summary: Ask every configured model
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatRequest'
+      responses:
+        '200':
+          description: Provider replies
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatResponse'
+  /api/v1/providers:
+    get:
+      tags: [ai]
+      operationId: listProviders
+      summary: List configured model providers
+      responses:
+        '200':
+          description: Providers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Provider'
+  /api/v1/agent/chat:
+    post:
+      tags: [ai]
+      operationId: agentChat
+      summary: Start a durable banking agent workflow
+      parameters:
+        - name: Authorization
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentChatRequest'
+      responses:
+        '200':
+          description: Workflow result or handle
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '503':
+          description: Agent workflow unavailable
+  /api/v1/disputes/research:
+    post:
+      tags: [ai]
+      operationId: disputeResearch
+      summary: Start multi-agent dispute research
+      parameters:
+        - name: X-Internal-Token
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DisputeResearchRequest'
+      responses:
+        '200':
+          description: Research result or handle
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '401':
+          description: Internal token required
+        '503':
+          description: Dispute research unavailable
+  /api/v1/health:
+    get:
+      tags: [ai]
+      operationId: aiHealth
+      summary: Liveness
+      responses:
+        '200':
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+components:
+  schemas:
+    ChatRequest:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+        accountContext:
+          type: string
+          default: ""
+        locale:
+          type: string
+          default: en-US
+    ProviderResult:
+      type: object
+      required: [provider, name, model]
+      properties:
+        provider:
+          type: string
+        name:
+          type: string
+        model:
+          type: string
+        message:
+          type: string
+        error:
+          type: string
+          nullable: true
+        durationMs:
+          type: integer
+    ChatResponse:
+      type: object
+      required: [results]
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProviderResult'
+    Provider:
+      type: object
+      properties:
+        provider:
+          type: string
+        name:
+          type: string
+        model:
+          type: string
+    AgentChatRequest:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+        accountId:
+          type: string
+          nullable: true
+        locale:
+          type: string
+          default: en-US
+        conversationClaim:
+          type: string
+          nullable: true
+        authToken:
+          type: string
+        wait:
+          type: boolean
+          default: true
+    DisputeResearchRequest:
+      type: object
+      required: [caseId]
+      properties:
+        caseId:
+          type: integer
+          format: int64
+        locale:
+          type: string
+          default: en-US
+        wait:
+          type: boolean
+          default: true
+    Health:
+      type: object
+      properties:
+        status:
+          type: string
+        temporalQueue:
+          type: string

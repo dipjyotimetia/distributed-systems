@@ -39,7 +39,7 @@ setup_api_gateway() {
         sleep 5
         API_GATEWAY_URL="http://localhost:8080"
         
-        if ! curl -s --max-time 5 "$API_GATEWAY_URL/health" > /dev/null 2>&1; then
+        if ! curl -s --max-time 5 "$API_GATEWAY_URL/api/v1/health" > /dev/null 2>&1; then
             print_color $RED "❌ Failed to connect to API Gateway"
             kill $PORT_FORWARD_PID 2>/dev/null || true
             exit 1
@@ -104,19 +104,19 @@ generate_user_traffic() {
     local password="TestPassword123!"
     
     # Check username availability
-    api_call "GET" "/api/users/check-username?username=$username" "" ""
+    api_call "GET" "/api/v1/users/check-username?username=$username" "" ""
     
     # Check email availability  
-    api_call "GET" "/api/users/check-email?email=$email" "" ""
+    api_call "GET" "/api/v1/users/check-email?email=$email" "" ""
     
     # Register new user
     local register_data='{"username":"'$username'","email":"'$email'","password":"'$password'"}'
-    local register_response=$(api_call "POST" "/api/users/register" "$register_data" "")
+    local register_response=$(api_call "POST" "/api/v1/users/register" "$register_data" "")
     
     # Login
     local login_data='{"usernameOrEmail":"'$username'","password":"'$password'"}'
     local login_response=$(curl -s -X POST -H "Content-Type: application/json" \
-        -d "$login_data" "$API_GATEWAY_URL/api/users/login" 2>/dev/null)
+        -d "$login_data" "$API_GATEWAY_URL/api/v1/users/login" 2>/dev/null)
     
     local token=""
     if echo "$login_response" | jq . > /dev/null 2>&1; then
@@ -130,7 +130,7 @@ generate_user_traffic() {
     
     # Get profile (requires auth)
     if [ ! -z "$token" ]; then
-        api_call "GET" "/api/users/profile" "" "$token"
+        api_call "GET" "/api/v1/users/profile" "" "$token"
     fi
     
     echo "$token"
@@ -150,7 +150,7 @@ generate_account_traffic() {
     local account_data='{"accountType":"CHECKING","initialBalance":1000.00}'
     local account_response=$(curl -s -X POST -H "Content-Type: application/json" \
         -H "Authorization: Bearer $token" \
-        -d "$account_data" "$API_GATEWAY_URL/api/accounts" 2>/dev/null)
+        -d "$account_data" "$API_GATEWAY_URL/api/v1/accounts" 2>/dev/null)
     
     local account_id=""
     if echo "$account_response" | jq . > /dev/null 2>&1; then
@@ -161,14 +161,14 @@ generate_account_traffic() {
     fi
     
     # Get all accounts
-    api_call "GET" "/api/accounts" "" "$token"
+    api_call "GET" "/api/v1/accounts" "" "$token"
     
     if [ ! -z "$account_id" ]; then
         # Get specific account
-        api_call "GET" "/api/accounts/$account_id" "" "$token"
+        api_call "GET" "/api/v1/accounts/$account_id" "" "$token"
         
         # Get account balance
-        api_call "GET" "/api/accounts/$account_id/balance" "" "$token"
+        api_call "GET" "/api/v1/accounts/$account_id/balance" "" "$token"
     fi
     
     echo "$account_id"
@@ -187,20 +187,20 @@ generate_transaction_traffic() {
     
     # Deposit
     local deposit_data='{"accountId":"'$account_id'","amount":100.00,"description":"Test deposit"}'
-    api_call "POST" "/api/transactions/deposit" "$deposit_data" "$token"
+    api_call "POST" "/api/v1/transactions/deposit" "$deposit_data" "$token"
     
     # Withdraw
     local withdraw_data='{"accountId":"'$account_id'","amount":50.00,"description":"Test withdrawal"}'
-    api_call "POST" "/api/transactions/withdraw" "$withdraw_data" "$token"
+    api_call "POST" "/api/v1/transactions/withdraw" "$withdraw_data" "$token"
     
     # Get all transactions
-    api_call "GET" "/api/transactions?accountId=$account_id" "" "$token"
+    api_call "GET" "/api/v1/transactions?accountId=$account_id" "" "$token"
     
     # Create another account for transfer
     local account2_data='{"accountType":"SAVINGS","initialBalance":500.00}'
     local account2_response=$(curl -s -X POST -H "Content-Type: application/json" \
         -H "Authorization: Bearer $token" \
-        -d "$account2_data" "$API_GATEWAY_URL/api/accounts" 2>/dev/null)
+        -d "$account2_data" "$API_GATEWAY_URL/api/v1/accounts" 2>/dev/null)
     
     local account2_id=""
     if echo "$account2_response" | jq . > /dev/null 2>&1; then
@@ -210,7 +210,7 @@ generate_transaction_traffic() {
     if [ ! -z "$account2_id" ]; then
         # Transfer between accounts
         local transfer_data='{"fromAccountId":"'$account_id'","toAccountId":"'$account2_id'","amount":25.00,"description":"Test transfer"}'
-        api_call "POST" "/api/transactions/transfer" "$transfer_data" "$token"
+        api_call "POST" "/api/v1/transactions/transfer" "$transfer_data" "$token"
     fi
 }
 

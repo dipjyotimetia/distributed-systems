@@ -41,9 +41,9 @@ function transport(address: string, serverName: string) {
     baseUrl: endpoint(address, tls),
     nodeOptions: tls
       ? {
-          ca: fs.readFileSync(process.env.MTLS_CA || ''),
-          key: fs.readFileSync(process.env.MTLS_KEY || ''),
-          cert: fs.readFileSync(process.env.MTLS_CERT || ''),
+          ca: fs.readFileSync(/*turbopackIgnore: true*/ process.env.MTLS_CA || ''),
+          key: fs.readFileSync(/*turbopackIgnore: true*/ process.env.MTLS_KEY || ''),
+          cert: fs.readFileSync(/*turbopackIgnore: true*/ process.env.MTLS_CERT || ''),
           servername: serverName,
         }
       : undefined,

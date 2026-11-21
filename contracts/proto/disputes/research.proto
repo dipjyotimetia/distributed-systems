@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package disputes.research.v1;
+
+option go_package = "github.com/dipjyotimetia/distributed-systems/backend/disputes-service/gen/disputes/research/v1;researchv1";
+
+// Internal research API. The shared token is x-internal-token metadata.
+// Case JSON matches the public dispute document.
+service DisputeResearch {
+  rpc GetContext(GetContextRequest) returns (CaseJson);
+  rpc SaveDraft(SaveDraftRequest) returns (CaseJson);
+}
+
+message GetContextRequest {
+  int64 case_id = 1;
+}
+
+message SaveDraftRequest {
+  int64 case_id = 1;
+  string draft_json = 2;
+}
+
+message CaseJson {
+  string json = 1;
+}

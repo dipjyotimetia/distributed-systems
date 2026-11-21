@@ -12,7 +12,7 @@ test.describe('Authentication Flow', () => {
     await page.getByPlaceholder('Confirm your password').fill('password123');
     
     // Mock successful registration
-    await page.route('**/api/users/register', async (route) => {
+    await page.route('**/api/v1/users/register', async (route) => {
       await route.fulfill({
         status: 201,
         contentType: 'application/json',
@@ -37,7 +37,7 @@ test.describe('Authentication Flow', () => {
     await page.getByPlaceholder('Enter your password').fill('password123');
     
     // Mock successful login
-    await page.route('**/api/users/login', async (route) => {
+    await page.route('**/api/v1/users/login', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -51,7 +51,7 @@ test.describe('Authentication Flow', () => {
     });
     
     // Mock profile endpoint
-    await page.route('**/api/users/profile', async (route) => {
+    await page.route('**/api/v1/users/profile', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -85,7 +85,7 @@ test.describe('Authentication Flow', () => {
 
   test('should redirect authenticated users away from login/register', async ({ page }) => {
     // Mock authentication
-    await page.route('**/api/users/profile', async (route) => {
+    await page.route('**/api/v1/users/profile', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -117,7 +117,7 @@ test.describe('Authentication Flow', () => {
 
   test('should handle logout flow', async ({ page }) => {
     // Mock authentication
-    await page.route('**/api/users/profile', async (route) => {
+    await page.route('**/api/v1/users/profile', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -134,7 +134,7 @@ test.describe('Authentication Flow', () => {
     });
     
     // Mock accounts data
-    await page.route('**/api/accounts', async (route) => {
+    await page.route('**/api/v1/accounts', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -143,7 +143,7 @@ test.describe('Authentication Flow', () => {
     });
     
     // Mock transactions data
-    await page.route('**/api/transactions/recent*', async (route) => {
+    await page.route('**/api/v1/transactions/recent*', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -166,7 +166,7 @@ test.describe('Authentication Flow', () => {
     // Should redirect to login
     await expect(page).toHaveURL('/login');
 
-    await page.route('**/api/users/profile', async (route) => {
+    await page.route('**/api/v1/users/profile', async (route) => {
       await route.fulfill({
         status: 401,
         contentType: 'application/json',
@@ -179,7 +179,7 @@ test.describe('Authentication Flow', () => {
 
   test('should handle token expiration', async ({ page }) => {
     // Mock authentication with expired token
-    await page.route('**/api/users/profile', async (route) => {
+    await page.route('**/api/v1/users/profile', async (route) => {
       await route.fulfill({
         status: 401,
         contentType: 'application/json',
@@ -206,7 +206,7 @@ test.describe('Authentication Flow', () => {
     await page.goto('/login');
     
     // Mock failed login
-    await page.route('**/api/users/login', async (route) => {
+    await page.route('**/api/v1/users/login', async (route) => {
       await route.fulfill({
         status: 401,
         contentType: 'application/json',
@@ -233,7 +233,7 @@ test.describe('Authentication Flow', () => {
     await page.goto('/register');
     
     // Mock registration failure
-    await page.route('**/api/users/register', async (route) => {
+    await page.route('**/api/v1/users/register', async (route) => {
       await route.fulfill({
         status: 409,
         contentType: 'application/json',
@@ -261,7 +261,7 @@ test.describe('Authentication Flow', () => {
 
   test('should handle session timeout during activity', async ({ page }) => {
     // Mock initial authentication
-    await page.route('**/api/users/profile', async (route) => {
+    await page.route('**/api/v1/users/profile', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -278,7 +278,7 @@ test.describe('Authentication Flow', () => {
     });
     
     // Mock accounts data initially
-    await page.route('**/api/accounts', async (route) => {
+    await page.route('**/api/v1/accounts', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -287,7 +287,7 @@ test.describe('Authentication Flow', () => {
     });
     
     // Mock transactions data
-    await page.route('**/api/transactions/recent*', async (route) => {
+    await page.route('**/api/v1/transactions/recent*', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -305,7 +305,7 @@ test.describe('Authentication Flow', () => {
     await expect(page.getByText('Welcome back, testuser!')).toBeVisible();
     
     // Change API to return 401 (simulating session timeout)
-    await page.route('**/api/accounts', async (route) => {
+    await page.route('**/api/v1/accounts', async (route) => {
       await route.fulfill({
         status: 401,
         contentType: 'application/json',
@@ -335,7 +335,7 @@ test.describe('Authentication Flow', () => {
     await page.getByPlaceholder('Enter your password').fill('password123');
     
     // Mock successful login
-    await page.route('**/api/users/login', async (route) => {
+    await page.route('**/api/v1/users/login', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -349,7 +349,7 @@ test.describe('Authentication Flow', () => {
     });
     
     // Mock profile endpoint
-    await page.route('**/api/users/profile', async (route) => {
+    await page.route('**/api/v1/users/profile', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -366,7 +366,7 @@ test.describe('Authentication Flow', () => {
     });
     
     // Mock accounts data
-    await page.route('**/api/accounts', async (route) => {
+    await page.route('**/api/v1/accounts', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',

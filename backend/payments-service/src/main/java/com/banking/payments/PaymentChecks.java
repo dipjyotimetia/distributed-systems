@@ -5,6 +5,12 @@ import fraud.v1.Fraud.TransactionRequest;
 import fraud.v1.FraudCheckerGrpc;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
+import io.grpc.Metadata;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
+import io.grpc.stub.MetadataUtils;
+import ledger.v1.AccountLedgerGrpc;
+import ledger.v1.MovementRequest;
 import jakarta.annotation.PreDestroy;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
@@ -31,23 +37,24 @@ import java.util.concurrent.TimeUnit;
 public class PaymentChecks {
     enum Movement { RESERVE, COMMIT, COMPENSATE }
     private static final Duration TIMEOUT = Duration.ofSeconds(4);
+    private static final Metadata.Key<String> SIGNATURE = Metadata.Key.of("x-movement-signature", Metadata.ASCII_STRING_MARSHALLER);
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(TIMEOUT).build();
     private final ManagedChannel fraud;
+    private final ManagedChannel ledger;
     private final URI complianceUrl;
     private final String complianceToken;
-    private final String accountUrl;
     private final SecretKeySpec movementKey;
     private final ObjectMapper json;
 
     public PaymentChecks(@Value("${FRAUD_SERVICE_ADDRESS}") String fraudAddress,
                          @Value("${PAYMENTS_COMPLIANCE_URL}") URI complianceUrl,
                          @Value("${PAYMENTS_COMPLIANCE_TOKEN}") String complianceToken,
-                         @Value("${PAYMENTS_ACCOUNTS_URL}") String accountUrl,
+                         @Value("${ACCOUNTS_GRPC_ADDRESS:accounts-service:9092}") String accountsGrpc,
                          @Value("${MOVEMENT_SECRET}") String movementSecret, ObjectMapper json) {
         this.fraud = ManagedChannelBuilder.forTarget(fraudAddress).usePlaintext().build();
+        this.ledger = ManagedChannelBuilder.forTarget(accountsGrpc).usePlaintext().build();
         this.complianceUrl = complianceUrl;
         this.complianceToken = complianceToken;
-        this.accountUrl = accountUrl.replaceAll("/+$", "");
         this.movementKey = new SecretKeySpec(movementSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
         this.json = json;
     }
@@ -85,15 +92,23 @@ public class PaymentChecks {
         } catch (GeneralSecurityException failure) {
             throw new IllegalStateException("Cannot sign account movement", failure);
         }
-        var request = HttpRequest.newBuilder(URI.create(accountUrl + "/internal/account-movements/outbound-aud/" + id + "/" + action))
-                .timeout(TIMEOUT).header("Content-Type", "application/json").header("X-Movement-Signature", signature)
-                .POST(HttpRequest.BodyPublishers.ofString("""
-                        {"userId":%d,"fromAccountId":%d,"toAccountId":null,"amount":%s}
-                        """.formatted(customer, account, amount))).build();
-        int status = send(request, HttpResponse.BodyHandlers.discarding()).statusCode();
-        if (status == 204) return true;
-        if (action == Movement.RESERVE && (status == 404 || status == 409 || status == 422)) return false;
-        throw new IllegalStateException("Account movement has no successful acknowledgement (HTTP " + status + ")");
+        Metadata headers = new Metadata();
+        headers.put(SIGNATURE, signature);
+        var request = MovementRequest.newBuilder().setOperationId(id.toString()).setAction(action.name())
+                .setUserId(customer).setFromAccountId(account).setAmount(amount).build();
+        try {
+            AccountLedgerGrpc.newBlockingStub(ledger).withDeadlineAfter(4, TimeUnit.SECONDS)
+                    .withInterceptors(MetadataUtils.newAttachHeadersInterceptor(headers))
+                    .applyOutboundAud(request);
+            return true;
+        } catch (StatusRuntimeException failure) {
+            Status.Code code = failure.getStatus().getCode();
+            if (action == Movement.RESERVE && (code == Status.Code.NOT_FOUND || code == Status.Code.ABORTED
+                    || code == Status.Code.FAILED_PRECONDITION)) {
+                return false;
+            }
+            throw new IllegalStateException("Account movement has no successful acknowledgement (" + code + ")");
+        }
     }
 
     private <T> HttpResponse<T> send(HttpRequest request, HttpResponse.BodyHandler<T> body) {
@@ -110,6 +125,7 @@ public class PaymentChecks {
     @PreDestroy
     void close() {
         fraud.shutdownNow();
+        ledger.shutdownNow();
         http.close();
     }
 }

@@ -31,7 +31,7 @@ function Queue() {
     const controller = new AbortController();
     async function load() {
       try {
-        const response = await fetch('/api/operations/payments/reconciliation?offset=' + offset, {
+        const response = await fetch('/api/v1/operations/payments/reconciliation?offset=' + offset, {
           signal: controller.signal, cache: 'no-store',
         });
         if (response.status === 403) {

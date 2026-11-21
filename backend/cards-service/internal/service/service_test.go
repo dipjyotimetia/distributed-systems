@@ -2,13 +2,10 @@ package service
 
 import (
 	"context"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 
 	cardsv1 "github.com/dipjyotimetia/distributed-systems/backend/cards-service/gen/cards/v1"
-	"github.com/dipjyotimetia/distributed-systems/backend/cards-service/internal/ledger"
 	fraudv1 "github.com/dipjyotimetia/distributed-systems/backend/fraud-service/gen/fraud/v1"
 	kycv1 "github.com/dipjyotimetia/distributed-systems/backend/kyc-service/gen/kyc/v1"
 	"github.com/golang-jwt/jwt/v5"
@@ -68,6 +65,13 @@ func (f fakeKyc) Decide(context.Context, *kycv1.DecideRequest, ...grpc.CallOptio
 	return nil, nil
 }
 
+type fakeLedger struct{}
+
+func (fakeLedger) Owns(context.Context, string, int64) error { return nil }
+func (fakeLedger) Withdraw(context.Context, int64, int64, string, string) error {
+	return nil
+}
+
 type fakeFraud struct{ approved bool }
 
 func (f fakeFraud) CheckTransaction(context.Context, *fraudv1.TransactionRequest, ...grpc.CallOption) (*fraudv1.FraudCheckResponse, error) {
@@ -75,21 +79,10 @@ func (f fakeFraud) CheckTransaction(context.Context, *fraudv1.TransactionRequest
 }
 
 func TestIssueRequiresKycAndAuthorizeIsIdempotent(t *testing.T) {
-	accounts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet {
-			w.WriteHeader(http.StatusOK)
-			return
-		}
-		if r.Header.Get("X-Movement-Signature") == "" {
-			t.Error("missing movement signature")
-		}
-		w.WriteHeader(http.StatusNoContent)
-	}))
-	defer accounts.Close()
 	server := &Server{
 		Repo:   &memory{cards: map[string]Card{}, auths: map[string]Authorization{}, owner: map[string]int64{}},
 		Secret: []byte("secret"),
-		Ledger: ledger.Client{Base: accounts.URL, Secret: "secret"},
+		Ledger: fakeLedger{},
 		Kyc:    fakeKyc{status: "PENDING"}, Fraud: fakeFraud{approved: true},
 	}
 	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("authorization", "Bearer "+token(t)))

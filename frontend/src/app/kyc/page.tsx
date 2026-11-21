@@ -36,7 +36,7 @@ function Form() {
 
     async function load() {
       try {
-        const response = await fetch('/api/kyc');
+        const response = await fetch('/api/v1/kyc');
         const body = await response.json().catch(() => ({}));
         if (!active) return;
         if (!response.ok) setError(body.message || 'Could not read KYC status');
@@ -61,7 +61,7 @@ function Form() {
     setError('');
     setLoading(true);
     try {
-      const response = await fetch('/api/kyc');
+      const response = await fetch('/api/v1/kyc');
       const body = await response.json().catch(() => ({}));
       if (!response.ok) setError(body.message || 'Could not read KYC status');
       else {
@@ -81,7 +81,7 @@ function Form() {
     setError('');
     setSubmitting(true);
     try {
-      const response = await fetch('/api/kyc', {
+      const response = await fetch('/api/v1/kyc', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({

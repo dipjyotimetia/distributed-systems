@@ -22,10 +22,10 @@ type ledgerMovement struct {
 }
 
 var ledgerMovements = []ledgerMovement{
-	{"/api/transactions/deposit", "DEPOSIT", 30},
-	{"/api/transactions/withdraw", "WITHDRAWAL", 7},
-	{"/api/transactions", "DEPOSIT", 11},
-	{"/api/transactions/create", "WITHDRAWAL", 5},
+	{"/api/v1/transactions/deposit", "DEPOSIT", 30},
+	{"/api/v1/transactions/withdraw", "WITHDRAWAL", 7},
+	{"/api/v1/transactions", "DEPOSIT", 11},
+	{"/api/v1/transactions/create", "WITHDRAWAL", 5},
 }
 
 func LedgerJourney(ctx workflow.Context, input Input) ([]BoundaryEvidence, error) {
@@ -102,7 +102,7 @@ func (a *Activities) MoveFunds(ctx context.Context, input Input, accountID int64
 		return ledgerEntry{}, err
 	}
 	payload := map[string]any{"accountId": accountID, "amount": movement.Amount, "type": movement.Type, "description": "Synthetic ledger movement"}
-	if movement.Path == "/api/transactions" || movement.Path == "/api/transactions/create" {
+	if movement.Path == "/api/v1/transactions" || movement.Path == "/api/v1/transactions/create" {
 		payload["currency"] = "USD"
 	}
 	var entry ledgerEntry
@@ -119,7 +119,7 @@ func (a *Activities) RejectWithdrawal(ctx context.Context, input Input, accountI
 		return err
 	}
 	var failure struct{ Code string }
-	if err := call(ctx, a.Frontend, "/api/transactions/withdraw", token, map[string]any{
+	if err := call(ctx, a.Frontend, "/api/v1/transactions/withdraw", token, map[string]any{
 		"accountId": accountID, "amount": 150, "description": "Synthetic insufficient funds",
 	}, 400, &failure); err != nil {
 		return err
@@ -149,9 +149,9 @@ func (a *Activities) VerifyAccounts(ctx context.Context, input Input, userID, ac
 		return BoundaryEvidence{}, err
 	}
 	expected := accountRecord{ID: accountID, UserID: userID, AccountType: "CHECKING", Currency: "USD", Status: "ACTIVE", Balance: 129}
-	for _, path := range []string{"/api/accounts", "/api/accounts?page=0&size=2", "/api/accounts/search?q=checking&page=0&size=2"} {
+	for _, path := range []string{"/api/v1/accounts", "/api/v1/accounts?page=0&size=2", "/api/v1/accounts/search?q=checking&page=0&size=2"} {
 		var records []accountRecord
-		if path == "/api/accounts" {
+		if path == "/api/v1/accounts" {
 			err = call(ctx, a.Frontend, path, token, nil, 200, &records)
 		} else {
 			var result page[accountRecord]
@@ -168,7 +168,7 @@ func (a *Activities) VerifyAccounts(ctx context.Context, input Input, userID, ac
 			return BoundaryEvidence{}, fmt.Errorf("incorrect account scope or balance on %s", path)
 		}
 	}
-	accountPath := fmt.Sprintf("/api/accounts/%d", accountID)
+	accountPath := fmt.Sprintf("/api/v1/accounts/%d", accountID)
 	var detail accountRecord
 	if err := call(ctx, a.Frontend, accountPath, token, nil, 200, &detail); err != nil {
 		return BoundaryEvidence{}, err
@@ -176,7 +176,7 @@ func (a *Activities) VerifyAccounts(ctx context.Context, input Input, userID, ac
 	if detail != expected {
 		return BoundaryEvidence{}, fmt.Errorf("account detail did not match owned account")
 	}
-	forbidden, err := request(ctx, http.MethodGet, a.Frontend, fmt.Sprintf("/api/accounts/%d", otherAccountID), token, nil)
+	forbidden, err := request(ctx, http.MethodGet, a.Frontend, fmt.Sprintf("/api/v1/accounts/%d", otherAccountID), token, nil)
 	if err != nil {
 		return BoundaryEvidence{}, err
 	}
@@ -198,7 +198,7 @@ func (a *Activities) VerifyAccounts(ctx context.Context, input Input, userID, ac
 		TotalBalance                  float64
 		AccountsByType                map[string]int
 	}
-	if err := call(ctx, a.Frontend, "/api/accounts/summary", token, nil, 200, &summary); err != nil {
+	if err := call(ctx, a.Frontend, "/api/v1/accounts/summary", token, nil, 200, &summary); err != nil {
 		return BoundaryEvidence{}, err
 	}
 	if summary.TotalAccounts != 1 || summary.ActiveAccounts != 1 || summary.TotalBalance != 129 || summary.AccountsByType["CHECKING"] != 1 {
@@ -235,8 +235,8 @@ func (a *Activities) VerifyLedger(ctx context.Context, input Input, userID, acco
 		}
 		expected[entry.ID] = entry
 	}
-	accountPath := fmt.Sprintf("/api/accounts/%d/transactions", accountID)
-	for _, path := range []string{"/api/transactions", "/api/transactions/recent?limit=4", accountPath} {
+	accountPath := fmt.Sprintf("/api/v1/accounts/%d/transactions", accountID)
+	for _, path := range []string{"/api/v1/transactions", "/api/v1/transactions/recent?limit=4", accountPath} {
 		var rows []ledgerEntry
 		if err := call(ctx, a.Frontend, path, token, nil, 200, &rows); err != nil {
 			return BoundaryEvidence{}, err
@@ -250,7 +250,7 @@ func (a *Activities) VerifyLedger(ctx context.Context, input Input, userID, acco
 			}
 		}
 	}
-	for _, path := range []string{"/api/transactions?page=0&size=2&type=DEPOSIT", "/api/transactions/search?page=0&size=2&type=DEPOSIT"} {
+	for _, path := range []string{"/api/v1/transactions?page=0&size=2&type=DEPOSIT", "/api/v1/transactions/search?page=0&size=2&type=DEPOSIT"} {
 		var result page[ledgerEntry]
 		if err := call(ctx, a.Frontend, path, token, nil, 200, &result); err != nil {
 			return BoundaryEvidence{}, err
@@ -260,7 +260,7 @@ func (a *Activities) VerifyLedger(ctx context.Context, input Input, userID, acco
 			return BoundaryEvidence{}, fmt.Errorf("wrong filtered ledger page on %s", path)
 		}
 	}
-	for _, path := range []string{"/api/transactions/summary", accountPath + "/summary"} {
+	for _, path := range []string{"/api/v1/transactions/summary", accountPath + "/summary"} {
 		var summary struct {
 			TotalTransactions, TotalDeposits, TotalWithdrawals, CompletedTransactions int
 		}
@@ -271,7 +271,7 @@ func (a *Activities) VerifyLedger(ctx context.Context, input Input, userID, acco
 			return BoundaryEvidence{}, fmt.Errorf("incorrect ledger summary on %s", path)
 		}
 	}
-	detailPath := fmt.Sprintf("/api/transactions/%d", entries[0].ID)
+	detailPath := fmt.Sprintf("/api/v1/transactions/%d", entries[0].ID)
 	var detail ledgerEntry
 	if err := call(ctx, a.Frontend, detailPath, token, nil, 200, &detail); err != nil {
 		return BoundaryEvidence{}, err
@@ -297,7 +297,7 @@ func (a *Activities) AssertSettledConflict(ctx context.Context, input Input, ent
 	if err != nil {
 		return err
 	}
-	path := fmt.Sprintf("/api/transactions/%d/cancel", entry.ID)
+	path := fmt.Sprintf("/api/v1/transactions/%d/cancel", entry.ID)
 	response, err := request(ctx, http.MethodPatch, a.Frontend, path, token, nil)
 	if err != nil {
 		return err
@@ -332,7 +332,7 @@ func (a *Activities) VerifyPayments(ctx context.Context, entries []ledgerEntry) 
 }
 
 func (a *Activities) VerifyAccountTypeUpdate(ctx context.Context, input Input, userID, accountID int64) (BoundaryEvidence, error) {
-	path := fmt.Sprintf("/api/accounts/%d", accountID)
+	path := fmt.Sprintf("/api/v1/accounts/%d", accountID)
 	payload := map[string]string{"accountType": "SAVINGS"}
 	other, err := a.login(ctx, Input{User: input.User + "b"})
 	if err != nil {

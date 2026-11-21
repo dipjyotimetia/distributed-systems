@@ -24,19 +24,19 @@ SERVICES=("frontend" "api-gateway" "user-service" "accounts-service" "transactio
 
 # Business endpoints we WANT to see (from e2e tests)
 EXPECTED_BUSINESS_ENDPOINTS=(
-    "/api/users/register"
-    "/api/users/login"
-    "/api/users/profile"
-    "/api/users/check-username"
-    "/api/users/check-email"
-    "/api/accounts"
-    "/api/accounts/[0-9]+"
-    "/api/accounts/[0-9]+/balance"
-    "/api/transactions"
-    "/api/transactions/create"
-    "/api/transactions/deposit"
-    "/api/transactions/withdraw"
-    "/api/transactions/transfer"
+    "/api/v1/users/register"
+    "/api/v1/users/login"
+    "/api/v1/users/profile"
+    "/api/v1/users/check-username"
+    "/api/v1/users/check-email"
+    "/api/v1/accounts"
+    "/api/v1/accounts/[0-9]+"
+    "/api/v1/accounts/[0-9]+/balance"
+    "/api/v1/transactions"
+    "/api/v1/transactions/create"
+    "/api/v1/transactions/deposit"
+    "/api/v1/transactions/withdraw"
+    "/api/v1/transactions/transfer"
 )
 
 # Database operations we WANT to see
@@ -53,7 +53,7 @@ UNWANTED_PATTERNS=(
     "/actuator/prometheus"
     "/actuator/info"
     "/actuator/metrics"
-    "/api/healthz"
+    "/api/v1/healthz"
     "/healthz"
     "/metrics"
     "/-/ready"

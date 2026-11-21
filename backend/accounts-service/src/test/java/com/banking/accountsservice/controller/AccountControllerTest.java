@@ -1,5 +1,6 @@
 package com.banking.accountsservice.controller;
 
+import com.banking.accountsservice.contract.ContractJson;
 import com.banking.accountsservice.dto.AccountCreateRequest;
 import com.banking.accountsservice.dto.AccountResponse;
 import com.banking.accountsservice.dto.AccountQuery;
@@ -17,6 +18,8 @@ import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.SpanBuilder;
 import io.opentelemetry.api.trace.Tracer;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Validation;
+import jakarta.validation.Validator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -114,7 +117,7 @@ class AccountControllerTest {
         when(accountService.updateAccount(testAccountId, testUserId, null, Account.Status.FROZEN))
                 .thenReturn(testAccountResponse);
 
-        mockMvc.perform(patch("/api/accounts/{id}/status", testAccountId)
+        mockMvc.perform(patch("/api/v1/accounts/{id}/status", testAccountId)
                         .contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"FROZEN\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("FROZEN"));
@@ -123,7 +126,7 @@ class AccountControllerTest {
     @Test
     void deleteReturnsNoContentOnRepeatedClosure() throws Exception {
         for (int attempt = 0; attempt < 2; attempt++) {
-            mockMvc.perform(delete("/api/accounts/{id}", testAccountId))
+            mockMvc.perform(delete("/api/v1/accounts/{id}", testAccountId))
                     .andExpect(status().isNoContent())
                     .andExpect(content().string(""));
         }
@@ -135,7 +138,7 @@ class AccountControllerTest {
         List<AccountResponse> accounts = Arrays.asList(testAccountResponse);
         when(accountService.getUserAccounts(testUserId)).thenReturn(accounts);
 
-        mockMvc.perform(get("/api/accounts"))
+        mockMvc.perform(get("/api/v1/accounts"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].accountNumber").value("123456789012"));
 
@@ -148,7 +151,7 @@ class AccountControllerTest {
         when(accountService.queryAccounts(testUserId, query, true)).thenReturn(
                 new PageImpl<>(List.of(new AccountResponse()), PageRequest.of(0, 2, Sort.by("id")), 1));
 
-        mockMvc.perform(get("/api/accounts/search").param("q", "checking").param("type", "CHECKING")
+        mockMvc.perform(get("/api/v1/accounts/search").param("q", "checking").param("type", "CHECKING")
                 .param("status", "ACTIVE").param("page", "0").param("size", "2").param("sort", "id,asc"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].status").value("ACTIVE"))
@@ -161,7 +164,7 @@ class AccountControllerTest {
     void getAccountById_Success() throws Exception {
         when(accountService.getAccountById(testAccountId, testUserId)).thenReturn(testAccountResponse);
 
-        mockMvc.perform(get("/api/accounts/{accountId}", testAccountId))
+        mockMvc.perform(get("/api/v1/accounts/{accountId}", testAccountId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accountNumber").value("123456789012"));
 
@@ -172,7 +175,7 @@ class AccountControllerTest {
     void getAccountById_NotFound() throws Exception {
         when(accountService.getAccountById(anyLong(), anyLong())).thenThrow(new RuntimeException("Account not found"));
 
-        mockMvc.perform(get("/api/accounts/{accountId}", testAccountId))
+        mockMvc.perform(get("/api/v1/accounts/{accountId}", testAccountId))
                 .andExpect(status().isNotFound());
     }
 
@@ -180,7 +183,7 @@ class AccountControllerTest {
     void getAccountBalance_Success() throws Exception {
         when(accountService.getAccountBalance(testAccountId, testUserId)).thenReturn(testBalanceResponse);
 
-        mockMvc.perform(get("/api/accounts/{accountId}/balance", testAccountId))
+        mockMvc.perform(get("/api/v1/accounts/{accountId}/balance", testAccountId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.balance").value(1000.00));
     }
@@ -189,7 +192,7 @@ class AccountControllerTest {
     void createAccount_Success() throws Exception {
         when(accountService.createAccount(any(AccountCreateRequest.class), eq(testUserId))).thenReturn(testAccountResponse);
 
-        mockMvc.perform(post("/api/accounts")
+        mockMvc.perform(post("/api/v1/accounts")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(createRequest)))
                 .andExpect(status().isCreated())
@@ -200,7 +203,7 @@ class AccountControllerTest {
     void createAccount_InvalidInput() throws Exception {
         AccountCreateRequest invalidRequest = new AccountCreateRequest("");
 
-        mockMvc.perform(post("/api/accounts")
+        mockMvc.perform(post("/api/v1/accounts")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(invalidRequest)))
                 .andExpect(status().isBadRequest());
@@ -212,7 +215,7 @@ class AccountControllerTest {
     void updateBalance_Success() throws Exception {
         when(accountService.updateBalance(eq(testAccountId), any(BigDecimal.class), eq(testUserId))).thenReturn(true);
 
-        mockMvc.perform(put("/api/accounts/{accountId}/balance", testAccountId)
+        mockMvc.perform(put("/api/v1/accounts/{accountId}/balance", testAccountId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"balance\": 1500.00}"))
                 .andExpect(status().isOk());
@@ -223,7 +226,7 @@ class AccountControllerTest {
         when(accountService.updateBalance(eq(testAccountId), any(BigDecimal.class), eq(testUserId)))
                 .thenThrow(new RuntimeException("Account not found or access denied"));
 
-        mockMvc.perform(put("/api/accounts/{accountId}/balance", testAccountId)
+        mockMvc.perform(put("/api/v1/accounts/{accountId}/balance", testAccountId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"balance\": 1500.00}"))
                 .andExpect(status().isNotFound());
@@ -241,6 +244,16 @@ class AccountControllerTest {
             lenient().when(mockTracer.spanBuilder(anyString())).thenReturn(mockSpanBuilder);
             lenient().when(mockSpanBuilder.startSpan()).thenReturn(mockSpan);
             return mockTracer;
+        }
+
+        @Bean
+        public ContractJson contractJson() {
+            return new ContractJson();
+        }
+
+        @Bean
+        public Validator validator() {
+            return Validation.buildDefaultValidatorFactory().getValidator();
         }
 
         @Bean

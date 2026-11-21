@@ -14,7 +14,7 @@ reviewed and agreed, not buried in code, and the same engine runs for every serv
 
 Rules file (scripts/proxymock/services/<service>.invariants.json), a list of rules:
   {
-    "match": {"method": "GET", "url": "/api/accounts/{id}/balance", "status": "200"},
+    "match": {"method": "GET", "url": "/api/v1/accounts/{id}/balance", "status": "200"},
     "assert": [
       {"field": "$.balance",   "type": "number", "min": 0},
       {"field": "$.accountId", "type": "number", "required": true},

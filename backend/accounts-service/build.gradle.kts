@@ -1,8 +1,12 @@
+import com.google.protobuf.gradle.*
+
 plugins {
     java
     id("org.springframework.boot")
     id("io.spring.dependency-management")
     id("org.flywaydb.flyway")
+    id("org.openapi.generator")
+    id("com.google.protobuf")
 }
 
 group = "com.banking"
@@ -11,6 +15,7 @@ version = findProperty("serviceVersion") as String
 dependencyManagement {
     imports {
         mavenBom("io.opentelemetry:opentelemetry-bom:1.68.0")
+        mavenBom("io.grpc:grpc-bom:1.85.1")
         mavenBom("software.amazon.awssdk:bom:2.59.4")
     }
     dependencies {
@@ -22,6 +27,9 @@ dependencies {
     implementation("io.temporal:temporal-sdk:1.41.1")
     testImplementation("io.temporal:temporal-testing:1.41.1")
     implementation("com.google.protobuf:protobuf-java:4.36.2")
+    implementation("io.grpc:grpc-netty:1.85.1")
+    implementation("io.grpc:grpc-protobuf:1.85.1")
+    implementation("io.grpc:grpc-stub:1.85.1")
     implementation("org.springframework.boot:spring-boot-starter-oauth2-client")
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
@@ -48,6 +56,47 @@ dependencies {
     testImplementation("com.h2database:h2")
     testImplementation("org.testcontainers:testcontainers-postgresql")
     testImplementation("org.testcontainers:testcontainers-junit-jupiter")
+}
+
+openApiGenerate {
+    generatorName.set("spring")
+    inputSpec.set(rootProject.file("contracts/openapi/accounts.yaml").absolutePath)
+    outputDir.set(layout.buildDirectory.dir("generated/openapi").get().asFile.absolutePath)
+    apiPackage.set("com.banking.accountsservice.contract")
+    modelPackage.set("com.banking.accountsservice.contract.model")
+    configOptions.set(mapOf(
+        "interfaceOnly" to "true",
+        "useSpringBoot3" to "true",
+        "useTags" to "true",
+        "skipDefaultInterface" to "true",
+        "openApiNullable" to "false",
+        "documentationProvider" to "none",
+        "annotationLibrary" to "none",
+        "useBeanValidation" to "false",
+        "dateLibrary" to "java8",
+        "hideGenerationTimestamp" to "true",
+        "useResponseEntity" to "true",
+        "requestMappingMode" to "api_interface",
+    ))
+}
+
+sourceSets.main {
+    java.srcDir(layout.buildDirectory.dir("generated/openapi/src/main/java"))
+    proto.srcDir(rootProject.file("contracts/proto/ledger"))
+}
+
+protobuf {
+    protoc { artifact = "com.google.protobuf:protoc:4.36.2" }
+    plugins {
+        id("grpc") { artifact = "io.grpc:protoc-gen-grpc-java:1.85.1" }
+    }
+    generateProtoTasks {
+        all().configureEach { plugins { maybeCreate("grpc") } }
+    }
+}
+
+tasks.compileJava {
+    dependsOn(tasks.named("openApiGenerate"))
 }
 
 tasks.jar { enabled = false }

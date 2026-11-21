@@ -1,8 +1,8 @@
 /** @jest-environment node */
 
 import { NextRequest } from 'next/server';
-import { GET as accounts } from '@/app/api/accounts/route';
-import { GET as statement, POST as createStatement } from '@/app/api/accounts/[id]/statement-jobs/[[...jobPath]]/route';
+import { GET as accounts } from '@/app/api/v1/accounts/route';
+import { GET as statement, POST as createStatement } from '@/app/api/v1/accounts/[id]/statement-jobs/[[...jobPath]]/route';
 import { sessionCookieOptions } from '@/lib/auth/session';
 import { disputeProxy } from '../disputes-proxy';
 
@@ -14,12 +14,12 @@ afterEach(() => jest.restoreAllMocks());
 
 test('accounts forwards the query and bearer token and preserves an upstream rejection', async () => {
   const upstream = jest.spyOn(globalThis, 'fetch').mockResolvedValue(Response.json({ message: 'Denied' }, { status: 403 }));
-  const response = await accounts(new NextRequest('http://localhost/api/accounts?page=2', {
+  const response = await accounts(new NextRequest('http://localhost/api/v1/accounts?page=2', {
     headers: { authorization: 'Bearer fixture' },
   }));
   expect(response.status).toBe(403);
   expect(await response.json()).toEqual({ message: 'Denied' });
-  expect(upstream).toHaveBeenCalledWith(expect.stringContaining('/api/accounts?page=2'), expect.objectContaining({
+  expect(upstream).toHaveBeenCalledWith(expect.stringContaining('/api/v1/accounts?page=2'), expect.objectContaining({
     headers: expect.objectContaining({ Authorization: 'Bearer fixture', traceparent: expect.stringMatching(/^00-[a-f0-9]{32}-[a-f0-9]{16}-01$/) }),
   }));
 });
@@ -57,7 +57,7 @@ test('operations dispute updates forward JSON and reject unsupported paths and b
     method: 'POST', body, headers: { 'content-type': contentType, authorization: 'Bearer fixture', 'idempotency-key': 'case-1' },
   });
   expect((await send(request('{}', 'application/json'), disputeParams(['7', 'resolve']))).status).toBe(200);
-  expect(upstream.mock.calls[0][0]).toContain('/api/operations/disputes/7/resolve?page=1');
+  expect(upstream.mock.calls[0][0]).toContain('/api/v1/operations/disputes/7/resolve?page=1');
   expect(new Headers(upstream.mock.calls[0][1]?.headers).get('idempotency-key')).toBe('case-1');
   expect((await send(request('{}', 'text/plain'), disputeParams(['7', 'resolve']))).status).toBe(415);
   expect((await send(request('x'.repeat(16385), 'application/json'), disputeParams(['7', 'resolve']))).status).toBe(413);

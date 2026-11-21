@@ -79,7 +79,7 @@ func call(ctx context.Context, base, path, token string, body any, status int, d
 
 func (a *Activities) login(ctx context.Context, input Input) (string, error) {
 	var result struct{ Token string }
-	err := call(ctx, a.Frontend, "/api/users/login", "", map[string]string{"usernameOrEmail": input.User, "password": a.Password}, 200, &result)
+	err := call(ctx, a.Frontend, "/api/v1/users/login", "", map[string]string{"usernameOrEmail": input.User, "password": a.Password}, 200, &result)
 	if err == nil && result.Token == "" {
 		err = fmt.Errorf("login returned an empty token")
 	}
@@ -88,7 +88,7 @@ func (a *Activities) login(ctx context.Context, input Input) (string, error) {
 
 func (a *Activities) Register(ctx context.Context, input Input) (int64, error) {
 	var user struct{ ID int64 }
-	err := call(ctx, a.Frontend, "/api/users/register", "", map[string]string{
+	err := call(ctx, a.Frontend, "/api/v1/users/register", "", map[string]string{
 		"username": input.User, "email": input.email(), "password": a.Password,
 	}, 201, &user)
 	if err == nil && user.ID <= 0 {
@@ -103,7 +103,7 @@ func (a *Activities) CreateAccount(ctx context.Context, input Input, kind string
 		return 0, err
 	}
 	var account struct{ ID int64 }
-	err = call(ctx, a.Frontend, "/api/accounts", token, map[string]any{
+	err = call(ctx, a.Frontend, "/api/v1/accounts", token, map[string]any{
 		"accountType": kind, "initialBalance": balance,
 	}, 201, &account)
 	if err == nil && account.ID <= 0 {
@@ -118,7 +118,7 @@ func (a *Activities) SubmitTransfer(ctx context.Context, input Input, t Transfer
 		return 0, err
 	}
 	var result struct{ ID int64 }
-	err = call(ctx, a.Frontend, "/api/transactions/transfer", token, transferBody(t, 25), 201, &result)
+	err = call(ctx, a.Frontend, "/api/v1/transactions/transfer", token, transferBody(t, 25), 201, &result)
 	if err == nil && result.ID <= 0 {
 		err = fmt.Errorf("transfer response missing ID")
 	}
@@ -143,7 +143,7 @@ func (a *Activities) Reject(ctx context.Context, input Input, t Transfer) error 
 		return err
 	}
 	var rejection struct{ Code string }
-	if err = call(ctx, a.Frontend, "/api/transactions/transfer", token, transferBody(t, 90), 400, &rejection); err != nil {
+	if err = call(ctx, a.Frontend, "/api/v1/transactions/transfer", token, transferBody(t, 90), 400, &rejection); err != nil {
 		return err
 	}
 	if rejection.Code != "INSUFFICIENT_FUNDS" {
@@ -158,7 +158,7 @@ func (a *Activities) verify(ctx context.Context, token string, t Transfer) error
 		balance int
 	}{{t.From, 75}, {t.To, 45}} {
 		var result struct{ Balance *json.Number }
-		path := fmt.Sprintf("/api/accounts/%d/balance", account.id)
+		path := fmt.Sprintf("/api/v1/accounts/%d/balance", account.id)
 		if err := call(ctx, a.Frontend, path, token, nil, 200, &result); err != nil {
 			return err
 		}
@@ -175,7 +175,7 @@ func (a *Activities) verify(ctx context.Context, token string, t Transfer) error
 		Amount                         float64
 		Type, Status                   string
 	}
-	if err := call(ctx, a.Frontend, "/api/transactions", token, nil, 200, &history); err != nil {
+	if err := call(ctx, a.Frontend, "/api/v1/transactions", token, nil, 200, &history); err != nil {
 		return err
 	}
 	if len(history) != 1 {
@@ -221,7 +221,7 @@ func (a *Activities) AssertFraudRejections(ctx context.Context, input Input, tra
 				return fmt.Errorf("configure fraud provider failure")
 			}
 		}
-		rejection, err := request(ctx, http.MethodPost, a.Frontend, "/api/transactions/transfer", token, transferBody(transfer, amount))
+		rejection, err := request(ctx, http.MethodPost, a.Frontend, "/api/v1/transactions/transfer", token, transferBody(transfer, amount))
 		if err != nil {
 			return err
 		}

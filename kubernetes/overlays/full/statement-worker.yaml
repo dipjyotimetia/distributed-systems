@@ -40,6 +40,8 @@ spec:
               value: banking-temporal:7233
             - name: OTEL_SERVICE_NAME
               value: statement-worker
+            - name: LEDGER_GRPC_ENABLED
+              value: "false"
           startupProbe:
             httpGet:
               path: /actuator/health
