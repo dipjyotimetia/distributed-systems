@@ -105,7 +105,9 @@ jobs:
             attempt=1
             while [ "$attempt" -le 5 ]; do
               echo "::group::docker build $image (attempt $attempt)"
-              if docker build -t "$image" "$@"; then
+              # Rotate BuildKit gradle cache id on retry so a poisoned module
+              # metadata cache from a prior Maven miss cannot fail-fast forever.
+              if docker build -t "$image" --build-arg "GRADLE_CACHE_SUFFIX=r${attempt}" "$@"; then
                 echo "::endgroup::"
                 return 0
               fi
