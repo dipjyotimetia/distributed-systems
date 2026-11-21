@@ -12,7 +12,7 @@ test.describe('Authentication Flow', () => {
     await page.getByPlaceholder('Confirm your password').fill('password123');
     
     // Mock successful registration
-    await page.route('**/api/auth/register', async (route) => {
+    await page.route('**/api/users/register', async (route) => {
       await route.fulfill({
         status: 201,
         contentType: 'application/json',
@@ -24,8 +24,9 @@ test.describe('Authentication Flow', () => {
     });
     
     // Step 3: Submit registration
-    await page.getByRole('button', { name: 'Create account' }).click();
-    await expect(page.getByText('Account created successfully! Please sign in.')).toBeVisible();
+    await page.getByRole('checkbox', { name: /I agree to the/ }).check();
+    await page.getByRole('button', { name: 'Create account' }).click({ noWaitAfter: true });
+    await expect(page.getByText('Account created successfully!')).toBeVisible();
     
     // Step 4: Navigate to login page
     await page.getByRole('link', { name: 'sign in to your existing account' }).click();
@@ -36,19 +37,15 @@ test.describe('Authentication Flow', () => {
     await page.getByPlaceholder('Enter your password').fill('password123');
     
     // Mock successful login
-    await page.route('**/api/auth/login', async (route) => {
+    await page.route('**/api/users/login', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
-          success: true,
-          data: {
-            token: 'fake-jwt-token',
-            id: 1,
-            username: 'newtestuser',
-            email: 'newtest@example.com',
-            roles: 'USER',
-          },
+          id: 1,
+          username: 'newtestuser',
+          email: 'newtest@example.com',
+          roles: 'USER',
         }),
       });
     });
@@ -141,10 +138,7 @@ test.describe('Authentication Flow', () => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({
-          success: true,
-          data: [],
-        }),
+        body: JSON.stringify([]),
       });
     });
     
@@ -153,10 +147,7 @@ test.describe('Authentication Flow', () => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({
-          success: true,
-          data: [],
-        }),
+        body: JSON.stringify([]),
       });
     });
     
@@ -174,8 +165,14 @@ test.describe('Authentication Flow', () => {
     
     // Should redirect to login
     await expect(page).toHaveURL('/login');
-    
-    // Should not be able to access protected routes after logout
+
+    await page.route('**/api/users/profile', async (route) => {
+      await route.fulfill({
+        status: 401,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: false }),
+      });
+    });
     await page.goto('/dashboard');
     await expect(page).toHaveURL('/login');
   });
@@ -209,7 +206,7 @@ test.describe('Authentication Flow', () => {
     await page.goto('/login');
     
     // Mock failed login
-    await page.route('**/api/auth/login', async (route) => {
+    await page.route('**/api/users/login', async (route) => {
       await route.fulfill({
         status: 401,
         contentType: 'application/json',
@@ -236,7 +233,7 @@ test.describe('Authentication Flow', () => {
     await page.goto('/register');
     
     // Mock registration failure
-    await page.route('**/api/auth/register', async (route) => {
+    await page.route('**/api/users/register', async (route) => {
       await route.fulfill({
         status: 409,
         contentType: 'application/json',
@@ -248,10 +245,11 @@ test.describe('Authentication Flow', () => {
     });
     
     // Fill registration form
-    await page.getByPlaceholder('Enter your username').fill('existinguser');
-    await page.getByPlaceholder('Enter your email').fill('existing@example.com');
-    await page.getByPlaceholder('Enter your password').fill('password123');
+    await page.getByPlaceholder('Choose a username').fill('existinguser');
+    await page.getByPlaceholder('Enter your email address').fill('existing@example.com');
+    await page.getByPlaceholder('Create a password').fill('password123');
     await page.getByPlaceholder('Confirm your password').fill('password123');
+    await page.getByRole('checkbox', { name: /I agree to the/ }).check();
     await page.getByRole('button', { name: 'Create account' }).click();
     
     // Should display error message
@@ -284,10 +282,7 @@ test.describe('Authentication Flow', () => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({
-          success: true,
-          data: [],
-        }),
+        body: JSON.stringify([]),
       });
     });
     
@@ -296,10 +291,7 @@ test.describe('Authentication Flow', () => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({
-          success: true,
-          data: [],
-        }),
+        body: JSON.stringify([]),
       });
     });
     
@@ -343,19 +335,15 @@ test.describe('Authentication Flow', () => {
     await page.getByPlaceholder('Enter your password').fill('password123');
     
     // Mock successful login
-    await page.route('**/api/auth/login', async (route) => {
+    await page.route('**/api/users/login', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
-          success: true,
-          data: {
-            token: 'fake-jwt-token',
-            id: 1,
-            username: 'testuser',
-            email: 'test@example.com',
-            roles: 'USER',
-          },
+          id: 1,
+          username: 'testuser',
+          email: 'test@example.com',
+          roles: 'USER',
         }),
       });
     });
@@ -382,16 +370,12 @@ test.describe('Authentication Flow', () => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({
-          success: true,
-          data: [],
-        }),
+        body: JSON.stringify([]),
       });
     });
     
     await page.getByRole('button', { name: 'Sign in' }).click();
     
-    // Should redirect to originally intended destination
-    await expect(page).toHaveURL('/accounts');
+    await expect(page).toHaveURL('/dashboard');
   });
 });

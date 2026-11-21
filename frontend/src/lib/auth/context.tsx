@@ -36,8 +36,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []);
 
   const login = useCallback(async (credentials: LoginRequest): Promise<AuthResponse> => {
-    setIsLoading(true);
-    
     try {
       const response = await AuthAPI.login(credentials);
       
@@ -65,14 +63,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         message: 'Login failed',
         errors: ['An unexpected error occurred'],
       };
-    } finally {
-      setIsLoading(false);
     }
   }, []);
 
   const register = useCallback(async (userData: RegisterRequest): Promise<AuthResponse> => {
-    setIsLoading(true);
-    
     try {
       const response = await AuthAPI.register(userData);
       
@@ -88,8 +82,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         message: 'Registration failed',
         errors: ['An unexpected error occurred'],
       };
-    } finally {
-      setIsLoading(false);
     }
   }, []);
 

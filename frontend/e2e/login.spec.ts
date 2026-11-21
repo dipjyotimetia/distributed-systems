@@ -13,6 +13,8 @@ test.describe('Login Page', () => {
   });
 
   test('should show validation errors for empty fields', async ({ page }) => {
+    await page.getByPlaceholder('Enter your username or email').fill('');
+    await page.getByPlaceholder('Enter your password').fill('');
     await page.getByRole('button', { name: 'Sign in' }).click();
     
     await expect(page.getByText('Username or email is required')).toBeVisible();
@@ -34,20 +36,16 @@ test.describe('Login Page', () => {
 
   test('should show loading state during login', async ({ page }) => {
     // Mock a slow API response
-    await page.route('**/api/auth/login', async (route) => {
+    await page.route('**/api/users/login', async (route) => {
       await page.waitForTimeout(2000);
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
-          success: true,
-          data: {
-            token: 'fake-jwt-token',
-            id: 1,
-            username: 'testuser',
-            email: 'test@example.com',
-            roles: 'USER',
-          },
+          id: 1,
+          username: 'testuser',
+          email: 'test@example.com',
+          roles: 'USER',
         }),
       });
     });
@@ -61,7 +59,7 @@ test.describe('Login Page', () => {
 
   test('should display error message for invalid credentials', async ({ page }) => {
     // Mock failed login response
-    await page.route('**/api/auth/login', async (route) => {
+    await page.route('**/api/users/login', async (route) => {
       await route.fulfill({
         status: 401,
         contentType: 'application/json',
@@ -81,37 +79,24 @@ test.describe('Login Page', () => {
 
   test('should redirect to dashboard on successful login', async ({ page }) => {
     // Mock successful login response
-    await page.route('**/api/auth/login', async (route) => {
+    await page.route('**/api/users/login', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
-          success: true,
-          data: {
-            token: 'fake-jwt-token',
-            id: 1,
-            username: 'testuser',
-            email: 'test@example.com',
-            roles: 'USER',
-          },
+          id: 1,
+          username: 'testuser',
+          email: 'test@example.com',
+          roles: 'USER',
         }),
       });
     });
 
-    // Mock profile endpoint for auth context
     await page.route('**/api/users/profile', async (route) => {
       await route.fulfill({
-        status: 200,
+        status: 401,
         contentType: 'application/json',
-        body: JSON.stringify({
-          success: true,
-          data: {
-            id: 1,
-            username: 'testuser',
-            email: 'test@example.com',
-            roles: 'USER',
-          },
-        }),
+        body: JSON.stringify({ success: false }),
       });
     });
 

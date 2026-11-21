@@ -38,15 +38,17 @@ const DashboardPage: React.FC = () => {
 
       if (!active) return;
 
-      if (accountsResponse.success && accountsResponse.data) {
+      if (accountsResponse.success && Array.isArray(accountsResponse.data)) {
         setAccounts(accountsResponse.data);
+      } else if (accountsResponse.success && accountsResponse.data && Array.isArray((accountsResponse.data as { content?: Account[] }).content)) {
+        setAccounts((accountsResponse.data as { content: Account[] }).content);
       } else {
         setError(accountsResponse.message || 'Failed to load accounts');
       }
 
-      if (transactionsResponse.success && transactionsResponse.data) {
+      if (transactionsResponse.success && Array.isArray(transactionsResponse.data)) {
         setTransactions(transactionsResponse.data);
-      } else {
+      } else if (!transactionsResponse.success) {
         setTransactionsError(transactionsResponse.message || 'Failed to load recent transactions');
       }
 
