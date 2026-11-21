@@ -33,8 +33,9 @@ class TransactionResponse(BaseModel):
     to_account_id: Optional[StrictInt] = Field(default=None, alias="toAccountId")
     amount: Optional[Union[StrictFloat, StrictInt]] = None
     type: Optional[StrictStr] = None
+    processed_at: Optional[StrictStr] = Field(default=None, alias="processedAt")
     timestamp: Optional[datetime] = None
-    __properties: ClassVar[List[str]] = ["id", "userId", "fromAccountId", "toAccountId", "amount", "type", "timestamp"]
+    __properties: ClassVar[List[str]] = ["id", "userId", "fromAccountId", "toAccountId", "amount", "type", "processedAt", "timestamp"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -103,6 +104,7 @@ class TransactionResponse(BaseModel):
             "toAccountId": obj.get("toAccountId"),
             "amount": obj.get("amount"),
             "type": obj.get("type"),
+            "processedAt": obj.get("processedAt"),
             "timestamp": obj.get("timestamp")
         })
         return _obj

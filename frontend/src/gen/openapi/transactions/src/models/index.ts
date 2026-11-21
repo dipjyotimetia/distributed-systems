@@ -194,6 +194,12 @@ export interface TransactionResponse {
      * @type {string}
      * @memberof TransactionResponse
      */
+    processedAt?: string;
+    /**
+     * 
+     * @type {string}
+     * @memberof TransactionResponse
+     */
     timestamp?: string;
 }
 /**
