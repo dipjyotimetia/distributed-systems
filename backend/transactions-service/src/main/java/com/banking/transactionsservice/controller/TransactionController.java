@@ -157,6 +157,8 @@ public class TransactionController implements TransactionsApi {
             span.setAttribute("transaction.amount", request.getAmount().toString());
             span.setAttribute("transaction.id", transaction.getId());
             return ResponseEntity.status(HttpStatus.CREATED).body(contractJson.convert(transaction, TransactionResponse.class));
+        } catch (InsufficientFundsException e) {
+            return rejected(ResponseEntity.badRequest().body(Map.of("code", "INSUFFICIENT_FUNDS", "message", e.getMessage())));
         } catch (NullPointerException e) {
             span.recordException(e);
             span.setStatus(StatusCode.ERROR, e.getClass().getSimpleName());

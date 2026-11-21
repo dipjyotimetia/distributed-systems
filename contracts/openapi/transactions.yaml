@@ -203,6 +203,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TransactionResponse'
+        '400':
+          description: Insufficient funds return an INSUFFICIENT_FUNDS body. Validation failures return a field map. Other rejections use this status with an empty body.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Rejection'
       tags:
       - transactions
       operationId: deposit
@@ -225,11 +231,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/TransactionResponse'
         '400':
-          description: Insufficient funds return an INSUFFICIENT_FUNDS body. Fraud and validation failures use this status with an empty body.
+          description: Insufficient funds return an INSUFFICIENT_FUNDS body. Validation failures return a field map. Fraud and other rejections use this status with an empty body.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/InsufficientFunds'
+                $ref: '#/components/schemas/Rejection'
       tags:
       - transactions
       operationId: withdraw
@@ -252,11 +258,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/TransactionResponse'
         '400':
-          description: Insufficient funds return an INSUFFICIENT_FUNDS body. Fraud and validation failures use this status with an empty body.
+          description: Insufficient funds return an INSUFFICIENT_FUNDS body. Validation failures return a field map. Fraud and other rejections use this status with an empty body.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/InsufficientFunds'
+                $ref: '#/components/schemas/Rejection'
       tags:
       - transactions
       operationId: transfer
@@ -492,9 +498,19 @@ components:
           type: number
         description:
           type: string
+    Rejection:
+      description: Confirmed insufficient funds, or a validation field map. Fraud and other rejections use HTTP 400 with an empty body and are not this schema.
+      oneOf:
+      - $ref: '#/components/schemas/InsufficientFunds'
+      - $ref: '#/components/schemas/FieldErrors'
+    FieldErrors:
+      type: object
+      description: Validation errors keyed by request field.
+      additionalProperties:
+        type: string
     InsufficientFunds:
       type: object
-      description: Present when the ledger rejects a confirmed insufficient balance. Fraud and validation failures use HTTP 400 with an empty body.
+      description: Present when the ledger rejects a confirmed insufficient balance.
       required:
       - code
       - message

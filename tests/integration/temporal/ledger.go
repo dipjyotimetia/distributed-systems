@@ -183,10 +183,7 @@ func (a *Activities) RejectWithdrawal(ctx context.Context, input Input, accountI
 	if err != nil {
 		return fmt.Errorf("POST /api/v1/transactions/withdraw request failed")
 	}
-	if result.StatusCode() != http.StatusBadRequest {
-		return unexpectedStatus(http.MethodPost, "/api/v1/transactions/withdraw", result.StatusCode(), http.StatusBadRequest)
-	}
-	if result.JSON400 == nil || result.JSON400.Code != transactions.INSUFFICIENTFUNDS {
+	if result.StatusCode() != http.StatusBadRequest || !insufficientFunds(result.JSON400) {
 		return fmt.Errorf("withdrawal did not return INSUFFICIENT_FUNDS")
 	}
 	return nil

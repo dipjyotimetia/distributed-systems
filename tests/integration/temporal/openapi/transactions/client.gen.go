@@ -40,7 +40,10 @@ type DepositRequest struct {
 	Description *string `json:"description,omitempty"`
 }
 
-// InsufficientFunds Present when the ledger rejects a confirmed insufficient balance. Fraud and validation failures use HTTP 400 with an empty body.
+// FieldErrors Validation errors keyed by request field.
+type FieldErrors map[string]string
+
+// InsufficientFunds Present when the ledger rejects a confirmed insufficient balance.
 type InsufficientFunds struct {
 	Code    InsufficientFundsCode `json:"code"`
 	Message string                `json:"message"`
@@ -48,6 +51,11 @@ type InsufficientFunds struct {
 
 // InsufficientFundsCode defines model for InsufficientFunds.Code.
 type InsufficientFundsCode string
+
+// Rejection Confirmed insufficient funds, or a validation field map. Fraud and other rejections use HTTP 400 with an empty body and are not this schema.
+type Rejection struct {
+	union json.RawMessage
+}
 
 // TransactionList defines model for TransactionList.
 type TransactionList = []TransactionResponse
@@ -217,6 +225,68 @@ type TransferJSONRequestBody = TransferRequest
 
 // WithdrawJSONRequestBody defines body for Withdraw for application/json ContentType.
 type WithdrawJSONRequestBody = WithdrawRequest
+
+// AsInsufficientFunds returns the union data inside the Rejection as a InsufficientFunds
+func (t Rejection) AsInsufficientFunds() (InsufficientFunds, error) {
+	var body InsufficientFunds
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromInsufficientFunds overwrites any union data inside the Rejection as the provided InsufficientFunds
+func (t *Rejection) FromInsufficientFunds(v InsufficientFunds) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeInsufficientFunds performs a merge with any union data inside the Rejection, using the provided InsufficientFunds
+func (t *Rejection) MergeInsufficientFunds(v InsufficientFunds) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsFieldErrors returns the union data inside the Rejection as a FieldErrors
+func (t Rejection) AsFieldErrors() (FieldErrors, error) {
+	var body FieldErrors
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromFieldErrors overwrites any union data inside the Rejection as the provided FieldErrors
+func (t *Rejection) FromFieldErrors(v FieldErrors) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeFieldErrors performs a merge with any union data inside the Rejection, using the provided FieldErrors
+func (t *Rejection) MergeFieldErrors(v FieldErrors) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t Rejection) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *Rejection) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
 
 // AsTransactionList returns the union data inside the TransactionListOrPage as a TransactionList
 func (t TransactionListOrPage) AsTransactionList() (TransactionList, error) {
@@ -1450,6 +1520,7 @@ type DepositHTTP struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON201      *TransactionResponse
+	JSON400      *Rejection
 }
 
 // Status returns HTTPResponse.Status
@@ -1538,7 +1609,7 @@ type TransferHTTP struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON201      *TransactionResponse
-	JSON400      *InsufficientFunds
+	JSON400      *Rejection
 }
 
 // Status returns HTTPResponse.Status
@@ -1561,7 +1632,7 @@ type WithdrawHTTP struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON201      *TransactionResponse
-	JSON400      *InsufficientFunds
+	JSON400      *Rejection
 }
 
 // Status returns HTTPResponse.Status
@@ -1819,6 +1890,13 @@ func ParseDepositHTTP(rsp *http.Response) (*DepositHTTP, error) {
 		}
 		response.JSON201 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Rejection
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	}
 
 	return response, nil
@@ -1924,7 +2002,7 @@ func ParseTransferHTTP(rsp *http.Response) (*TransferHTTP, error) {
 		response.JSON201 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest InsufficientFunds
+		var dest Rejection
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -1957,7 +2035,7 @@ func ParseWithdrawHTTP(rsp *http.Response) (*WithdrawHTTP, error) {
 		response.JSON201 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest InsufficientFunds
+		var dest Rejection
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

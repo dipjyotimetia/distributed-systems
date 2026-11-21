@@ -130,6 +130,14 @@ func statementFrom(export *accounts.StatementExport) (string, string, accountSta
 	return textValue(export.Status), textValue(export.Key), stored, nil
 }
 
+func insufficientFunds(rejection *transactions.Rejection) bool {
+	if rejection == nil {
+		return false
+	}
+	funds, err := rejection.AsInsufficientFunds()
+	return err == nil && funds.Code == transactions.INSUFFICIENTFUNDS && funds.Message != ""
+}
+
 func transferRequest(t Transfer, amount int) transactions.TransferRequest {
 	return transactions.TransferRequest{
 		FromAccountId: t.From,

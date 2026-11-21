@@ -7,6 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"microsvc/integration/temporal/openapi/transactions"
 )
 
 func TestMutationTimeoutIsRedacted(t *testing.T) {
@@ -25,6 +27,40 @@ func TestMutationTimeoutIsRedacted(t *testing.T) {
 	}
 	if count := len(requests); count != 1 {
 		t.Fatalf("got %d requests, expected one", count)
+	}
+}
+
+func TestTransferRejectionShapes(t *testing.T) {
+	body := transactions.TransferRequest{FromAccountId: 1, ToAccountId: 2, Amount: 1}
+	for _, check := range []struct {
+		name        string
+		payload     string
+		contentType string
+		funds       bool
+	}{
+		{"insufficient funds", `{"code":"INSUFFICIENT_FUNDS","message":"short"}`, "application/json", true},
+		{"validation map", `{"amount":"must be greater than 0"}`, "application/json", false},
+		{"empty fraud body", "", "", false},
+	} {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if check.contentType != "" {
+				w.Header().Set("Content-Type", check.contentType)
+			}
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprint(w, check.payload)
+		}))
+		activities := &Activities{Frontend: server.URL}
+		result, err := activities.transfer(context.Background(), "token", body)
+		server.Close()
+		if err != nil {
+			t.Fatalf("%s returned transport error %v", check.name, err)
+		}
+		if result.StatusCode() != http.StatusBadRequest || insufficientFunds(result.JSON400) != check.funds {
+			t.Fatalf("%s status %d funds %t, body %s", check.name, result.StatusCode(), insufficientFunds(result.JSON400), result.Body)
+		}
+		if check.payload == "" && (len(result.Body) != 0 || result.JSON400 != nil) {
+			t.Fatalf("fraud rejection was not an empty 400: %s", result.Body)
+		}
 	}
 }
 

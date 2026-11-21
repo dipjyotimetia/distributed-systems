@@ -196,6 +196,21 @@ class TransactionControllerTest {
     }
 
     @Test
+    void deposit_InsufficientBalance() throws Exception {
+        when(transactionService.deposit(any(DepositRequest.class), anyLong(), any(HttpServletRequest.class)))
+                .thenThrow(new InsufficientFundsException("Insufficient balance"));
+
+        mockMvc.perform(post("/api/v1/transactions/deposit")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(depositRequest)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INSUFFICIENT_FUNDS"))
+                .andExpect(jsonPath("$.message").value("Insufficient balance"));
+
+        verify(transactionService, times(1)).deposit(any(DepositRequest.class), eq(testUserId), any(HttpServletRequest.class));
+    }
+
+    @Test
     void deposit_NullPointerException() throws Exception {
         when(transactionService.deposit(any(DepositRequest.class), anyLong(), any(HttpServletRequest.class)))
                 .thenThrow(new NullPointerException());
