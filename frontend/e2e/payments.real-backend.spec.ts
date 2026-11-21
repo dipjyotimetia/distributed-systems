@@ -105,9 +105,17 @@ test('outbound payment settles through ActiveMQ Artemis and delivers one notific
   await expect.poll(async () => (await getPayment(page.request, initial.id)).status, { timeout: 50000 }).toBe('ACCEPTED');
   expect(await balance(page.request, account)).toBe(10000);
   const blockedDebit = await page.request.post('/api/v1/transactions/withdraw', {
-    data: { accountId: account, amount: 1, description: 'Check that clearing acceptance retains the hold' },
+    data: { accountId: account, amount: 76, description: 'Check that clearing acceptance retains the hold' },
   });
   expect(blockedDebit.ok()).toBe(false);
+
+  const exact = await page.request.get('/api/v2/accounts/' + account + '/balances');
+  expect(exact.status()).toBe(200);
+  expect(await exact.json()).toMatchObject({ currency: 'AUD', heldAmount: '25.00', availableBalance: '75.00' });
+  const independentDebit = await page.request.post('/api/v1/transactions/withdraw', {
+    data: { accountId: account, amount: 1, description: 'Post within available funds' },
+  });
+  expect(independentDebit.status()).toBe(201);
 
   const stranger = await browser.newContext();
   try {
@@ -121,7 +129,7 @@ test('outbound payment settles through ActiveMQ Artemis and delivers one notific
   const settlement = await getPayment(page.request, initial.id);
   expect(settlement.settlementBusinessDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   expect(settlement.clearingReference).toMatch(/^C[0-9]{11}$/);
-  expect(await balance(page.request, account)).toBe(7500);
+  expect(await balance(page.request, account)).toBe(7400);
 
   await page.getByRole('button', { name: 'Refresh status' }).click();
   await expect(page.getByRole('status')).toContainText('SETTLED');
@@ -166,7 +174,7 @@ test('outbound payment rejection and missing-reply scenarios preserve booked bal
 
     // Another debit is the externally visible difference between a released hold and a retained hold.
     const withdrawal = await request.post('/api/v1/transactions/withdraw', {
-      data: { accountId: account, amount: 1, description: 'Payment hold acceptance check' },
+      data: { accountId: account, amount: scenario.status === 'REVIEW_REQUIRED' ? 76 : 1, description: 'Payment hold acceptance check' },
     });
     if (scenario.status === 'REVIEW_REQUIRED') {
       expect(withdrawal.ok()).toBe(false);

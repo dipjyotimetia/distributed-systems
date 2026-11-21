@@ -1,25 +1,25 @@
 /* tslint:disable */
 /* eslint-disable */
 /**
- * 
+ *
  * @export
  * @interface AccountCreateRequest
  */
 export interface AccountCreateRequest {
     /**
-     * 
+     *
      * @type {string}
      * @memberof AccountCreateRequest
      */
     accountType: AccountCreateRequestAccountTypeEnum;
     /**
-     * 
+     *
      * @type {number}
      * @memberof AccountCreateRequest
      */
     initialBalance?: number;
     /**
-     * 
+     *
      * @type {string}
      * @memberof AccountCreateRequest
      */
@@ -39,134 +39,140 @@ export const AccountCreateRequestAccountTypeEnum = {
 export type AccountCreateRequestAccountTypeEnum = typeof AccountCreateRequestAccountTypeEnum[keyof typeof AccountCreateRequestAccountTypeEnum];
 
 /**
- * 
+ * @type AccountListOrPage
+ * Account array, or an account page when page or size is supplied
+ * @export
+ */
+export type AccountListOrPage = AccountPage | Array<AccountResponse>;
+/**
+ *
  * @export
  * @interface AccountPage
  */
 export interface AccountPage {
     /**
-     * 
+     *
      * @type {Array<AccountResponse>}
      * @memberof AccountPage
      */
     content: Array<AccountResponse>;
     /**
-     * 
+     *
      * @type {object}
      * @memberof AccountPage
      */
     pageable: object;
     /**
-     * 
+     *
      * @type {object}
      * @memberof AccountPage
      */
     sort: object;
     /**
-     * 
+     *
      * @type {boolean}
      * @memberof AccountPage
      */
     last: boolean;
     /**
-     * 
+     *
      * @type {boolean}
      * @memberof AccountPage
      */
     first: boolean;
     /**
-     * 
+     *
      * @type {boolean}
      * @memberof AccountPage
      */
     empty: boolean;
     /**
-     * 
+     *
      * @type {number}
      * @memberof AccountPage
      */
     totalPages: number;
     /**
-     * 
+     *
      * @type {number}
      * @memberof AccountPage
      */
     totalElements: number;
     /**
-     * 
+     *
      * @type {number}
      * @memberof AccountPage
      */
     size: number;
     /**
-     * 
+     *
      * @type {number}
      * @memberof AccountPage
      */
     number: number;
     /**
-     * 
+     *
      * @type {number}
      * @memberof AccountPage
      */
     numberOfElements: number;
 }
 /**
- * 
+ *
  * @export
  * @interface AccountResponse
  */
 export interface AccountResponse {
     /**
-     * 
+     *
      * @type {number}
      * @memberof AccountResponse
      */
     id?: number;
     /**
-     * 
+     *
      * @type {number}
      * @memberof AccountResponse
      */
     userId?: number;
     /**
-     * 
+     *
      * @type {string}
      * @memberof AccountResponse
      */
     accountNumber?: string;
     /**
-     * 
+     *
      * @type {number}
      * @memberof AccountResponse
      */
     balance?: number;
     /**
-     * 
+     *
      * @type {string}
      * @memberof AccountResponse
      */
     accountType?: string;
     /**
-     * 
+     *
      * @type {string}
      * @memberof AccountResponse
      */
     currency?: string;
     /**
-     * 
+     *
      * @type {AccountStatus}
      * @memberof AccountResponse
      */
     status?: AccountStatus;
     /**
-     * 
+     *
      * @type {string}
      * @memberof AccountResponse
      */
     createdAt?: string;
     /**
-     * 
+     *
      * @type {string}
      * @memberof AccountResponse
      */
@@ -176,7 +182,7 @@ export interface AccountResponse {
 
 
 /**
- * 
+ *
  * @export
  */
 export const AccountStatus = {
@@ -188,50 +194,50 @@ export const AccountStatus = {
 export type AccountStatus = typeof AccountStatus[keyof typeof AccountStatus];
 
 /**
- * 
+ *
  * @export
  * @interface AccountSummary
  */
 export interface AccountSummary {
     /**
-     * 
+     *
      * @type {number}
      * @memberof AccountSummary
      */
     totalAccounts?: number;
     /**
-     * 
+     *
      * @type {number}
      * @memberof AccountSummary
      */
     activeAccounts?: number;
     /**
-     * 
+     *
      * @type {number}
      * @memberof AccountSummary
      */
     totalBalance?: number;
     /**
-     * 
+     *
      * @type {{ [key: string]: number; }}
      * @memberof AccountSummary
      */
     accountsByType?: { [key: string]: number; };
 }
 /**
- * 
+ *
  * @export
  * @interface AccountUpdateRequest
  */
 export interface AccountUpdateRequest {
     /**
-     * 
+     *
      * @type {string}
      * @memberof AccountUpdateRequest
      */
     accountType?: AccountUpdateRequestAccountTypeEnum;
     /**
-     * 
+     *
      * @type {string}
      * @memberof AccountUpdateRequest
      */
@@ -261,132 +267,296 @@ export const AccountUpdateRequestStatusEnum = {
 export type AccountUpdateRequestStatusEnum = typeof AccountUpdateRequestStatusEnum[keyof typeof AccountUpdateRequestStatusEnum];
 
 /**
- * 
+ *
  * @export
  * @interface BalanceResponse
  */
 export interface BalanceResponse {
     /**
-     * 
+     *
      * @type {number}
      * @memberof BalanceResponse
      */
     accountId?: number;
     /**
-     * 
+     *
      * @type {string}
      * @memberof BalanceResponse
      */
     currency?: string;
     /**
-     * 
+     *
      * @type {number}
      * @memberof BalanceResponse
      */
     balance?: number;
     /**
-     * 
+     *
      * @type {string}
      * @memberof BalanceResponse
      */
     accountNumber?: string;
 }
 /**
- * 
+ *
  * @export
  * @interface BalanceUpdateRequest
  */
 export interface BalanceUpdateRequest {
     /**
-     * 
+     *
      * @type {number}
      * @memberof BalanceUpdateRequest
      */
     balance: number;
 }
 /**
- * 
+ *
+ * @export
+ * @interface ExactBalances
+ */
+export interface ExactBalances {
+    /**
+     *
+     * @type {string}
+     * @memberof ExactBalances
+     */
+    currency: string;
+    /**
+     *
+     * @type {string}
+     * @memberof ExactBalances
+     */
+    postedBalance: string;
+    /**
+     *
+     * @type {string}
+     * @memberof ExactBalances
+     */
+    heldAmount: string;
+    /**
+     *
+     * @type {string}
+     * @memberof ExactBalances
+     */
+    availableBalance: string;
+    /**
+     *
+     * @type {string}
+     * @memberof ExactBalances
+     */
+    asOf: string;
+    /**
+     *
+     * @type {string}
+     * @memberof ExactBalances
+     */
+    postingCoverageStart?: string;
+}
+/**
+ *
+ * @export
+ * @interface PeriodStatement
+ */
+export interface PeriodStatement {
+    /**
+     *
+     * @type {number}
+     * @memberof PeriodStatement
+     */
+    schemaVersion: PeriodStatementSchemaVersionEnum;
+    /**
+     *
+     * @type {number}
+     * @memberof PeriodStatement
+     */
+    accountId: number;
+    /**
+     *
+     * @type {StatementPeriod}
+     * @memberof PeriodStatement
+     */
+    period: StatementPeriod;
+    /**
+     *
+     * @type {string}
+     * @memberof PeriodStatement
+     */
+    currency: string;
+    /**
+     *
+     * @type {string}
+     * @memberof PeriodStatement
+     */
+    openingBalance: string;
+    /**
+     *
+     * @type {Array<PostedEntry>}
+     * @memberof PeriodStatement
+     */
+    entries: Array<PostedEntry>;
+    /**
+     *
+     * @type {string}
+     * @memberof PeriodStatement
+     */
+    closingBalance: string;
+    /**
+     *
+     * @type {string}
+     * @memberof PeriodStatement
+     */
+    generatedAt: string;
+}
+
+
+/**
+ * @export
+ */
+export const PeriodStatementSchemaVersionEnum = {
+    NUMBER_2: 2
+} as const;
+export type PeriodStatementSchemaVersionEnum = typeof PeriodStatementSchemaVersionEnum[keyof typeof PeriodStatementSchemaVersionEnum];
+
+/**
+ *
+ * @export
+ * @interface PostedEntry
+ */
+export interface PostedEntry {
+    /**
+     *
+     * @type {number}
+     * @memberof PostedEntry
+     */
+    id: number;
+    /**
+     *
+     * @type {string}
+     * @memberof PostedEntry
+     */
+    operationId: string;
+    /**
+     *
+     * @type {string}
+     * @memberof PostedEntry
+     */
+    amount: string;
+    /**
+     *
+     * @type {string}
+     * @memberof PostedEntry
+     */
+    postedAt: string;
+    /**
+     *
+     * @type {string}
+     * @memberof PostedEntry
+     */
+    source: string;
+}
+/**
+ *
  * @export
  * @interface StatementExport
  */
 export interface StatementExport {
     /**
-     * 
+     *
      * @type {string}
      * @memberof StatementExport
      */
     status?: string;
     /**
-     * 
+     *
      * @type {string}
      * @memberof StatementExport
      */
     key?: string;
     /**
-     * 
+     *
      * @type {{ [key: string]: any; }}
      * @memberof StatementExport
      */
     statement?: { [key: string]: any; };
 }
 /**
- * 
+ *
  * @export
  * @interface StatementJob
  */
 export interface StatementJob {
     /**
-     * 
+     *
      * @type {string}
      * @memberof StatementJob
      */
     id: string;
     /**
-     * 
+     *
      * @type {string}
      * @memberof StatementJob
      */
     status: string;
     /**
-     * 
+     *
      * @type {string}
      * @memberof StatementJob
      */
     createdAt: string;
     /**
-     * 
+     *
      * @type {string}
      * @memberof StatementJob
      */
     expiresAt: string;
 }
 /**
- * 
+ *
  * @export
  * @interface StatementJobPage
  */
 export interface StatementJobPage {
     /**
-     * 
+     *
      * @type {Array<StatementJob>}
      * @memberof StatementJobPage
      */
     items: Array<StatementJob>;
     /**
-     * 
+     *
      * @type {boolean}
      * @memberof StatementJobPage
      */
     hasMore: boolean;
 }
 /**
- * 
+ *
+ * @export
+ * @interface StatementPeriod
+ */
+export interface StatementPeriod {
+    /**
+     * Inclusive UTC boundary
+     * @type {string}
+     * @memberof StatementPeriod
+     */
+    start: string;
+    /**
+     * Exclusive UTC boundary
+     * @type {string}
+     * @memberof StatementPeriod
+     */
+    end: string;
+}
+/**
+ *
  * @export
  * @interface StatusUpdateRequest
  */
 export interface StatusUpdateRequest {
     /**
-     * 
+     *
      * @type {string}
      * @memberof StatusUpdateRequest
      */
@@ -403,4 +573,3 @@ export const StatusUpdateRequestStatusEnum = {
     Closed: 'CLOSED'
 } as const;
 export type StatusUpdateRequestStatusEnum = typeof StatusUpdateRequestStatusEnum[keyof typeof StatusUpdateRequestStatusEnum];
-

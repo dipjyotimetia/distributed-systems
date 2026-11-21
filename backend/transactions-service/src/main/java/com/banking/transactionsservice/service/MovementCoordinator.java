@@ -25,7 +25,7 @@ public class MovementCoordinator {
     private static final Logger logger = LoggerFactory.getLogger(MovementCoordinator.class);
     public record Movement(long userId, Long fromAccountId, Long toAccountId, BigDecimal amount) {}
     public enum Action { RESERVE, COMMIT, COMPENSATE }
-    private record Decision(UUID operation, Movement movement, String state, boolean finalized) {}
+    private record Decision(UUID operation, Movement movement, String state, boolean finalized, Long ledgerId) {}
 
     private final JdbcTemplate jdbc;
     private final TransactionTemplate durable;
@@ -67,12 +67,11 @@ public class MovementCoordinator {
                     throw new IllegalStateException("Movement already resolved");
                 }
                 accounts.applyMovement(operation, Action.RESERVE, movement);
-                transaction.setStatus(Transaction.TransactionStatus.COMPLETED);
-                transaction.setProcessedAt(LocalDateTime.now());
+                transaction.setStatus(Transaction.TransactionStatus.PENDING);
+                transaction.setMovementPosting(true);
                 Transaction entry = ledger.saveAndFlush(transaction);
-                outbox.enqueue(entry);
                 jdbc.update("""
-                        UPDATE transactions_service.movement_decisions SET state = 'COMMITTED', ledger_id = ?
+                        UPDATE transactions_service.movement_decisions SET state = 'READY_TO_POST', ledger_id = ?
                         WHERE operation_id = ?
                         """, entry.getId(), operation);
                 return entry;
@@ -87,7 +86,7 @@ public class MovementCoordinator {
                 failure.addSuppressed(unresolved);
                 throw pending(failure);
             }
-            if ("COMMITTED".equals(outcome)) {
+            if ("COMMITTED".equals(outcome) || "READY_TO_POST".equals(outcome)) {
                 throw pending(failure);
             }
             throw failure;
@@ -98,7 +97,7 @@ public class MovementCoordinator {
         } catch (RuntimeException failure) {
             throw pending(failure);
         }
-        return saved;
+        return ledger.findById(saved.getId()).orElseThrow();
     }
 
     private static ResponseStatusException pending(RuntimeException cause) {
@@ -138,15 +137,28 @@ public class MovementCoordinator {
             Decision current = lock(operation);
             if ("STARTED".equals(current.state())) {
                 jdbc.update("UPDATE transactions_service.movement_decisions SET state = 'ABORTED' WHERE operation_id = ?", operation);
-                return new Decision(operation, current.movement(), "ABORTED", false);
+                return new Decision(operation, current.movement(), "ABORTED", false, null);
             }
             return current;
         });
         if (!decision.finalized()) {
-            accounts.applyMovement(operation, "COMMITTED".equals(decision.state()) ? Action.COMMIT : Action.COMPENSATE,
-                    decision.movement());
-            durable.executeWithoutResult(status -> jdbc.update(
-                    "UPDATE transactions_service.movement_decisions SET finalized = TRUE WHERE operation_id = ?", operation));
+            boolean posting = !"ABORTED".equals(decision.state());
+            accounts.applyMovement(operation, posting ? Action.COMMIT : Action.COMPENSATE, decision.movement());
+            durable.executeWithoutResult(status -> {
+                Decision current = lock(operation);
+                if (current.finalized()) return;
+                if ("READY_TO_POST".equals(current.state())) {
+                    Transaction posted = ledger.findById(current.ledgerId()).orElseThrow();
+                    posted.setStatus(Transaction.TransactionStatus.COMPLETED);
+                    posted.setProcessedAt(LocalDateTime.now());
+                    posted.setMovementPosting(false);
+                    outbox.enqueue(ledger.saveAndFlush(posted));
+                }
+                jdbc.update("""
+                        UPDATE transactions_service.movement_decisions SET finalized = TRUE, state = ?
+                        WHERE operation_id = ?
+                        """, posting ? "COMMITTED" : "ABORTED", operation);
+            });
         }
         return decision.state();
     }
@@ -156,6 +168,6 @@ public class MovementCoordinator {
                 SELECT * FROM transactions_service.movement_decisions WHERE operation_id = ? FOR UPDATE
                 """, (rs, row) -> new Decision(operation, new Movement(rs.getLong("user_id"),
                 rs.getObject("from_account_id", Long.class), rs.getObject("to_account_id", Long.class),
-                rs.getBigDecimal("amount")), rs.getString("state"), rs.getBoolean("finalized")), operation);
+                rs.getBigDecimal("amount")), rs.getString("state"), rs.getBoolean("finalized"), rs.getObject("ledger_id", Long.class)), operation);
     }
 }

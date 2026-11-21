@@ -64,6 +64,9 @@ public class PaymentChecks {
                 .checkTransaction(TransactionRequest.newBuilder().setAccountId(Long.toString(account))
                         .setUserId(Long.toString(customer)).setAmount(BigDecimal.valueOf(cents, 2).doubleValue())
                         .setTransactionType("TRANSFER").setMerchantCategory("5812").build());
+        if ("external-verification-unavailable".equals(risk.getReason())) {
+            throw new IllegalStateException("Fraud screening unavailable");
+        }
         if (!risk.getApproved()) return false;
 
         var request = HttpRequest.newBuilder(complianceUrl).timeout(TIMEOUT)

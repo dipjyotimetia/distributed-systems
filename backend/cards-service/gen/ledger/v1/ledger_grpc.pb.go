@@ -22,6 +22,9 @@ const (
 	AccountLedger_ApplyMovement_FullMethodName    = "/ledger.v1.AccountLedger/ApplyMovement"
 	AccountLedger_ApplyOutboundAud_FullMethodName = "/ledger.v1.AccountLedger/ApplyOutboundAud"
 	AccountLedger_GetAccount_FullMethodName       = "/ledger.v1.AccountLedger/GetAccount"
+	AccountLedger_Reserve_FullMethodName          = "/ledger.v1.AccountLedger/Reserve"
+	AccountLedger_Post_FullMethodName             = "/ledger.v1.AccountLedger/Post"
+	AccountLedger_Release_FullMethodName          = "/ledger.v1.AccountLedger/Release"
 )
 
 // AccountLedgerClient is the client API for AccountLedger service.
@@ -35,6 +38,9 @@ type AccountLedgerClient interface {
 	ApplyMovement(ctx context.Context, in *MovementRequest, opts ...grpc.CallOption) (*MovementResult, error)
 	ApplyOutboundAud(ctx context.Context, in *MovementRequest, opts ...grpc.CallOption) (*MovementResult, error)
 	GetAccount(ctx context.Context, in *GetAccountRequest, opts ...grpc.CallOption) (*GetAccountResponse, error)
+	Reserve(ctx context.Context, in *ExactMovementCommand, opts ...grpc.CallOption) (*ExactMovementOutcome, error)
+	Post(ctx context.Context, in *ExactMovementCommand, opts ...grpc.CallOption) (*ExactMovementOutcome, error)
+	Release(ctx context.Context, in *ExactMovementCommand, opts ...grpc.CallOption) (*ExactMovementOutcome, error)
 }
 
 type accountLedgerClient struct {
@@ -75,6 +81,36 @@ func (c *accountLedgerClient) GetAccount(ctx context.Context, in *GetAccountRequ
 	return out, nil
 }
 
+func (c *accountLedgerClient) Reserve(ctx context.Context, in *ExactMovementCommand, opts ...grpc.CallOption) (*ExactMovementOutcome, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ExactMovementOutcome)
+	err := c.cc.Invoke(ctx, AccountLedger_Reserve_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *accountLedgerClient) Post(ctx context.Context, in *ExactMovementCommand, opts ...grpc.CallOption) (*ExactMovementOutcome, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ExactMovementOutcome)
+	err := c.cc.Invoke(ctx, AccountLedger_Post_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *accountLedgerClient) Release(ctx context.Context, in *ExactMovementCommand, opts ...grpc.CallOption) (*ExactMovementOutcome, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ExactMovementOutcome)
+	err := c.cc.Invoke(ctx, AccountLedger_Release_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AccountLedgerServer is the server API for AccountLedger service.
 // All implementations must embed UnimplementedAccountLedgerServer
 // for forward compatibility.
@@ -86,6 +122,9 @@ type AccountLedgerServer interface {
 	ApplyMovement(context.Context, *MovementRequest) (*MovementResult, error)
 	ApplyOutboundAud(context.Context, *MovementRequest) (*MovementResult, error)
 	GetAccount(context.Context, *GetAccountRequest) (*GetAccountResponse, error)
+	Reserve(context.Context, *ExactMovementCommand) (*ExactMovementOutcome, error)
+	Post(context.Context, *ExactMovementCommand) (*ExactMovementOutcome, error)
+	Release(context.Context, *ExactMovementCommand) (*ExactMovementOutcome, error)
 	mustEmbedUnimplementedAccountLedgerServer()
 }
 
@@ -104,6 +143,15 @@ func (UnimplementedAccountLedgerServer) ApplyOutboundAud(context.Context, *Movem
 }
 func (UnimplementedAccountLedgerServer) GetAccount(context.Context, *GetAccountRequest) (*GetAccountResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetAccount not implemented")
+}
+func (UnimplementedAccountLedgerServer) Reserve(context.Context, *ExactMovementCommand) (*ExactMovementOutcome, error) {
+	return nil, status.Error(codes.Unimplemented, "method Reserve not implemented")
+}
+func (UnimplementedAccountLedgerServer) Post(context.Context, *ExactMovementCommand) (*ExactMovementOutcome, error) {
+	return nil, status.Error(codes.Unimplemented, "method Post not implemented")
+}
+func (UnimplementedAccountLedgerServer) Release(context.Context, *ExactMovementCommand) (*ExactMovementOutcome, error) {
+	return nil, status.Error(codes.Unimplemented, "method Release not implemented")
 }
 func (UnimplementedAccountLedgerServer) mustEmbedUnimplementedAccountLedgerServer() {}
 func (UnimplementedAccountLedgerServer) testEmbeddedByValue()                       {}
@@ -180,6 +228,60 @@ func _AccountLedger_GetAccount_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AccountLedger_Reserve_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ExactMovementCommand)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AccountLedgerServer).Reserve(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AccountLedger_Reserve_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AccountLedgerServer).Reserve(ctx, req.(*ExactMovementCommand))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AccountLedger_Post_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ExactMovementCommand)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AccountLedgerServer).Post(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AccountLedger_Post_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AccountLedgerServer).Post(ctx, req.(*ExactMovementCommand))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AccountLedger_Release_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ExactMovementCommand)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AccountLedgerServer).Release(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AccountLedger_Release_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AccountLedgerServer).Release(ctx, req.(*ExactMovementCommand))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AccountLedger_ServiceDesc is the grpc.ServiceDesc for AccountLedger service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -198,6 +300,18 @@ var AccountLedger_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetAccount",
 			Handler:    _AccountLedger_GetAccount_Handler,
+		},
+		{
+			MethodName: "Reserve",
+			Handler:    _AccountLedger_Reserve_Handler,
+		},
+		{
+			MethodName: "Post",
+			Handler:    _AccountLedger_Post_Handler,
+		},
+		{
+			MethodName: "Release",
+			Handler:    _AccountLedger_Release_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

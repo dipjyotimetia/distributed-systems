@@ -65,7 +65,7 @@ func RecoveryJourney(ctx workflow.Context, input Input) ([]BoundaryEvidence, err
 	}
 	return []BoundaryEvidence{broker, mongo, deliveries, {
 		Boundary: "Kafka consumer group", Expected: "committed offset survives broker restart and duplicate commits after consumer restart",
-		Observed: "consumer resumed with one stored event and one attempt per provider after committing offsets 1 and 2",
+		Observed: "consumer resumed with one stored event and retried only the transiently failed channel after committing offsets 1 and 2",
 	}}, nil
 }
 

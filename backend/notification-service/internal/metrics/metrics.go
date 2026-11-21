@@ -6,6 +6,16 @@ import (
 )
 
 var (
+	DeliveryExhausted = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "notification_delivery_exhausted_total",
+		Help: "Delivery intents that need operator attention, by channel.",
+	}, []string{"channel"})
+
+	DeliveryRetries = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "notification_delivery_retries_total",
+		Help: "Transient delivery failures scheduled for retry.",
+	}, []string{"channel"})
+
 	// EventsConsumed counts transaction events consumed from Kafka.
 	EventsConsumed = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "notification_events_consumed_total",

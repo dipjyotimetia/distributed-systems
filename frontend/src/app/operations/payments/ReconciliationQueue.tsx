@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import AuthenticatedLayout from '@/components/layout/AuthenticatedLayout';
 import Button from '@/components/ui/Button';
+import ReviewQueue from './ReviewQueue';
 
 type Discrepancy = {
   businessDate: string;
@@ -98,7 +99,7 @@ function Queue() {
 export default function ReconciliationQueue() {
   return (
     <ProtectedRoute>
-      <AuthenticatedLayout><Queue /></AuthenticatedLayout>
+      <AuthenticatedLayout><Queue /><ReviewQueue /></AuthenticatedLayout>
     </ProtectedRoute>
   );
 }

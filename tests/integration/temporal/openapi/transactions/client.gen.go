@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/oapi-codegen/runtime"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 const (
@@ -26,11 +27,25 @@ const (
 	INSUFFICIENTFUNDS InsufficientFundsCode = "INSUFFICIENT_FUNDS"
 )
 
+// Defines values for MovementIntentType.
+const (
+	MovementIntentTypeDEPOSIT    MovementIntentType = "DEPOSIT"
+	MovementIntentTypeTRANSFER   MovementIntentType = "TRANSFER"
+	MovementIntentTypeWITHDRAWAL MovementIntentType = "WITHDRAWAL"
+)
+
+// Defines values for MovementOutcomeStatus.
+const (
+	PENDING  MovementOutcomeStatus = "PENDING"
+	POSTED   MovementOutcomeStatus = "POSTED"
+	REJECTED MovementOutcomeStatus = "REJECTED"
+)
+
 // Defines values for CreateTransactionJSONBodyType.
 const (
-	DEPOSIT    CreateTransactionJSONBodyType = "DEPOSIT"
-	TRANSFER   CreateTransactionJSONBodyType = "TRANSFER"
-	WITHDRAWAL CreateTransactionJSONBodyType = "WITHDRAWAL"
+	CreateTransactionJSONBodyTypeDEPOSIT    CreateTransactionJSONBodyType = "DEPOSIT"
+	CreateTransactionJSONBodyTypeTRANSFER   CreateTransactionJSONBodyType = "TRANSFER"
+	CreateTransactionJSONBodyTypeWITHDRAWAL CreateTransactionJSONBodyType = "WITHDRAWAL"
 )
 
 // DepositRequest defines model for DepositRequest.
@@ -51,6 +66,50 @@ type InsufficientFunds struct {
 
 // InsufficientFundsCode defines model for InsufficientFunds.Code.
 type InsufficientFundsCode string
+
+// MovementError defines model for MovementError.
+type MovementError struct {
+	// Code Stable machine-readable error code.
+	Code    string  `json:"code"`
+	Message *string `json:"message,omitempty"`
+}
+
+// MovementIntent Supply only toAccountId for DEPOSIT, only fromAccountId for WITHDRAWAL, and two distinct account IDs for TRANSFER. The caller must own the source account, or the destination for a deposit.
+type MovementIntent struct {
+	Description   *string            `json:"description,omitempty"`
+	FromAccountId *int64             `json:"fromAccountId,omitempty"`
+	Money         MovementMoney      `json:"money"`
+	ToAccountId   *int64             `json:"toAccountId,omitempty"`
+	Type          MovementIntentType `json:"type"`
+}
+
+// MovementIntentType defines model for MovementIntent.Type.
+type MovementIntentType string
+
+// MovementMoney defines model for MovementMoney.
+type MovementMoney struct {
+	// Amount Positive exact amount within the supported currency scale. Excess precision is rejected.
+	Amount string `json:"amount"`
+
+	// Currency Supported account currency as an ISO 4217 code.
+	Currency string `json:"currency"`
+}
+
+// MovementOutcome defines model for MovementOutcome.
+type MovementOutcome struct {
+	CreatedAt time.Time          `json:"createdAt"`
+	Id        openapi_types.UUID `json:"id"`
+
+	// ReasonCode Machine-readable reason for a pending or rejected outcome.
+	ReasonCode *string `json:"reasonCode,omitempty"`
+
+	// Status POSTED requires durable account posting. REJECTED requires confirmation that no posting occurred and any hold was released.
+	Status    MovementOutcomeStatus `json:"status"`
+	UpdatedAt time.Time             `json:"updatedAt"`
+}
+
+// MovementOutcomeStatus POSTED requires durable account posting. REJECTED requires confirmation that no posting occurred and any hold was released.
+type MovementOutcomeStatus string
 
 // Rejection Confirmed insufficient funds, or a validation field map. Fraud and other rejections use HTTP 400 with an empty body and are not this schema.
 type Rejection struct {
@@ -157,8 +216,22 @@ type Status = string
 // Type defines model for type.
 type Type = string
 
+// InvalidMovementRequest defines model for InvalidMovementRequest.
+type InvalidMovementRequest = MovementError
+
+// MovementAuthenticationRequired defines model for MovementAuthenticationRequired.
+type MovementAuthenticationRequired = MovementError
+
+// MovementResourceNotFound defines model for MovementResourceNotFound.
+type MovementResourceNotFound = MovementError
+
 // TransactionRecord defines model for TransactionRecord.
 type TransactionRecord = TransactionResponse
+
+// SubmitMovementParams defines parameters for SubmitMovement.
+type SubmitMovementParams struct {
+	IdempotencyKey string `json:"Idempotency-Key"`
+}
 
 // ListTransactionsParams defines parameters for ListTransactions.
 type ListTransactionsParams struct {
@@ -213,6 +286,9 @@ type SearchTransactionsParams struct {
 type SummarizeTransactionsParams struct {
 	AccountId *AccountId `form:"accountId,omitempty" json:"accountId,omitempty"`
 }
+
+// SubmitMovementJSONRequestBody defines body for SubmitMovement for application/json ContentType.
+type SubmitMovementJSONRequestBody = MovementIntent
 
 // CreateTransactionJSONRequestBody defines body for CreateTransaction for application/json ContentType.
 type CreateTransactionJSONRequestBody CreateTransactionJSONBody
@@ -423,6 +499,14 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 
 // The interface specification for the client above.
 type ClientInterface interface {
+	// SubmitMovementWithBody request with any body
+	SubmitMovementWithBody(ctx context.Context, params *SubmitMovementParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	SubmitMovement(ctx context.Context, params *SubmitMovementParams, body SubmitMovementJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetMovement request
+	GetMovement(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListTransactions request
 	ListTransactions(ctx context.Context, params *ListTransactionsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -460,6 +544,42 @@ type ClientInterface interface {
 
 	// CancelTransaction request
 	CancelTransaction(ctx context.Context, id TransactionId, reqEditors ...RequestEditorFn) (*http.Response, error)
+}
+
+func (c *Client) SubmitMovementWithBody(ctx context.Context, params *SubmitMovementParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSubmitMovementRequestWithBody(c.Server, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) SubmitMovement(ctx context.Context, params *SubmitMovementParams, body SubmitMovementJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSubmitMovementRequest(c.Server, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetMovement(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetMovementRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
 }
 
 func (c *Client) ListTransactions(ctx context.Context, params *ListTransactionsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -628,6 +748,93 @@ func (c *Client) CancelTransaction(ctx context.Context, id TransactionId, reqEdi
 		return nil, err
 	}
 	return c.Client.Do(req)
+}
+
+// NewSubmitMovementRequest calls the generic SubmitMovement builder with application/json body
+func NewSubmitMovementRequest(server string, params *SubmitMovementParams, body SubmitMovementJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewSubmitMovementRequestWithBody(server, params, "application/json", bodyReader)
+}
+
+// NewSubmitMovementRequestWithBody generates requests for SubmitMovement with any type of body
+func NewSubmitMovementRequestWithBody(server string, params *SubmitMovementParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/movements")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		var headerParam0 string
+
+		headerParam0, err = runtime.StyleParamWithLocation("simple", false, "Idempotency-Key", runtime.ParamLocationHeader, params.IdempotencyKey)
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("Idempotency-Key", headerParam0)
+
+	}
+
+	return req, nil
+}
+
+// NewGetMovementRequest generates requests for GetMovement
+func NewGetMovementRequest(server string, id openapi_types.UUID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "id", runtime.ParamLocationPath, id)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/movements/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
 }
 
 // NewListTransactionsRequest generates requests for ListTransactions
@@ -1433,6 +1640,14 @@ func WithBaseURL(baseURL string) ClientOption {
 
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
+	// SubmitMovementWithBodyWithResponse request with any body
+	SubmitMovementWithBodyWithResponse(ctx context.Context, params *SubmitMovementParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SubmitMovementHTTP, error)
+
+	SubmitMovementWithResponse(ctx context.Context, params *SubmitMovementParams, body SubmitMovementJSONRequestBody, reqEditors ...RequestEditorFn) (*SubmitMovementHTTP, error)
+
+	// GetMovementWithResponse request
+	GetMovementWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetMovementHTTP, error)
+
 	// ListTransactionsWithResponse request
 	ListTransactionsWithResponse(ctx context.Context, params *ListTransactionsParams, reqEditors ...RequestEditorFn) (*ListTransactionsHTTP, error)
 
@@ -1470,6 +1685,58 @@ type ClientWithResponsesInterface interface {
 
 	// CancelTransactionWithResponse request
 	CancelTransactionWithResponse(ctx context.Context, id TransactionId, reqEditors ...RequestEditorFn) (*CancelTransactionHTTP, error)
+}
+
+type SubmitMovementHTTP struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON202      *MovementOutcome
+	JSON400      *InvalidMovementRequest
+	JSON401      *MovementAuthenticationRequired
+	JSON404      *MovementResourceNotFound
+	JSON409      *MovementError
+	JSON422      *MovementError
+}
+
+// Status returns HTTPResponse.Status
+func (r SubmitMovementHTTP) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SubmitMovementHTTP) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetMovementHTTP struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *MovementOutcome
+	JSON400      *InvalidMovementRequest
+	JSON401      *MovementAuthenticationRequired
+	JSON404      *MovementResourceNotFound
+}
+
+// Status returns HTTPResponse.Status
+func (r GetMovementHTTP) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetMovementHTTP) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
 }
 
 type ListTransactionsHTTP struct {
@@ -1695,6 +1962,32 @@ func (r CancelTransactionHTTP) StatusCode() int {
 	return 0
 }
 
+// SubmitMovementWithBodyWithResponse request with arbitrary body returning *SubmitMovementHTTP
+func (c *ClientWithResponses) SubmitMovementWithBodyWithResponse(ctx context.Context, params *SubmitMovementParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SubmitMovementHTTP, error) {
+	rsp, err := c.SubmitMovementWithBody(ctx, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSubmitMovementHTTP(rsp)
+}
+
+func (c *ClientWithResponses) SubmitMovementWithResponse(ctx context.Context, params *SubmitMovementParams, body SubmitMovementJSONRequestBody, reqEditors ...RequestEditorFn) (*SubmitMovementHTTP, error) {
+	rsp, err := c.SubmitMovement(ctx, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSubmitMovementHTTP(rsp)
+}
+
+// GetMovementWithResponse request returning *GetMovementHTTP
+func (c *ClientWithResponses) GetMovementWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetMovementHTTP, error) {
+	rsp, err := c.GetMovement(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetMovementHTTP(rsp)
+}
+
 // ListTransactionsWithResponse request returning *ListTransactionsHTTP
 func (c *ClientWithResponses) ListTransactionsWithResponse(ctx context.Context, params *ListTransactionsParams, reqEditors ...RequestEditorFn) (*ListTransactionsHTTP, error) {
 	rsp, err := c.ListTransactions(ctx, params, reqEditors...)
@@ -1815,6 +2108,114 @@ func (c *ClientWithResponses) CancelTransactionWithResponse(ctx context.Context,
 		return nil, err
 	}
 	return ParseCancelTransactionHTTP(rsp)
+}
+
+// ParseSubmitMovementHTTP parses an HTTP response from a SubmitMovementWithResponse call
+func ParseSubmitMovementHTTP(rsp *http.Response) (*SubmitMovementHTTP, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SubmitMovementHTTP{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 202:
+		var dest MovementOutcome
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON202 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest InvalidMovementRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest MovementAuthenticationRequired
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest MovementResourceNotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest MovementError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest MovementError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetMovementHTTP parses an HTTP response from a GetMovementWithResponse call
+func ParseGetMovementHTTP(rsp *http.Response) (*GetMovementHTTP, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetMovementHTTP{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest MovementOutcome
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest InvalidMovementRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest MovementAuthenticationRequired
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest MovementResourceNotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	}
+
+	return response, nil
 }
 
 // ParseListTransactionsHTTP parses an HTTP response from a ListTransactionsWithResponse call

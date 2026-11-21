@@ -1,31 +1,31 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import AuthenticatedLayout from '@/components/layout/AuthenticatedLayout';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import Link from 'next/link';
-import { TransactionsAPI } from '@/lib/api/transactions';
+import { useMovement } from '@/lib/api/movements';
+import MovementStatus from '@/components/accounts/MovementStatus';
 import { AccountsAPI, Account } from '@/lib/api/accounts';
 import { demoTransfer } from '@/lib/demo';
 
 const TransferPage: React.FC = () => {
   const params = useParams();
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [fromAccount, setFromAccount] = useState<Account | null>(null);
   const [toAccountId, setToAccountId] = useState('');
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [isLoading, setIsLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
   const [availableAccounts, setAvailableAccounts] = useState<Account[]>([]);
 
   const fromAccountId = params.id as string;
+  const movement = useMovement('TRANSFER', fromAccountId);
+  const submitted = movement.submission;
   const isDemoTransfer = searchParams.get('demo') === demoTransfer.queryValue;
 
   useEffect(() => {
@@ -78,58 +78,21 @@ const TransferPage: React.FC = () => {
       return;
     }
     
-    if (!amount || parseFloat(amount) <= 0) {
+    if (!/^(0|[1-9][0-9]*)([.][0-9]+)?$/.test(amount) || !/[1-9]/.test(amount)) {
       setError('Please enter a valid amount');
       return;
     }
-
-    if (!toAccountId) {
-      setError('Please select a destination account');
+    if (!toAccountId || toAccountId === fromAccountId) {
+      setError('Choose a different destination account.');
       return;
     }
-
-    if (toAccountId === fromAccountId) {
-      setError('You cannot transfer to the same account');
-      return;
-    }
-
-    if (!description.trim()) {
-      setError('Please enter a description');
-      return;
-    }
-
-    const transferAmount = parseFloat(amount);
-    if (fromAccount && transferAmount > fromAccount.balance) {
-      setError('Insufficient funds. You cannot transfer more than your current balance.');
-      return;
-    }
-
-    setIsSubmitting(true);
+    if (!fromAccount) return;
     setError(null);
-
-    try {
-      const response = await TransactionsAPI.createTransfer(
-        parseInt(fromAccountId),
-        parseInt(toAccountId),
-        transferAmount,
-        description.trim(),
-        fromAccount?.currency || 'USD'
-      );
-
-      if (response.success) {
-        setSuccess(true);
-        setTimeout(() => {
-          router.push(`/accounts/${fromAccountId}`);
-        }, 2000);
-      } else {
-        setError(response.message || 'Failed to process transfer');
-      }
-    } catch (err) {
-      setError('An unexpected error occurred');
-      console.error('Transfer error:', err);
-    } finally {
-      setIsSubmitting(false);
-    }
+    movement.submit({
+      type: 'TRANSFER', fromAccountId: Number(fromAccountId), toAccountId: Number(toAccountId),
+      money: { currency: fromAccount.currency, amount },
+      description: description.trim() || undefined,
+    });
   };
 
   const formatCurrency = (amount: number, currency: string) => {
@@ -222,26 +185,7 @@ const TransferPage: React.FC = () => {
               </div>
             )}
 
-            {/* Success Message */}
-            {success && (
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
-                <div className="flex">
-                  <div className="flex-shrink-0">
-                    <svg className="h-5 w-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                  <div className="ml-3">
-                    <h3 className="text-sm font-medium text-green-800">
-                      Transfer Successful!
-                    </h3>
-                    <p className="mt-1 text-sm text-green-700">
-                      Your transfer has been processed successfully. Redirecting to account details...
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
+            <MovementStatus movement={movement} />
 
             {/* Transfer Form */}
             <div className="rounded-3xl border border-line bg-surface">
@@ -275,7 +219,8 @@ const TransferPage: React.FC = () => {
                   </label>
                   <select
                     id="toAccount"
-                    value={toAccountId}
+                    value={submitted ? String(submitted.intent.toAccountId) : toAccountId}
+                    disabled={Boolean(submitted)}
                     onChange={(e) => setToAccountId(e.target.value)}
                     required
                     className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
@@ -302,7 +247,8 @@ const TransferPage: React.FC = () => {
                     step="0.01"
                     min="0.01"
                     max={fromAccount?.balance || undefined}
-                    value={amount}
+                    value={submitted?.intent.money.amount ?? amount}
+                    disabled={Boolean(submitted)}
                     onChange={(e) => setAmount(e.target.value)}
                     placeholder="0.00"
                     required
@@ -320,7 +266,8 @@ const TransferPage: React.FC = () => {
                   <Input
                     id="description"
                     type="text"
-                    value={description}
+                    value={submitted ? submitted.intent.description ?? '' : description}
+                    disabled={Boolean(submitted)}
                     onChange={(e) => setDescription(e.target.value)}
                     placeholder="e.g., Transfer to savings, Bill payment"
                     required
@@ -340,10 +287,10 @@ const TransferPage: React.FC = () => {
                   <Button
                     variant="primary"
                     type="submit"
-                    disabled={isSubmitting || movementLocked}
+                    disabled={!movement.ready || Boolean(submitted) || movementLocked}
                     className="min-w-[120px]"
                   >
-                    {isSubmitting ? (
+                    {submitted && !submitted.outcome ? (
                       <>
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                         Processing...

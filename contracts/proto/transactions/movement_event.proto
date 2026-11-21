@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package transactions.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option java_package = "transactions.v1";
+option java_multiple_files = true;
+
+// Published using the protobuf JSON mapping on movement-lifecycle-v1.
+// The event ID is stable across retries and redeliveries.
+message MovementLifecycleEvent {
+  enum Type {
+    TYPE_UNSPECIFIED = 0;
+    DEPOSIT = 1;
+    WITHDRAWAL = 2;
+    TRANSFER = 3;
+  }
+
+  enum Status {
+    STATUS_UNSPECIFIED = 0;
+    PENDING = 1;
+    POSTED = 2;
+    REJECTED = 3;
+  }
+
+  message Money {
+    string currency = 1;
+    string amount = 2;
+  }
+
+  uint32 schema_version = 1;
+  string event_id = 2;
+  string movement_id = 3;
+  Type type = 4;
+  optional int64 from_account_id = 5;
+  optional int64 to_account_id = 6;
+  Money money = 7;
+  Status status = 8;
+  google.protobuf.Timestamp occurred_at = 9;
+}

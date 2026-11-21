@@ -20,7 +20,7 @@ public class PaymentLifecycle {
         if (expected.equals(next)) return false;
         int changed = db.update("""
                 UPDATE payments.payment
-                SET status = ?, clearing_reference = coalesce(?, clearing_reference)
+                SET status = ?, clearing_reference = coalesce(?, clearing_reference), review_revision = review_revision + 1
                 WHERE id = ? AND status = ?
                 """, next, reference, paymentId, expected);
         if (changed == 0) {

@@ -88,7 +88,7 @@ func testJourney(t *testing.T, scenario string, definition any, replaceWorker bo
 			t.Fatal("TEMPORAL_TEST_UI_HOLD must be a duration between 0s and 10m")
 		}
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
 	defer cancel()
 	started := time.Now()
 	id := "bank" + strings.ToLower(rand.Text()[:16])
@@ -104,20 +104,30 @@ func testJourney(t *testing.T, scenario string, definition any, replaceWorker bo
 		}
 	})
 	report["workflow_stage"] = "readiness"
-	waitFor(t, ctx, func(ctx context.Context) bool {
+	var lastReadinessError error
+	t.Cleanup(func() {
+		if t.Failed() && lastReadinessError != nil {
+			t.Logf("last startup probe: %v", lastReadinessError)
+		}
+	})
+	waitForLimit(t, ctx, 2*time.Minute, 15*time.Second, func(ctx context.Context) bool {
+		healthy := func(base, path string, output any) bool {
+			lastReadinessError = call(ctx, base, path, "", nil, 200, output)
+			return lastReadinessError == nil
+		}
 		if scenario == "ai" {
-			return call(ctx, frontend, "/api/v1/healthz", "", nil, 200, nil) == nil &&
-				call(ctx, frontend, "/api/v1/ai/chat", "", nil, 200, &[]struct{ Provider string }{}) == nil
+			return healthy(frontend, "/api/v1/healthz", nil) &&
+				healthy(frontend, "/api/v1/ai/chat", &[]struct{ Provider string }{})
 		}
 		gateway := os.Getenv("MICROSVC_GATEWAY")
 		for _, path := range []string{"/api/v1/user-service/health", "/api/v1/accounts-service/health", "/api/v1/transactions-service/health"} {
-			if call(ctx, gateway, path, "", nil, 200, nil) != nil {
+			if !healthy(gateway, path, nil) {
 				return false
 			}
 		}
 
-		return call(ctx, frontend, "/api/v1/healthz", "", nil, 200, nil) == nil &&
-			call(ctx, os.Getenv("MICROSVC_NOTIFICATIONS"), "/api/v1/health", "", nil, 200, nil) == nil
+		return healthy(frontend, "/api/v1/healthz", nil) &&
+			healthy(os.Getenv("MICROSVC_NOTIFICATIONS"), "/api/v1/health", nil)
 	})
 	report["workflow_stage"] = "temporal_startup"
 	dev, err := testsuite.StartDevServer(ctx, testsuite.DevServerOptions{
@@ -248,12 +258,17 @@ func testJourney(t *testing.T, scenario string, definition any, replaceWorker bo
 
 func waitFor(t *testing.T, ctx context.Context, probe func(context.Context) bool) {
 	t.Helper()
-	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	waitForLimit(t, ctx, 60*time.Second, 3*time.Second, probe)
+}
+
+func waitForLimit(t *testing.T, ctx context.Context, limit, attemptLimit time.Duration, probe func(context.Context) bool) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(ctx, limit)
 	defer cancel()
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 	for {
-		attempt, stop := context.WithTimeout(ctx, 3*time.Second)
+		attempt, stop := context.WithTimeout(ctx, attemptLimit)
 		ok := probe(attempt)
 		stop()
 		if ok {

@@ -80,7 +80,10 @@ public class PaymentComplianceService {
             }
 
             JsonNode data = objectMapper.readTree(response.body()).path("content").path("data");
-            int totalMatches = data.path("total_matches").asInt(0);
+            if (!data.path("total_matches").isIntegralNumber() || !data.path("risk_level").isTextual()) {
+                throw new IllegalStateException("Incomplete compliance decision");
+            }
+            int totalMatches = data.path("total_matches").asInt();
             String riskLevel = data.path("risk_level").asText("unknown");
             if (totalMatches > 0 || !"low".equalsIgnoreCase(riskLevel)) {
                 throw new RuntimeException("Compliance screening requires review");

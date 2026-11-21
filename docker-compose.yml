@@ -224,7 +224,13 @@ services:
       - --kafka-addr=0.0.0.0:9092
       - --advertise-kafka-addr=redpanda:9092
     healthcheck:
-      test: ["CMD-SHELL", "rpk topic describe transaction-events -X brokers=redpanda:9092 >/dev/null 2>&1 || rpk topic create transaction-events --partitions 1 --replicas 1 -X brokers=redpanda:9092"]
+      test:
+        - CMD-SHELL
+        - >-
+          (rpk topic describe transaction-events -X brokers=redpanda:9092 >/dev/null 2>&1 ||
+           rpk topic create transaction-events --partitions 1 --replicas 1 -X brokers=redpanda:9092) &&
+          (rpk topic describe movement-lifecycle-v1 -X brokers=redpanda:9092 >/dev/null 2>&1 ||
+           rpk topic create movement-lifecycle-v1 --partitions 1 --replicas 1 -X brokers=redpanda:9092)
       interval: 5s
       timeout: 10s
       retries: 15
@@ -514,6 +520,7 @@ services:
       - "9090:9090"
     volumes:
       - ./config/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./config/money-movement-alerts.yml:/etc/prometheus/money-movement-alerts.yml:ro
     networks:
       - banking-network
 

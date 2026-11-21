@@ -54,7 +54,7 @@ services:
     tmpfs: ["/var/lib/redpanda/data:size=512m,uid=101,gid=101,mode=0700"]
   mongodb:
     volumes: !reset []
-    tmpfs: ["/data/db:size=384m"]
+    tmpfs: ["/data/db:size=1g"]
   notification-service:
     networks: !override
       banking-network: {}
@@ -100,6 +100,7 @@ services:
       MANAGEMENT_HEALTH_DISKSPACE_PATH: /tmp
       MANAGEMENT_HEALTH_DISKSPACE_THRESHOLD: 10MB
   ai-service:
+    container_name: !reset null
     build: ./backend/ai-service
     networks: [banking-network]
     environment:

@@ -141,13 +141,19 @@ public class AccountService {
         Account account = new Account();
         account.setUserId(userId);
         account.setAccountNumber(accountNumber);
-        account.setBalance(request.getInitialBalance() != null ? request.getInitialBalance() : BigDecimal.ZERO);
+        BigDecimal opening = (request.getInitialBalance() != null ? request.getInitialBalance() : BigDecimal.ZERO)
+                .setScale(2, java.math.RoundingMode.UNNECESSARY);
+        if (opening.signum() < 0 || opening.precision() > 19) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid opening balance");
+        }
+        account.setBalance(opening);
         account.setAccountType(request.getAccountType());
         if (request.getCurrency() != null) {
             account.setCurrency(request.getCurrency());
         }
         
         Account savedAccount = accountRepository.save(account);
+        movementReservations.recordPosting(savedAccount, java.util.UUID.randomUUID(), account.getBalance(), "OPENING");
         logger.info("Created account {} for user: {} with balance: {}", 
                    savedAccount.getAccountNumber(), userId, savedAccount.getBalance());
         
@@ -203,7 +209,13 @@ public class AccountService {
         if (account.getStatus() != Account.Status.ACTIVE) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Account is not active");
         }
-        account.setBalance(newBalance);
+        BigDecimal exact = newBalance.setScale(2, java.math.RoundingMode.UNNECESSARY);
+        if (exact.signum() < 0 || exact.precision() > 19) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid balance");
+        }
+        BigDecimal delta = exact.subtract(account.getBalance());
+        account.setBalance(exact);
+        movementReservations.recordPosting(account, java.util.UUID.randomUUID(), delta, "MANUAL_ADJUSTMENT");
         accountRepository.save(account);
         return true;
     }

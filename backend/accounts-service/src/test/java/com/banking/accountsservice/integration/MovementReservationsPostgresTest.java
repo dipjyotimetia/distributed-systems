@@ -5,6 +5,7 @@ import com.banking.accountsservice.entity.Account.Status;
 import com.banking.accountsservice.grpc.LedgerGrpcServer;
 import com.banking.accountsservice.service.AccountService;
 import com.banking.accountsservice.service.MovementReservations;
+import com.banking.accountsservice.service.StatementExportService;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.Metadata;
@@ -27,6 +28,7 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.HexFormat;
 import java.util.UUID;
+import java.time.OffsetDateTime;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
@@ -54,11 +56,12 @@ class MovementReservationsPostgresTest {
     @Autowired private MovementReservations reservations;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private LedgerGrpcServer ledger;
+    @Autowired private StatementExportService statements;
 
     @Test
-    void competingMovementsCannotBothReserveTheSameAccount() throws Exception {
+    void competingHoldsCannotExceedAvailableFunds() throws Exception {
         long from = account("100"), to = account("0");
-        Movement debit = movement(from, to);
+        Movement debit = new Movement(OWNER, from, to, new BigDecimal("75.00"));
         UUID first = UUID.randomUUID(), second = UUID.randomUUID();
         boolean[] accepted = race(() -> reservations.apply(first, Action.RESERVE, debit),
                 () -> reservations.apply(second, Action.RESERVE, debit));
@@ -66,7 +69,53 @@ class MovementReservationsPostgresTest {
         UUID winner = accepted[0] ? first : second;
         reservations.apply(winner, Action.COMMIT, debit);
         reservations.apply(winner, Action.COMMIT, debit);
+        assertBalances(from, to, "25", "75");
+    }
+
+    @Test
+    void unrelatedDebitPostsWhileAnOutboundHoldRemainsActive() {
+        long from = account("100", "AUD"), to = account("0", "AUD");
+        UUID payment = UUID.randomUUID(), transfer = UUID.randomUUID();
+        Movement outbound = new Movement(OWNER, from, null, new BigDecimal("60.00"));
+        Movement internal = movement(from, to);
+        reservations.applyOutbound(payment, Action.RESERVE, outbound);
+        reservations.applyExact(transfer, Action.RESERVE, internal, "AUD", false);
+        reservations.applyExact(transfer, Action.COMMIT, internal, "AUD", false);
+        reservations.applyExact(transfer, Action.COMMIT, internal, "AUD", false);
         assertBalances(from, to, "75", "25");
+        reservations.applyOutbound(payment, Action.COMMIT, outbound);
+        assertBalances(from, to, "15", "25");
+        assertEquals(3, jdbc.queryForObject("""
+                SELECT COUNT(*) FROM accounts_service.account_postings WHERE operation_id IN (?, ?)
+                """, Integer.class, payment, transfer));
+    }
+
+    @Test
+    void periodIncludesPostingAtStartExcludesEndAndIgnoresActiveHolds() {
+        long account = account("100", "AUD");
+        UUID settled = UUID.randomUUID(), later = UUID.randomUUID(), held = UUID.randomUUID();
+        Movement debit = new Movement(OWNER, account, null, new BigDecimal("25.00"));
+        reservations.applyOutbound(settled, Action.RESERVE, debit);
+        reservations.applyOutbound(settled, Action.COMMIT, debit);
+        reservations.applyOutbound(later, Action.RESERVE, debit);
+        reservations.applyOutbound(later, Action.COMMIT, debit);
+        reservations.applyOutbound(held, Action.RESERVE, debit);
+
+        OffsetDateTime start = timestamp(settled);
+        OffsetDateTime end = timestamp(later);
+        var statement = statements.generatePeriod(account, OWNER, start, end);
+        assertEquals("100.00", statement.openingBalance());
+        assertEquals("75.00", statement.closingBalance());
+        assertEquals(1, statement.entries().size());
+        assertEquals(settled, statement.entries().getFirst().operationId());
+        assertEquals("OUTBOUND_PAYMENT", statement.entries().getFirst().source());
+        assertEquals(404, assertThrows(ResponseStatusException.class,
+                () -> statements.generatePeriod(account, OWNER + 1, start, end)).getStatusCode().value());
+    }
+
+    private OffsetDateTime timestamp(UUID operation) {
+        return jdbc.queryForObject("SELECT posted_at FROM accounts_service.account_postings WHERE operation_id = ?",
+                OffsetDateTime.class, operation);
     }
 
     @Test
@@ -111,8 +160,9 @@ class MovementReservationsPostgresTest {
         try {
             assertThrows(RuntimeException.class, () -> reservations.apply(operation, Action.COMMIT, debit));
             assertBalances(from, to, "100", "0");
-            assertEquals(409, assertThrows(ResponseStatusException.class,
-                    () -> reservations.apply(UUID.randomUUID(), Action.RESERVE, debit)).getStatusCode().value());
+            UUID independent = UUID.randomUUID();
+            reservations.apply(independent, Action.RESERVE, debit);
+            reservations.apply(independent, Action.COMPENSATE, debit);
         } finally {
             jdbc.execute("ALTER TABLE accounts_service.accounts DROP CONSTRAINT " + constraint);
         }
@@ -145,7 +195,7 @@ class MovementReservationsPostgresTest {
         assertEquals(403, callLedger(true, operation, Action.RESERVE, aud, null, "25.00", "account-movement:v1:", "25.00"));
         assertEquals(204, callLedger(true, operation, Action.RESERVE, aud, null, "25.00", "outbound-aud-movement:v1:", "25.00"));
         assertBalances(aud, usd, "100", "100");
-        assertEquals(409, assertThrows(ResponseStatusException.class,
+        assertEquals(422, assertThrows(ResponseStatusException.class,
                 () -> reservations.apply(UUID.randomUUID(), Action.RESERVE, movement(aud, usd)))
                 .getStatusCode().value());
         assertEquals(204, callLedger(true, operation, Action.COMMIT, aud, null, "25.00", "outbound-aud-movement:v1:", "25.00"));
@@ -239,7 +289,7 @@ class MovementReservationsPostgresTest {
                 action.run();
                 return true;
             } catch (ResponseStatusException rejected) {
-                assertEquals(409, rejected.getStatusCode().value());
+                assertTrue(java.util.Set.of(409, 422).contains(rejected.getStatusCode().value()));
                 return false;
             }
         };

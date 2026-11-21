@@ -5,12 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -52,41 +50,29 @@ func NewNotifier() *Notifier {
 	}
 }
 
-func (n *Notifier) FanOut(ctx context.Context, txn TransactionInfo) {
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
+var Channels = [...]string{"email", "sms", "slack"}
 
-	var wg sync.WaitGroup
-	wg.Add(3)
+func (n *Notifier) Deliver(ctx context.Context, channel string, txn TransactionInfo) error {
+	switch channel {
+	case "email":
+		return n.sendEmail(ctx, txn)
+	case "sms":
+		return n.sendSMS(ctx, txn)
+	case "slack":
+		return n.sendSlack(ctx, txn)
+	default:
+		return fmt.Errorf("unknown notification channel %q", channel)
+	}
+}
 
-	go func() {
-		defer wg.Done()
-		if err := n.sendEmail(ctx, txn); err != nil {
-			log.Printf("sendgrid error for txn=%s: %v", txn.TransactionID, err)
-		} else {
-			log.Printf("sendgrid call completed for txn=%s", txn.TransactionID)
-		}
-	}()
+type ProviderStatus int
 
-	go func() {
-		defer wg.Done()
-		if err := n.sendSMS(ctx, txn); err != nil {
-			log.Printf("twilio error for txn=%s: %v", txn.TransactionID, err)
-		} else {
-			log.Printf("twilio call completed for txn=%s", txn.TransactionID)
-		}
-	}()
+func (status ProviderStatus) Error() string {
+	return fmt.Sprintf("provider returned HTTP %d", status)
+}
 
-	go func() {
-		defer wg.Done()
-		if err := n.sendSlack(ctx, txn); err != nil {
-			log.Printf("slack error for txn=%s: %v", txn.TransactionID, err)
-		} else {
-			log.Printf("slack call completed for txn=%s", txn.TransactionID)
-		}
-	}()
-
-	wg.Wait()
+func (status ProviderStatus) Retriable() bool {
+	return status == 408 || status == 429 || status >= 500
 }
 
 func (n *Notifier) sendEmail(ctx context.Context, txn TransactionInfo) error {
@@ -157,7 +143,7 @@ func (n *Notifier) send(req *http.Request) error {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("provider returned HTTP %d", resp.StatusCode)
+		return ProviderStatus(resp.StatusCode)
 	}
 	return nil
 }

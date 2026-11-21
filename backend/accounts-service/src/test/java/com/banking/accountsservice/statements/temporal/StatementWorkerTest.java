@@ -22,7 +22,7 @@ class StatementWorkerTest {
             var id = UUID.randomUUID();
             when(jobs.pending()).thenThrow(new IllegalStateException("Database unavailable"))
                     .thenReturn(List.of(id));
-            when(jobs.work(id)).thenReturn(new Work(42, 7, "FAILED", null));
+            when(jobs.work(id)).thenReturn(new Work(42, 7, "FAILED", null, null, null));
             var worker = new StatementWorker(jobs, mock(StatementExportService.class), new ObjectMapper(),
                     OpenTelemetry.noop().getTracer("test"), "unused", 604800);
             assertEquals(Status.DOWN, worker.health().getStatus());

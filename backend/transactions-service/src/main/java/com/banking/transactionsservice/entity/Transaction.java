@@ -55,6 +55,13 @@ public class Transaction {
     @Column(name = "idempotency_hash", length = 64)
     private String idempotencyHash;
     
+    @Column(name = "movement_posting", nullable = false)
+    private boolean movementPosting;
+
+    public void setMovementPosting(boolean movementPosting) {
+        this.movementPosting = movementPosting;
+    }
+
     public Transaction() {}
     
     public Transaction(Long userId, Long fromAccountId, Long toAccountId, Double amount, 

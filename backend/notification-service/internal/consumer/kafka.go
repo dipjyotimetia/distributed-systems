@@ -16,7 +16,6 @@ import (
 	"github.com/twmb/franz-go/pkg/sasl/plain"
 
 	"github.com/dipjyotimetia/distributed-systems/backend/notification-service/internal/metrics"
-	"github.com/dipjyotimetia/distributed-systems/backend/notification-service/internal/notify"
 )
 
 const ringSize = 1000
@@ -90,7 +89,7 @@ func (r *RingBuffer) ForUser(userID string, n int) []*TransactionEvent {
 	return out
 }
 
-// Store persists events for durable retrieval.
+// Store atomically persists events and their delivery intents.
 type Store interface {
 	Insert(ctx context.Context, evt *TransactionEvent) (inserted bool, err error)
 }
@@ -102,7 +101,6 @@ type Consumer struct {
 	paymentTopic string
 	Buffer       *RingBuffer
 	store        Store
-	notifier     *notify.Notifier
 }
 
 type AuthConfig struct {
@@ -159,7 +157,6 @@ func NewWithAuth(brokers []string, topic, groupID string, store Store, auth Auth
 		paymentTopic: paymentTopic,
 		Buffer:       &RingBuffer{},
 		store:        store,
-		notifier:     notify.NewNotifier(),
 	}, nil
 }
 
@@ -273,18 +270,6 @@ func (c *Consumer) deliver(ctx context.Context, event *TransactionEvent) error {
 	}
 	metrics.EventsConsumed.WithLabelValues(event.TransactionType, event.Status).Inc()
 	c.Buffer.Push(event)
-	reference := event.TransactionID.String()
-	if event.PaymentID != "" {
-		reference = event.PaymentID
-	}
-	c.notifier.FanOut(ctx, notify.TransactionInfo{
-		TransactionID: reference,
-		Currency:      event.Currency,
-		UserID:        event.UserID.String(),
-		Amount:        event.Amount,
-		Type:          event.TransactionType,
-		Status:        event.Status,
-	})
 	return nil
 }
 

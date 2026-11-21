@@ -53,6 +53,11 @@ const (
 	AccountUpdateRequestStatusFROZEN AccountUpdateRequestStatus = "FROZEN"
 )
 
+// Defines values for PeriodStatementSchemaVersion.
+const (
+	N2 PeriodStatementSchemaVersion = 2
+)
+
 // Defines values for StatusUpdateRequestStatus.
 const (
 	ACTIVE StatusUpdateRequestStatus = "ACTIVE"
@@ -166,6 +171,40 @@ type BalanceUpdateRequest struct {
 	Balance float32 `json:"balance"`
 }
 
+// ExactBalances defines model for ExactBalances.
+type ExactBalances struct {
+	AsOf                 time.Time  `json:"asOf"`
+	AvailableBalance     string     `json:"availableBalance"`
+	Currency             string     `json:"currency"`
+	HeldAmount           string     `json:"heldAmount"`
+	PostedBalance        string     `json:"postedBalance"`
+	PostingCoverageStart *time.Time `json:"postingCoverageStart,omitempty"`
+}
+
+// PeriodStatement defines model for PeriodStatement.
+type PeriodStatement struct {
+	AccountId      int64                        `json:"accountId"`
+	ClosingBalance string                       `json:"closingBalance"`
+	Currency       string                       `json:"currency"`
+	Entries        []PostedEntry                `json:"entries"`
+	GeneratedAt    time.Time                    `json:"generatedAt"`
+	OpeningBalance string                       `json:"openingBalance"`
+	Period         StatementPeriod              `json:"period"`
+	SchemaVersion  PeriodStatementSchemaVersion `json:"schemaVersion"`
+}
+
+// PeriodStatementSchemaVersion defines model for PeriodStatement.SchemaVersion.
+type PeriodStatementSchemaVersion int
+
+// PostedEntry defines model for PostedEntry.
+type PostedEntry struct {
+	Amount      string             `json:"amount"`
+	Id          int64              `json:"id"`
+	OperationId openapi_types.UUID `json:"operationId"`
+	PostedAt    time.Time          `json:"postedAt"`
+	Source      string             `json:"source"`
+}
+
 // StatementExport defines model for StatementExport.
 type StatementExport struct {
 	Key       *string                 `json:"key,omitempty"`
@@ -185,6 +224,15 @@ type StatementJob struct {
 type StatementJobPage struct {
 	HasMore bool           `json:"hasMore"`
 	Items   []StatementJob `json:"items"`
+}
+
+// StatementPeriod defines model for StatementPeriod.
+type StatementPeriod struct {
+	// End Exclusive UTC boundary
+	End time.Time `json:"end"`
+
+	// Start Inclusive UTC boundary
+	Start time.Time `json:"start"`
 }
 
 // StatusUpdateRequest defines model for StatusUpdateRequest.
@@ -256,6 +304,9 @@ type UpdateAccountBalanceJSONRequestBody = BalanceUpdateRequest
 
 // UpdateAccountStatusJSONRequestBody defines body for UpdateAccountStatus for application/json ContentType.
 type UpdateAccountStatusJSONRequestBody = StatusUpdateRequest
+
+// CreatePeriodStatementJSONRequestBody defines body for CreatePeriodStatement for application/json ContentType.
+type CreatePeriodStatementJSONRequestBody = StatementPeriod
 
 // AsAccountListOrPage0 returns the union data inside the AccountListOrPage as a AccountListOrPage0
 func (t AccountListOrPage) AsAccountListOrPage0() (AccountListOrPage0, error) {
@@ -444,6 +495,20 @@ type ClientInterface interface {
 	UpdateAccountStatusWithBody(ctx context.Context, accountId int64, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	UpdateAccountStatus(ctx context.Context, accountId int64, body UpdateAccountStatusJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetExactBalances request
+	GetExactBalances(ctx context.Context, accountId int64, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreatePeriodStatementWithBody request with any body
+	CreatePeriodStatementWithBody(ctx context.Context, accountId int64, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	CreatePeriodStatement(ctx context.Context, accountId int64, body CreatePeriodStatementJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetPeriodStatement request
+	GetPeriodStatement(ctx context.Context, accountId int64, jobId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DownloadPeriodStatement request
+	DownloadPeriodStatement(ctx context.Context, accountId int64, jobId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
 func (c *Client) ListAccounts(ctx context.Context, params *ListAccountsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -664,6 +729,66 @@ func (c *Client) UpdateAccountStatusWithBody(ctx context.Context, accountId int6
 
 func (c *Client) UpdateAccountStatus(ctx context.Context, accountId int64, body UpdateAccountStatusJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUpdateAccountStatusRequest(c.Server, accountId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetExactBalances(ctx context.Context, accountId int64, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetExactBalancesRequest(c.Server, accountId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreatePeriodStatementWithBody(ctx context.Context, accountId int64, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreatePeriodStatementRequestWithBody(c.Server, accountId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreatePeriodStatement(ctx context.Context, accountId int64, body CreatePeriodStatementJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreatePeriodStatementRequest(c.Server, accountId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetPeriodStatement(ctx context.Context, accountId int64, jobId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetPeriodStatementRequest(c.Server, accountId, jobId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DownloadPeriodStatement(ctx context.Context, accountId int64, jobId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDownloadPeriodStatementRequest(c.Server, accountId, jobId)
 	if err != nil {
 		return nil, err
 	}
@@ -1445,6 +1570,169 @@ func NewUpdateAccountStatusRequestWithBody(server string, accountId int64, conte
 	return req, nil
 }
 
+// NewGetExactBalancesRequest generates requests for GetExactBalances
+func NewGetExactBalancesRequest(server string, accountId int64) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "accountId", runtime.ParamLocationPath, accountId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v2/accounts/%s/balances", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreatePeriodStatementRequest calls the generic CreatePeriodStatement builder with application/json body
+func NewCreatePeriodStatementRequest(server string, accountId int64, body CreatePeriodStatementJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreatePeriodStatementRequestWithBody(server, accountId, "application/json", bodyReader)
+}
+
+// NewCreatePeriodStatementRequestWithBody generates requests for CreatePeriodStatement with any type of body
+func NewCreatePeriodStatementRequestWithBody(server string, accountId int64, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "accountId", runtime.ParamLocationPath, accountId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v2/accounts/%s/statement-jobs", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetPeriodStatementRequest generates requests for GetPeriodStatement
+func NewGetPeriodStatementRequest(server string, accountId int64, jobId openapi_types.UUID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "accountId", runtime.ParamLocationPath, accountId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "jobId", runtime.ParamLocationPath, jobId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v2/accounts/%s/statement-jobs/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewDownloadPeriodStatementRequest generates requests for DownloadPeriodStatement
+func NewDownloadPeriodStatementRequest(server string, accountId int64, jobId openapi_types.UUID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "accountId", runtime.ParamLocationPath, accountId)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "jobId", runtime.ParamLocationPath, jobId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v2/accounts/%s/statement-jobs/%s/download", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 func (c *Client) applyEditors(ctx context.Context, req *http.Request, additionalEditors []RequestEditorFn) error {
 	for _, r := range c.RequestEditors {
 		if err := r(ctx, req); err != nil {
@@ -1540,6 +1828,20 @@ type ClientWithResponsesInterface interface {
 	UpdateAccountStatusWithBodyWithResponse(ctx context.Context, accountId int64, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateAccountStatusHTTP, error)
 
 	UpdateAccountStatusWithResponse(ctx context.Context, accountId int64, body UpdateAccountStatusJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateAccountStatusHTTP, error)
+
+	// GetExactBalancesWithResponse request
+	GetExactBalancesWithResponse(ctx context.Context, accountId int64, reqEditors ...RequestEditorFn) (*GetExactBalancesHTTP, error)
+
+	// CreatePeriodStatementWithBodyWithResponse request with any body
+	CreatePeriodStatementWithBodyWithResponse(ctx context.Context, accountId int64, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreatePeriodStatementHTTP, error)
+
+	CreatePeriodStatementWithResponse(ctx context.Context, accountId int64, body CreatePeriodStatementJSONRequestBody, reqEditors ...RequestEditorFn) (*CreatePeriodStatementHTTP, error)
+
+	// GetPeriodStatementWithResponse request
+	GetPeriodStatementWithResponse(ctx context.Context, accountId int64, jobId openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetPeriodStatementHTTP, error)
+
+	// DownloadPeriodStatementWithResponse request
+	DownloadPeriodStatementWithResponse(ctx context.Context, accountId int64, jobId openapi_types.UUID, reqEditors ...RequestEditorFn) (*DownloadPeriodStatementHTTP, error)
 }
 
 type ListAccountsHTTP struct {
@@ -1870,6 +2172,94 @@ func (r UpdateAccountStatusHTTP) StatusCode() int {
 	return 0
 }
 
+type GetExactBalancesHTTP struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ExactBalances
+}
+
+// Status returns HTTPResponse.Status
+func (r GetExactBalancesHTTP) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetExactBalancesHTTP) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type CreatePeriodStatementHTTP struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON202      *StatementJob
+}
+
+// Status returns HTTPResponse.Status
+func (r CreatePeriodStatementHTTP) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreatePeriodStatementHTTP) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetPeriodStatementHTTP struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *StatementJob
+}
+
+// Status returns HTTPResponse.Status
+func (r GetPeriodStatementHTTP) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetPeriodStatementHTTP) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type DownloadPeriodStatementHTTP struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *PeriodStatement
+}
+
+// Status returns HTTPResponse.Status
+func (r DownloadPeriodStatementHTTP) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DownloadPeriodStatementHTTP) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 // ListAccountsWithResponse request returning *ListAccountsHTTP
 func (c *ClientWithResponses) ListAccountsWithResponse(ctx context.Context, params *ListAccountsParams, reqEditors ...RequestEditorFn) (*ListAccountsHTTP, error) {
 	rsp, err := c.ListAccounts(ctx, params, reqEditors...)
@@ -2035,6 +2425,50 @@ func (c *ClientWithResponses) UpdateAccountStatusWithResponse(ctx context.Contex
 		return nil, err
 	}
 	return ParseUpdateAccountStatusHTTP(rsp)
+}
+
+// GetExactBalancesWithResponse request returning *GetExactBalancesHTTP
+func (c *ClientWithResponses) GetExactBalancesWithResponse(ctx context.Context, accountId int64, reqEditors ...RequestEditorFn) (*GetExactBalancesHTTP, error) {
+	rsp, err := c.GetExactBalances(ctx, accountId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetExactBalancesHTTP(rsp)
+}
+
+// CreatePeriodStatementWithBodyWithResponse request with arbitrary body returning *CreatePeriodStatementHTTP
+func (c *ClientWithResponses) CreatePeriodStatementWithBodyWithResponse(ctx context.Context, accountId int64, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreatePeriodStatementHTTP, error) {
+	rsp, err := c.CreatePeriodStatementWithBody(ctx, accountId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreatePeriodStatementHTTP(rsp)
+}
+
+func (c *ClientWithResponses) CreatePeriodStatementWithResponse(ctx context.Context, accountId int64, body CreatePeriodStatementJSONRequestBody, reqEditors ...RequestEditorFn) (*CreatePeriodStatementHTTP, error) {
+	rsp, err := c.CreatePeriodStatement(ctx, accountId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreatePeriodStatementHTTP(rsp)
+}
+
+// GetPeriodStatementWithResponse request returning *GetPeriodStatementHTTP
+func (c *ClientWithResponses) GetPeriodStatementWithResponse(ctx context.Context, accountId int64, jobId openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetPeriodStatementHTTP, error) {
+	rsp, err := c.GetPeriodStatement(ctx, accountId, jobId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetPeriodStatementHTTP(rsp)
+}
+
+// DownloadPeriodStatementWithResponse request returning *DownloadPeriodStatementHTTP
+func (c *ClientWithResponses) DownloadPeriodStatementWithResponse(ctx context.Context, accountId int64, jobId openapi_types.UUID, reqEditors ...RequestEditorFn) (*DownloadPeriodStatementHTTP, error) {
+	rsp, err := c.DownloadPeriodStatement(ctx, accountId, jobId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDownloadPeriodStatementHTTP(rsp)
 }
 
 // ParseListAccountsHTTP parses an HTTP response from a ListAccountsWithResponse call
@@ -2397,6 +2831,110 @@ func ParseUpdateAccountStatusHTTP(rsp *http.Response) (*UpdateAccountStatusHTTP,
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest AccountResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetExactBalancesHTTP parses an HTTP response from a GetExactBalancesWithResponse call
+func ParseGetExactBalancesHTTP(rsp *http.Response) (*GetExactBalancesHTTP, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetExactBalancesHTTP{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ExactBalances
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreatePeriodStatementHTTP parses an HTTP response from a CreatePeriodStatementWithResponse call
+func ParseCreatePeriodStatementHTTP(rsp *http.Response) (*CreatePeriodStatementHTTP, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreatePeriodStatementHTTP{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 202:
+		var dest StatementJob
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON202 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetPeriodStatementHTTP parses an HTTP response from a GetPeriodStatementWithResponse call
+func ParseGetPeriodStatementHTTP(rsp *http.Response) (*GetPeriodStatementHTTP, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetPeriodStatementHTTP{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest StatementJob
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDownloadPeriodStatementHTTP parses an HTTP response from a DownloadPeriodStatementWithResponse call
+func ParseDownloadPeriodStatementHTTP(rsp *http.Response) (*DownloadPeriodStatementHTTP, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DownloadPeriodStatementHTTP{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest PeriodStatement
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

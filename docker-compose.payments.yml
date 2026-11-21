@@ -102,7 +102,9 @@ services:
           (rpk topic describe transaction-events -X brokers=redpanda:9092 >/dev/null 2>&1 ||
            rpk topic create transaction-events --partitions 1 --replicas 1 -X brokers=redpanda:9092) &&
           (rpk topic describe payment-events.v1 -X brokers=redpanda:9092 >/dev/null 2>&1 ||
-           rpk topic create payment-events.v1 --partitions 1 --replicas 1 -X brokers=redpanda:9092)
+           rpk topic create payment-events.v1 --partitions 1 --replicas 1 -X brokers=redpanda:9092) &&
+          (rpk topic describe movement-lifecycle-v1 -X brokers=redpanda:9092 >/dev/null 2>&1 ||
+           rpk topic create movement-lifecycle-v1 --partitions 1 --replicas 1 -X brokers=redpanda:9092)
 
   notification-service:
     environment:

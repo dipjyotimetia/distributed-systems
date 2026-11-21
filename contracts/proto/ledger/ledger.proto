@@ -13,6 +13,40 @@ service AccountLedger {
   rpc ApplyMovement(MovementRequest) returns (MovementResult);
   rpc ApplyOutboundAud(MovementRequest) returns (MovementResult);
   rpc GetAccount(GetAccountRequest) returns (GetAccountResponse);
+  rpc Reserve(ExactMovementCommand) returns (ExactMovementOutcome);
+  rpc Post(ExactMovementCommand) returns (ExactMovementOutcome);
+  rpc Release(ExactMovementCommand) returns (ExactMovementOutcome);
+}
+
+// The service authenticates and authorizes the calling workload and verifies
+// ownership and command scope before writing. An operation ID binds to the
+// original caller, scope and normalized parameters across all three methods.
+// A successful retry returns the outcome recorded for that method.
+message ExactMovementCommand {
+  string operation_id = 1;
+  int64 user_id = 2;
+  optional int64 from_account_id = 3;
+  optional int64 to_account_id = 4;
+  string currency = 5;
+  // Positive, base-10 decimal within the currency scale, with no rounding.
+  string amount = 6;
+  MovementScope scope = 7;
+}
+
+enum MovementScope {
+  MOVEMENT_SCOPE_UNSPECIFIED = 0;
+  MOVEMENT_SCOPE_INTERNAL = 1;
+  MOVEMENT_SCOPE_OUTBOUND = 2;
+}
+
+message ExactMovementOutcome {
+  enum Status {
+    STATUS_UNSPECIFIED = 0;
+    STATUS_RESERVED = 1;
+    STATUS_POSTED = 2;
+    STATUS_RELEASED = 3;
+  }
+  Status status = 1;
 }
 
 message MovementRequest {

@@ -34,6 +34,8 @@ func main() {
 		log.Fatalf("MongoDB startup failed: %v", err)
 	}
 
+	go mongoStore.RunDeliveries(ctx)
+
 	paymentTopic := os.Getenv("PAYMENT_KAFKA_TOPIC")
 	newConsumer := func() (*consumer.Consumer, error) {
 		return consumer.NewWithAuth(brokers, topic, "notification-service", mongoStore, kafkaAuth, paymentTopic)

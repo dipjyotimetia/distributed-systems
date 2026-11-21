@@ -1,0 +1,27 @@
+groups:
+  - name: money-movement
+    rules:
+      - alert: MoneyMovementStalled
+        expr: transactions_movements_oldest_pending_seconds > 120
+        for: 2m
+        annotations:
+          summary: A customer movement has remained pending
+      - alert: FinancialOutboxStalled
+        expr: transactions_outbox_oldest_seconds > 120 or payments_outbox_oldest_seconds > 120
+        for: 2m
+        annotations:
+          summary: Financial outbox publication is stalled
+      - alert: FinancialHoldOrReviewStale
+        expr: accounts_holds_oldest_seconds > 900 or payments_oldest_review_seconds > 900
+        for: 5m
+        annotations:
+          summary: An account hold or payment review needs attention
+      - alert: MovementScreeningUnavailable
+        expr: increase(transactions_movements_screening_outages_total[10m]) > 0
+        for: 2m
+        annotations:
+          summary: A movement could not obtain a screening decision
+      - alert: NotificationDeliveryExhausted
+        expr: increase(notification_delivery_exhausted_total[15m]) > 0
+        annotations:
+          summary: A financial notification exhausted its delivery attempts

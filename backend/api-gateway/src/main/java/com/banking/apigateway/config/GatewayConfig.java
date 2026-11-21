@@ -73,7 +73,7 @@ public class GatewayConfig {
                 .route("user-service", r -> r.path("/api/v1/users/**")
                         .filters(f -> f.filter(authFilter))
                         .uri(userServiceUrl))
-                .route("accounts-service", r -> r.path("/api/v1/accounts/**")
+                .route("accounts-service", r -> r.path("/api/v1/accounts/**", "/api/v2/accounts/**")
                         .filters(f -> {
                             f.filter(authFilter);
                             if (rateLimiterEnabled) {
@@ -82,7 +82,7 @@ public class GatewayConfig {
                             return f;
                         })
                         .uri(accountsServiceUrl))
-                .route("transactions-service", r -> r.path("/api/v1/transactions/**")
+                .route("transactions-service", r -> r.path("/api/v1/transactions/**", "/api/v1/movements", "/api/v1/movements/**")
                         .filters(f -> {
                             f.filter(authFilter);
                             if (rateLimiterEnabled) {
@@ -101,7 +101,7 @@ public class GatewayConfig {
                         })
                         .uri(disputesServiceUrl));
         if (paymentsServiceUrl != null && !paymentsServiceUrl.isBlank()) {
-            routes.route("payments-service", r -> r.path("/api/v1/payments", "/api/v1/payments/**", "/api/v1/operations/payments/reconciliation")
+            routes.route("payments-service", r -> r.path("/api/v1/payments", "/api/v1/payments/**", "/api/v1/operations/payments/**")
                     .filters(f -> {
                         f.filter(authFilter);
                         if (rateLimiterEnabled) {

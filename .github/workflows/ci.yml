@@ -73,7 +73,7 @@ jobs:
           MICROSVC_TX_SQL_INIT=never MICROSVC_TX_DEFER_INIT=false MICROSVC_TX_FLYWAY=true \
           MICROSVC_TX_DRIVER=org.postgresql.Driver MICROSVC_TX_USER=postgres MICROSVC_TX_PASSWORD=password \
           MICROSVC_TX_DDL=validate MICROSVC_TX_DIALECT=org.hibernate.dialect.PostgreSQLDialect \
-            ../../gradlew -p ../.. :transactions-service:test --tests "*TransactionRollbackTest"
+            ../../gradlew -p ../.. :transactions-service:test --tests "*TransactionRollbackTest" --tests "*CustomerMovementsPostgresTest"
         )
 
   test-frontend:

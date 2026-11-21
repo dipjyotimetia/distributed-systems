@@ -7,6 +7,146 @@ servers:
 - url: http://localhost:8083
   description: Local development server
 paths:
+  /api/v1/movements:
+    post:
+      tags: [movements]
+      operationId: submitMovement
+      summary: Durably accept a movement
+      description: >
+        The key is scoped to the authenticated customer across all movement types.
+        A retry with the same normalized intent returns the same ID and current
+        status without repeating screening, even during a screening outage.
+        Reuse with a different intent returns 409. The key is retained for the
+        lifetime of the movement.
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+          pattern: '^[!-~]+$'
+        example: 831b64b8-f015-4656-ac04-c69a557118a2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MovementIntent'
+            examples:
+              transfer:
+                value:
+                  type: TRANSFER
+                  fromAccountId: 12
+                  toAccountId: 34
+                  money: {currency: AUD, amount: '25.50'}
+              deposit:
+                value:
+                  type: DEPOSIT
+                  toAccountId: 34
+                  money: {currency: AUD, amount: '10.00'}
+              withdrawal:
+                value:
+                  type: WITHDRAWAL
+                  fromAccountId: 12
+                  money: {currency: AUD, amount: '10.00'}
+      responses:
+        '202':
+          description: Accepted intent or the current outcome of a same-key retry
+          headers:
+            Location:
+              required: true
+              schema:
+                type: string
+              example: /api/v1/movements/521155ce-1234-4e81-b47e-93579acc4859
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MovementOutcome'
+              examples:
+                accepted:
+                  value:
+                    id: 521155ce-1234-4e81-b47e-93579acc4859
+                    status: PENDING
+                    createdAt: '2026-11-21T01:00:00Z'
+                    updatedAt: '2026-11-21T01:00:00Z'
+                lostResponseRetry:
+                  value:
+                    id: 521155ce-1234-4e81-b47e-93579acc4859
+                    status: POSTED
+                    createdAt: '2026-11-21T01:00:00Z'
+                    updatedAt: '2026-11-21T01:00:01Z'
+        '400':
+          $ref: '#/components/responses/InvalidMovementRequest'
+        '401':
+          $ref: '#/components/responses/MovementAuthenticationRequired'
+        '404':
+          $ref: '#/components/responses/MovementResourceNotFound'
+        '409':
+          description: The key is already associated with a different intent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MovementError'
+              example: {code: IDEMPOTENCY_KEY_REUSED}
+        '422':
+          description: Business validation failed before the intent was accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MovementError'
+              example: {code: CURRENCY_MISMATCH}
+  /api/v1/movements/{id}:
+    get:
+      tags: [movements]
+      operationId: getMovement
+      summary: Look up a movement owned by the authenticated customer
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: The latest durable movement outcome
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MovementOutcome'
+              examples:
+                posted:
+                  value:
+                    id: 521155ce-1234-4e81-b47e-93579acc4859
+                    status: POSTED
+                    createdAt: '2026-11-21T01:00:00Z'
+                    updatedAt: '2026-11-21T01:00:01Z'
+                screeningUnavailable:
+                  value:
+                    id: 521155ce-1234-4e81-b47e-93579acc4859
+                    status: PENDING
+                    reasonCode: SCREENING_UNAVAILABLE
+                    createdAt: '2026-11-21T01:00:00Z'
+                    updatedAt: '2026-11-21T01:00:01Z'
+                insufficientFunds:
+                  value:
+                    id: 521155ce-1234-4e81-b47e-93579acc4859
+                    status: REJECTED
+                    reasonCode: INSUFFICIENT_AVAILABLE_FUNDS
+                    createdAt: '2026-11-21T01:00:00Z'
+                    updatedAt: '2026-11-21T01:00:01Z'
+        '400':
+          $ref: '#/components/responses/InvalidMovementRequest'
+        '401':
+          $ref: '#/components/responses/MovementAuthenticationRequired'
+        '404':
+          $ref: '#/components/responses/MovementResourceNotFound'
   /api/v1/transactions:
     get:
       summary: Get all transactions for the authenticated user
@@ -332,6 +472,27 @@ components:
         type: integer
         format: int64
   responses:
+    InvalidMovementRequest:
+      description: Invalid request or missing required idempotency key
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/MovementError'
+          example: {code: INVALID_INPUT}
+    MovementAuthenticationRequired:
+      description: Missing or invalid customer credentials
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/MovementError'
+          example: {code: UNAUTHENTICATED}
+    MovementResourceNotFound:
+      description: Unknown resource or resource owned by another customer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/MovementError'
+          example: {code: NOT_FOUND}
     TransactionRecord:
       description: Transaction record
       content:
@@ -344,6 +505,76 @@ components:
       scheme: bearer
       bearerFormat: JWT
   schemas:
+    MovementIntent:
+      type: object
+      additionalProperties: false
+      required: [type, money]
+      description: >
+        Supply only toAccountId for DEPOSIT, only fromAccountId for
+        WITHDRAWAL, and two distinct account IDs for TRANSFER. The caller
+        must own the source account, or the destination for a deposit.
+      properties:
+        type:
+          type: string
+          enum: [DEPOSIT, WITHDRAWAL, TRANSFER]
+        fromAccountId:
+          type: integer
+          format: int64
+          minimum: 1
+        toAccountId:
+          type: integer
+          format: int64
+          minimum: 1
+        money:
+          $ref: '#/components/schemas/MovementMoney'
+        description:
+          type: string
+          maxLength: 255
+    MovementMoney:
+      type: object
+      additionalProperties: false
+      required: [currency, amount]
+      properties:
+        currency:
+          type: string
+          pattern: '^[A-Z]{3}$'
+          description: Supported account currency as an ISO 4217 code.
+        amount:
+          type: string
+          pattern: '^(0|[1-9][0-9]*)([.][0-9]+)?$'
+          maxLength: 20
+          description: Positive exact amount within the supported currency scale. Excess precision is rejected.
+    MovementOutcome:
+      type: object
+      required: [id, status, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [PENDING, POSTED, REJECTED]
+          description: >
+            POSTED requires durable account posting. REJECTED requires
+            confirmation that no posting occurred and any hold was released.
+        reasonCode:
+          type: string
+          description: Machine-readable reason for a pending or rejected outcome.
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    MovementError:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+          description: Stable machine-readable error code.
+        message:
+          type: string
     TransactionListOrPage:
       description: Transaction array, or a transaction page when page or size is supplied
       nullable: true

@@ -33,6 +33,9 @@ class AccountServiceTest {
     @Mock
     private LongCounter createdAccountsCounter;
 
+    @Mock
+    private MovementReservations movementReservations;
+
     @InjectMocks
     private AccountService accountService;
 
