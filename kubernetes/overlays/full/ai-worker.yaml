@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: banking-ai-worker
+spec:
+  selector:
+    matchLabels:
+      app: banking-ai-worker
+  template:
+    metadata:
+      labels:
+        app: banking-ai-worker
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: ai-worker
+          image: ghcr.io/dipjyotimetia/distributed-systems/ai-service:v1.4.139
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef:
+                name: banking-ai-config
+            - secretRef:
+                name: ai-api-key
+                optional: true
+          env:
+            - name: AI_MODE
+              value: worker
+            - name: AI_PROVIDER_MODE
+              value: fixture
+            - name: TEMPORAL_ADDRESS
+              value: banking-temporal:7233
+            - name: DISPUTES_SERVICE_URL
+              value: http://banking-disputes
+            - name: DISPUTES_INTERNAL_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: banking-workflow-credentials
+                  key: disputes-internal-token
+                  optional: true
+            - name: ACCOUNTS_SERVICE_URL
+              value: http://banking-accounts
+            - name: TRANSACTIONS_SERVICE_URL
+              value: http://banking-transactions
+            - name: CLAIM_CHECK_DIR
+              value: /tmp/ai-claim-check
+            - name: OTEL_SERVICE_NAME
+              value: ai-worker
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            periodSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 512Mi

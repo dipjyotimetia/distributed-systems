@@ -41,7 +41,7 @@ Ten application backend services across four languages, a Next.js frontend, and 
 | `user-service` | .NET (ASP.NET Core) | Authentication, profile management |
 | `accounts-service` | Java (Spring Boot) | Account + balance management, Plaid integration |
 | `transactions-service` | Java (Spring Boot) | Transaction processing, Stripe / PayPal / ComplyAdvantage integrations |
-| `ai-service` | Python (FastAPI) | Chat endpoint that fans out to 5 LLM providers (Anthropic, OpenAI, Gemini, xAI, OpenRouter) and aggregates the replies |
+| `ai-service` / `ai-worker` | Python (FastAPI + Temporal) | Multi-provider chat fan-out plus durable banking agent (`ai-banking` queue): LiteLLM activities, hard-rule guardrails, read-only tools, claim-check history, and multi-agent dispute research drafts |
 | `fraud-service` | Go (gRPC h2c on :8080) | Fraud risk scoring with Sift / MaxMind / Stripe Radar |
 | `kyc-service` | Go (gRPC on :8091) | Customer identity review, with a Temporal worker |
 | `cards-service` | Go (gRPC on :8092) | Virtual cards; calls fraud over gRPC and accounts over HTTP |

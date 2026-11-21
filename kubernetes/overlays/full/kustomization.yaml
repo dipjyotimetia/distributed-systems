@@ -9,6 +9,7 @@ resources:
   - disputes.yaml
   - statement-worker.yaml
   - kyc-worker.yaml
+  - ai-worker.yaml
 
 configMapGenerator:
   - name: disputes-schema
@@ -28,7 +29,7 @@ patches:
           value: http://banking-disputes
   - target:
       kind: Deployment
-      name: banking-(disputes-worker|statement-worker|kyc-worker)
+      name: banking-(disputes-worker|statement-worker|kyc-worker|ai-worker)
     patch: |
       - op: add
         path: /spec/template/spec/initContainers
