@@ -3,8 +3,9 @@ set -euo pipefail
 
 cd "$(dirname "$0")/../../.."
 root="$(mktemp -d /tmp/banking-payment-kind.XXXXXX)"
-cluster="payments-$(openssl rand -hex 5)"
-export KUBECONFIG="$root/kubeconfig"
+cluster="${KIND_CLUSTER_NAME:-payments-$(openssl rand -hex 5)}"
+created_cluster=0
+export KUBECONFIG="${KUBECONFIG:-$root/kubeconfig}"
 export MICROSVC_PAYMENT_EVIDENCE="$root/evidence.json"
 export MICROSVC_PAYMENTS=1
 pids=()
@@ -17,32 +18,18 @@ cleanup() {
       kubectl -n banking-app logs "deployment/$app" --tail=40 || true
     done
   fi
-  kind delete cluster --name "$cluster" || true
+  if [[ "$created_cluster" -eq 1 ]]; then
+    kind delete cluster --name "$cluster" || true
+  fi
   rm -r "$root"
 }
 trap cleanup EXIT
 
-kind create cluster --name "$cluster" --wait 120s
-build_image() {
-  if ! docker build "$@"; then
-    sleep 5
-    docker build "$@"
-  fi
-}
-images=()
-for service in accounts-service ai-service api-gateway disputes-service fraud-service notification-service transactions-service user-service; do
-  image="microsvc-journeys/$service:checkout"
-  case "$service" in
-    accounts-service|api-gateway|payments-service|transactions-service) build_image -t "$image" -f "backend/$service/Dockerfile" . ;;
-    *) build_image -t "$image" "backend/$service" ;;
-  esac
-  images+=("$image")
-done
-build_image -t microsvc-journeys/frontend:checkout frontend
-build_image -t microsvc-journeys/payments-service:checkout -f backend/payments-service/Dockerfile .
-build_image -t microsvc-journeys/provider-fixtures:checkout -f tests/integration/temporal/stack/Dockerfile .
-kind load docker-image --name "$cluster" "${images[@]}" \
-  microsvc-journeys/frontend:checkout microsvc-journeys/payments-service:checkout microsvc-journeys/provider-fixtures:checkout
+if ! kind get clusters 2>/dev/null | grep -qx "$cluster"; then
+  kind create cluster --name "$cluster" --wait 120s
+  created_cluster=1
+fi
+bash scripts/ci/build-and-load-kind-images.sh "$cluster" payments
 
 
 kubectl create namespace banking-app
@@ -94,10 +81,14 @@ for topic in transaction-events payment-events.v1; do
   broker topic describe "$topic" || broker topic create "$topic" --partitions 1 --replicas 1
 done
 
-read -r cutoff date < <(python3 - <<'PY'
+# CI uses a shorter settlement horizon; local defaults stay a bit longer.
+settlement_minutes="${BANKING_SETTLEMENT_WAIT_MINUTES:-3}"
+read -r cutoff date < <(SETTLEMENT_MINUTES="$settlement_minutes" python3 - <<'PY'
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
-end = datetime.now(ZoneInfo("Australia/Sydney")) + timedelta(minutes=6)
+import os
+minutes = int(os.environ.get("SETTLEMENT_MINUTES", "3"))
+end = datetime.now(ZoneInfo("Australia/Sydney")) + timedelta(minutes=minutes)
 print(end.strftime("%H:%M"), end.date().isoformat())
 PY
 )
@@ -140,9 +131,9 @@ timeout 30 kubectl -n banking-app exec deployment/banking-kafka -- rpk topic con
 python3 tests/integration/verify-payment-trace.py "$jaeger" "$MICROSVC_PAYMENT_EVIDENCE"
 
 object="$fixtures/settlements-test/settlement/aud/$date.dat"
-for ((attempt = 0; attempt < 100; attempt++)); do
+for ((attempt = 0; attempt < 90; attempt++)); do
   if curl -fsS -o /dev/null "$object" 2>/dev/null; then break; fi
-  sleep 3
+  sleep 2
 done
 curl -fsS "$object" | python3 tests/integration/verify-payment-settlement.py "$MICROSVC_PAYMENT_EVIDENCE"
 for run in original replay; do

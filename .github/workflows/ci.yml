@@ -2,9 +2,13 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ main, master, develop, feature/* ]
+    branches: [ main, master, develop ]
   pull_request:
     branches: [ main, master, develop ]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   REGISTRY: ghcr.io
@@ -31,22 +35,22 @@ jobs:
     steps:
     - uses: actions/checkout@v7.0.1
     
-    - name: Set up JDK 17
-      uses: actions/setup-java@v6.3.0
-      with:
-        java-version: '25'
-        distribution: 'temurin'
-    - uses: gradle/actions/setup-gradle@v5
+    - name: Set up Java 25
+      uses: ./.github/actions/setup-java-gradle
     
-    - name: Setup test database
+    - name: Setup test databases
+      env:
+        PGPASSWORD: password
       run: |
-        PGPASSWORD=password psql -h localhost -U postgres -d banking_test -c "
+        psql -h localhost -U postgres -d banking_test -c "
           CREATE SCHEMA IF NOT EXISTS user_service;
           CREATE SCHEMA IF NOT EXISTS accounts_service;
           CREATE SCHEMA IF NOT EXISTS transactions_service;
           CREATE SCHEMA IF NOT EXISTS payments;
         "
-    
+        createdb -h localhost -U postgres microsvc_accounts_test
+        createdb -h localhost -U postgres microsvc_transactions_test
+
     - name: Test Backend Services
       env:
         PAYMENTS_DB_URL: jdbc:postgresql://localhost:5432/banking_test
@@ -54,27 +58,26 @@ jobs:
         PAYMENTS_DB_PASSWORD: password
       run: make test-backend
 
-    - name: Test movement reservations, statement jobs, and reconciliation against PostgreSQL
+    # Env-gated Postgres tests only (H2 suite already covered TransactionRollbackTest).
+    - name: Postgres-backed movement and statement tests
       env:
         PGPASSWORD: password
         MICROSVC_POSTGRES_PASSWORD: password
+        MICROSVC_ACCOUNTS_POSTGRES_URL: jdbc:postgresql://localhost:5432/microsvc_accounts_test
+        STATEMENTS_TEST_DATABASE_URL: jdbc:postgresql://localhost:5432/microsvc_accounts_test
+        MICROSVC_TX_POSTGRES_URL: jdbc:postgresql://localhost:5432/microsvc_transactions_test
+        MICROSVC_TX_SQL_INIT: never
+        MICROSVC_TX_DEFER_INIT: "false"
+        MICROSVC_TX_FLYWAY: "true"
+        MICROSVC_TX_DRIVER: org.postgresql.Driver
+        MICROSVC_TX_USER: postgres
+        MICROSVC_TX_PASSWORD: password
+        MICROSVC_TX_DDL: validate
+        MICROSVC_TX_DIALECT: org.hibernate.dialect.PostgreSQLDialect
       run: |
-        createdb -h localhost -U postgres microsvc_accounts_test
-        createdb -h localhost -U postgres microsvc_transactions_test
-        (
-          cd backend/accounts-service
-          MICROSVC_ACCOUNTS_POSTGRES_URL=jdbc:postgresql://localhost:5432/microsvc_accounts_test \
-          STATEMENTS_TEST_DATABASE_URL=jdbc:postgresql://localhost:5432/microsvc_accounts_test \
-            ../../gradlew -p ../.. :accounts-service:test --tests "*MovementReservationsPostgresTest" --tests "*StatementJobsPostgresTest"
-        )
-        (
-          cd backend/transactions-service
-          MICROSVC_TX_POSTGRES_URL=jdbc:postgresql://localhost:5432/microsvc_transactions_test \
-          MICROSVC_TX_SQL_INIT=never MICROSVC_TX_DEFER_INIT=false MICROSVC_TX_FLYWAY=true \
-          MICROSVC_TX_DRIVER=org.postgresql.Driver MICROSVC_TX_USER=postgres MICROSVC_TX_PASSWORD=password \
-          MICROSVC_TX_DDL=validate MICROSVC_TX_DIALECT=org.hibernate.dialect.PostgreSQLDialect \
-            ../../gradlew -p ../.. :transactions-service:test --tests "*TransactionRollbackTest" --tests "*CustomerMovementsPostgresTest"
-        )
+        ./gradlew \
+          :accounts-service:test --tests "*MovementReservationsPostgresTest" --tests "*StatementJobsPostgresTest" \
+          :transactions-service:test --tests "*CustomerMovementsPostgresTest"
 
   test-frontend:
     runs-on: ubuntu-latest
@@ -105,10 +108,18 @@ jobs:
     steps:
     - uses: actions/checkout@v7.0.1
 
-    - name: Set up .NET 8
+    - name: Set up .NET 10
       uses: actions/setup-dotnet@v6.1.0
       with:
         dotnet-version: '10.0.404'
+
+    - name: Cache proxymock binary
+      uses: actions/cache@v4
+      with:
+        path: ~/.speedscale
+        key: proxymock-${{ runner.os }}-v1
+        restore-keys: |
+          proxymock-${{ runner.os }}-
 
     - name: Proxymock validation (install, init, build, mock+replay)
       env:
@@ -128,15 +139,24 @@ jobs:
     steps:
     - uses: actions/checkout@v7.0.1
 
-    - name: Set up JDK 17
-      uses: actions/setup-java@v6.3.0
+    - name: Set up Java 25
+      uses: ./.github/actions/setup-java-gradle
+
+    - name: Cache proxymock binary
+      uses: actions/cache@v4
       with:
-        java-version: '25'
-        distribution: 'temurin'
-    - uses: gradle/actions/setup-gradle@v5
+        path: ~/.speedscale
+        key: proxymock-${{ runner.os }}-v1
+        restore-keys: |
+          proxymock-${{ runner.os }}-
 
     - name: Install proxymock
-      run: curl -Lfs https://downloads.speedscale.com/proxymock/install-proxymock | sh
+      run: |
+        export PATH="${HOME}/.speedscale:${PATH}"
+        if ! command -v proxymock >/dev/null 2>&1; then
+          curl -Lfs https://downloads.speedscale.com/proxymock/install-proxymock | sh
+        fi
+        echo "${HOME}/.speedscale" >> "$GITHUB_PATH"
 
     - name: Replay recorded traffic against ${{ matrix.service }}
       env:
@@ -207,7 +227,9 @@ jobs:
         (cd backend/cards-service && go test ./...)
 
   build-and-push:
-    needs: [test-backend, test-frontend, test-go-services, proxymock-validation, replay-gate, e2e-test]
+    # e2e runs in parallel; ci-gate still requires it. Decoupling starts the
+    # image matrix as soon as unit/proxymock gates pass.
+    needs: [test-backend, test-frontend, test-go-services, proxymock-validation, replay-gate]
     runs-on: ubuntu-latest
     # Runs on PRs too (amd64-only, no push) so the image build gates the merge,
     # and on push to master (full multi-arch, pushed). Platforms/push are set
@@ -394,24 +416,9 @@ jobs:
     steps:
     - uses: actions/checkout@v7.0.1
     
-    - name: Setup Node.js
-      uses: actions/setup-node@v7.1.0
-      with:
-        node-version: '26.13.1'
-        cache: 'npm'
-        cache-dependency-path: frontend/package-lock.json
-    
-    - name: Install dependencies
-      run: |
-        cd frontend
-        npm ci
-    
-    - name: Install Playwright browsers
-      run: |
-        cd frontend
-        sudo sed -i 's|http://\(archive\|security\).ubuntu.com/ubuntu|https://\1.ubuntu.com/ubuntu|g' /etc/apt/sources.list.d/ubuntu.sources
-        npx playwright install --with-deps chromium
-    
+    - name: Setup Node.js and Playwright
+      uses: ./.github/actions/setup-node-playwright
+
     - name: Create test results directory
       run: |
         cd frontend

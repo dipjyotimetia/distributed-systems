@@ -7,8 +7,24 @@ set -e
 
 VERSION_FILE="VERSION"
 REGISTRY="ghcr.io/dipjyotimetia/distributed-systems"
-SERVICES=("user-service" "accounts-service" "transactions-service" "api-gateway" "ai-service" "frontend" "simulation-client" "fraud-service" "notification-service")
-BACKEND_SERVICES=("user-service" "accounts-service" "transactions-service" "api-gateway")
+# Keep in sync with .github/workflows/ci.yml build-and-push matrix (+ k8s base deployments).
+SERVICES=(
+  "user-service"
+  "accounts-service"
+  "transactions-service"
+  "api-gateway"
+  "ai-service"
+  "frontend"
+  "simulation-client"
+  "fraud-service"
+  "notification-service"
+  "disputes-service"
+  "payments-service"
+  "kyc-service"
+  "cards-service"
+)
+# Java services that track serviceVersion in gradle.properties (not .NET/Go/Python).
+BACKEND_SERVICES=("accounts-service" "transactions-service" "api-gateway" "payments-service")
 FRONTEND_SERVICES=("frontend")
 SIMULATION_SERVICES=("simulation-client")
 
@@ -228,8 +244,11 @@ update_k8s_manifests() {
     done
 
     for deployment_file in kubernetes/overlays/full/{disputes,statement-worker}.yaml kubernetes/overlays/payments-shared/workloads.yaml; do
-        sed -E -i.bak "s#(image: ${REGISTRY}/(disputes-service|accounts-service|payments-service)):v[0-9]+\.[0-9]+\.[0-9]+#\1:${tag}#" "$deployment_file"
-        rm -f "${deployment_file}.bak"
+        if [ -f "$deployment_file" ]; then
+            sed -E -i.bak "s#(image: ${REGISTRY}/(disputes-service|accounts-service|payments-service|kyc-service|cards-service)):v[0-9]+\.[0-9]+\.[0-9]+#\1:${tag}#" "$deployment_file"
+            rm -f "${deployment_file}.bak"
+            echo "Updated $deployment_file"
+        fi
     done
 }
 

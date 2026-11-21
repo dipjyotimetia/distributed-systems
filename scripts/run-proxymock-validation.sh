@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Same flow as GitHub Actions job "proxymock-validation" for user-service (.NET 8):
+# Same flow as GitHub Actions job "proxymock-validation" for user-service (.NET 10):
 #   1. install proxymock (if needed) and init it (if PROXYMOCK_API_KEY is set)
 #   2. build user-service
 #   3. run it under `proxymock mock` (Postgres mock on 127.0.0.1:5432, from the recording)

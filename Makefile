@@ -5,7 +5,7 @@ REGISTRY ?= ghcr.io/dipjyotimetia/distributed-systems
 IMAGE_TAG ?= $(shell ./scripts/version.sh tag)
 NAMESPACE ?= banking-app
 KUSTOMIZE_DIR ?= kubernetes/base
-SERVICES = accounts-service transactions-service api-gateway
+SERVICES = accounts-service transactions-service api-gateway payments-service user-service ai-service fraud-service notification-service disputes-service kyc-service cards-service
 
 # Default target
 .PHONY: help
