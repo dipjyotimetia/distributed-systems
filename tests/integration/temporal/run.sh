@@ -80,12 +80,30 @@ trap 'exit 143' TERM
 
 docker info --format '{{.ServerVersion}}' >/dev/null
 stage=startup
+# Gradle classpath resolves inside Docker can flake on Maven Central; retry builds.
+compose_build() {
+  local attempt=1
+  while (( attempt <= 5 )); do
+    if "${compose[@]}" build "$@"; then
+      return 0
+    fi
+    echo "compose build failed (attempt $attempt); retrying..." >&2
+    if (( attempt == 5 )); then
+      return 1
+    fi
+    sleep $((attempt * 15))
+    attempt=$((attempt + 1))
+  done
+}
 if [[ "$MICROSVC_SCENARIO" == ai ]]; then
-  "${compose[@]}" up -d --no-deps --build frontend ai-service provider-fixtures
+  compose_build frontend ai-service provider-fixtures
+  "${compose[@]}" up -d --no-deps --no-build frontend ai-service provider-fixtures
 elif [[ "$MICROSVC_SCENARIO" == disputes ]]; then
-  "${compose[@]}" up -d --build frontend disputes-worker statement-worker notification-service
+  compose_build frontend disputes-worker statement-worker notification-service
+  "${compose[@]}" up -d --no-build frontend disputes-worker statement-worker notification-service
 else
-  "${compose[@]}" up -d --build frontend notification-service
+  compose_build frontend notification-service
+  "${compose[@]}" up -d --no-build frontend notification-service
   export MICROSVC_GATEWAY="http://$("${compose[@]}" port api-gateway 8080)"
   export MICROSVC_NOTIFICATIONS="http://$("${compose[@]}" port notification-service 8080)"
   export MICROSVC_BROKER_CONTAINER="$("${compose[@]}" ps -q redpanda)"
