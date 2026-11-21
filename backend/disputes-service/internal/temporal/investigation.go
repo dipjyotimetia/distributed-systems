@@ -79,19 +79,27 @@ func advanceWithAI(ctx context.Context, store *postgres.Store, temporal Workflow
 	return state, nil
 }
 
+// disputeResearchInput matches the Python DisputeResearchInput JSON field names.
+type disputeResearchInput struct {
+	CaseID int64  `json:"case_id"`
+	Locale string `json:"locale"`
+}
+
 func maybeStartAiResearch(ctx context.Context, store *postgres.Store, temporal WorkflowStarter, caseID int64) error {
 	needed, err := store.NeedsAiDraft(ctx, caseID)
 	if err != nil || !needed {
 		return err
 	}
+	// ALLOW_DUPLICATE_FAILED_ONLY so a crashed/failed research run can be retried
+	// when NeedsAiDraft is still true; a successful completed run is not restarted.
 	_, err = temporal.ExecuteWorkflow(ctx, client.StartWorkflowOptions{
 		ID:                    fmt.Sprintf("dispute-ai-%d", caseID),
 		TaskQueue:             aiBankingQueue,
-		WorkflowIDReusePolicy: enumspb.WORKFLOW_ID_REUSE_POLICY_REJECT_DUPLICATE,
+		WorkflowIDReusePolicy: enumspb.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE_FAILED_ONLY,
 		WorkflowExecutionErrorWhenAlreadyStarted: true,
-	}, disputeResearchWorkflow, map[string]any{
-		"case_id": caseID,
-		"locale":  "en-US",
+	}, disputeResearchWorkflow, disputeResearchInput{
+		CaseID: caseID,
+		Locale: "en-US",
 	})
 	var alreadyStarted *serviceerror.WorkflowExecutionAlreadyStarted
 	if errors.As(err, &alreadyStarted) {

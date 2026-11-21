@@ -96,18 +96,36 @@ jobs:
           go-version-file: tests/integration/temporal/go.mod
           cache: false
       - name: Build the services used by the smoke test
+        env:
+          DOCKER_BUILDKIT: "1"
         run: |
+          build_with_retry() {
+            image="$1"
+            shift
+            attempt=1
+            while [ "$attempt" -le 5 ]; do
+              echo "::group::docker build $image (attempt $attempt)"
+              if docker build -t "$image" "$@"; then
+                echo "::endgroup::"
+                return 0
+              fi
+              echo "::endgroup::"
+              echo "docker build failed for $image on attempt $attempt"
+              if [ "$attempt" -eq 5 ]; then
+                return 1
+              fi
+              sleep $((attempt * 15))
+              attempt=$((attempt + 1))
+            done
+          }
           for service in api-gateway accounts-service user-service transactions-service fraud-service notification-service ai-service disputes-service; do
             image="microsvc-journeys/$service:checkout"
             args=("backend/$service")
             case "$service" in accounts-service|api-gateway|payments-service|transactions-service) args=(-f "backend/$service/Dockerfile" .) ;; esac
-            if ! docker build -t "$image" "${args[@]}"; then
-              sleep 5
-              docker build -t "$image" "${args[@]}"
-            fi
+            build_with_retry "$image" "${args[@]}"
           done
-          docker build -t microsvc-journeys/frontend:checkout frontend
-          docker build -f tests/integration/temporal/stack/Dockerfile -t microsvc-journeys/provider-fixtures:checkout .
+          build_with_retry microsvc-journeys/frontend:checkout frontend
+          build_with_retry microsvc-journeys/provider-fixtures:checkout -f tests/integration/temporal/stack/Dockerfile .
       - name: Create Kind cluster
         run: |
           go install sigs.k8s.io/kind@v0.33.0
@@ -149,7 +167,8 @@ jobs:
           broker deployment/banking-kafka -- rpk topic create ci-round-trip --partitions 1 --replicas 1 -X brokers=banking-kafka:9092
           printf 'ci-fixture\n' | broker -i deployment/banking-kafka -- rpk topic produce ci-round-trip -X brokers=banking-kafka:9092
           timeout 30s kubectl -n banking-app exec deployment/banking-kafka -- rpk topic consume ci-round-trip -n 1 -X brokers=banking-kafka:9092 | grep -q ci-fixture
-          for name in banking-postgres banking-kafka redis mongodb banking-frontend banking-user banking-gateway banking-accounts banking-transactions banking-fraud banking-notification banking-ai banking-ai-worker banking-temporal banking-disputes banking-disputes-worker banking-statement-worker provider-fixtures; do
+          # Wait for Temporal before AI/disputes workers whose initContainers dial it.
+          for name in banking-postgres banking-kafka redis mongodb banking-temporal banking-frontend banking-user banking-gateway banking-accounts banking-transactions banking-fraud banking-notification banking-ai banking-ai-worker banking-disputes banking-disputes-worker banking-statement-worker provider-fixtures; do
             kubectl -n banking-app rollout status "deployment/$name" --timeout=5m
           done
           kubectl -n observability rollout status deployment/jaeger --timeout=3m
@@ -165,11 +184,16 @@ jobs:
           python3 tests/integration/kubernetes-smoke.py http://127.0.0.1:33000 http://127.0.0.1:33686 http://127.0.0.1:33001 | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Collect cluster diagnostics
         if: failure()
+        continue-on-error: true
         run: |
+          if ! kubectl cluster-info >/dev/null 2>&1; then
+            echo "No Kind cluster available (build likely failed before create)."
+            exit 0
+          fi
           for namespace in banking-app observability; do
-            kubectl -n "$namespace" get pods,services,pvc
-            kubectl -n "$namespace" get events --sort-by=.lastTimestamp
+            kubectl -n "$namespace" get pods,services,pvc || true
+            kubectl -n "$namespace" get events --sort-by=.lastTimestamp || true
           done
-          for name in banking-postgres banking-kafka mongodb banking-accounts banking-gateway banking-transactions banking-notification; do
+          for name in banking-postgres banking-kafka mongodb banking-accounts banking-gateway banking-transactions banking-notification banking-ai banking-ai-worker banking-disputes banking-disputes-worker banking-temporal; do
             kubectl -n banking-app logs "deployment/$name" --all-containers --tail=80 || true
           done

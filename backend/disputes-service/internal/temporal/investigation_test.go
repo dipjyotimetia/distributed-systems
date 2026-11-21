@@ -11,6 +11,7 @@ import (
 
 	disputesv1 "github.com/dipjyotimetia/distributed-systems/backend/disputes-service/internal/generated/disputes/v1"
 	"github.com/dipjyotimetia/distributed-systems/backend/disputes-service/internal/postgres"
+	enumspb "go.temporal.io/api/enums/v1"
 	"go.temporal.io/api/serviceerror"
 	"go.temporal.io/sdk/activity"
 	"go.temporal.io/sdk/client"
@@ -89,6 +90,16 @@ func TestMaybeStartAiResearch(t *testing.T) {
 		starts++
 		if opts.ID != fmt.Sprintf("dispute-ai-%d", c.ID) || opts.TaskQueue != aiBankingQueue {
 			t.Fatalf("unexpected AI workflow start: %#v %#v", opts, workflow)
+		}
+		if opts.WorkflowIDReusePolicy != enumspb.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE_FAILED_ONLY {
+			t.Fatalf("expected failed-only reuse policy, got %v", opts.WorkflowIDReusePolicy)
+		}
+		if len(args) != 1 {
+			t.Fatalf("expected research input arg, got %#v", args)
+		}
+		input, ok := args[0].(disputeResearchInput)
+		if !ok || input.CaseID != c.ID || input.Locale != "en-US" {
+			t.Fatalf("unexpected research input: %#v", args[0])
 		}
 		return nil, &serviceerror.WorkflowExecutionAlreadyStarted{}
 	})
