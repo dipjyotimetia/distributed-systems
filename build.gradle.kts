@@ -1,6 +1,10 @@
 buildscript {
     repositories {
         mavenCentral()
+        maven {
+            name = "google-maven-central"
+            url = uri("https://maven-central.storage-download.googleapis.com/maven2")
+        }
     }
     dependencies {
         classpath("org.flywaydb:flyway-database-postgresql:12.4.0")
