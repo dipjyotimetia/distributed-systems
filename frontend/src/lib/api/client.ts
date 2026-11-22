@@ -1,4 +1,5 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
+import { context, propagation } from '@opentelemetry/api';
 import { logApiRequest, logApiResponse, logError } from '../logger';
 
 // Trace propagation utilities
@@ -12,22 +13,14 @@ const getCurrentTraceContext = (): string | null => {
     }
     const processWithUtils = process as ProcessWithOtelUtils;
     if (processWithUtils.__OTEL_TRACE_UTILS__) {
-      return processWithUtils.__OTEL_TRACE_UTILS__.getCurrentTraceContext();
+      const fromProcess = processWithUtils.__OTEL_TRACE_UTILS__.getCurrentTraceContext();
+      if (fromProcess) return fromProcess;
     }
   }
-  
-  // Fallback for client-side (though this shouldn't be used in SSR context)
-  if (typeof window !== 'undefined') {
-    interface WindowWithOtelContext extends Window {
-      __OTEL_TRACE_CONTEXT__?: string;
-    }
-    const windowWithContext = window as WindowWithOtelContext;
-    if (windowWithContext.__OTEL_TRACE_CONTEXT__) {
-      return windowWithContext.__OTEL_TRACE_CONTEXT__;
-    }
-  }
-  
-  return null;
+
+  const carrier: Record<string, string> = {};
+  propagation.inject(context.active(), carrier);
+  return carrier.traceparent || null;
 };
 
 // Always use relative URLs - Next.js will handle API routing

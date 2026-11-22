@@ -1,0 +1,51 @@
+# Compose OpenTelemetry Collector — traces pipeline mirrors the Kubernetes
+# filter rules in kubernetes/observability/otel-collector.yaml (actuator + Spring
+# Security noise dropped before Jaeger). Metrics/logs/Speedscale pipelines are
+# omitted here; Compose keeps Prometheus/Grafana separate.
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  # Drop actuator probe/scrape spans and noisy Spring Security internal
+  # spans. Uses OTTL `traces.span` conditions, which are OR-ed: a span is
+  # dropped if ANY condition is true.
+  filter:
+    error_mode: ignore
+    traces:
+      span:
+        - 'IsMatch(name, "(?i)actuator")'
+        - 'IsMatch(attributes["http.url"], "/actuator")'
+        - 'IsMatch(attributes["http.target"], "/actuator")'
+        - 'IsMatch(attributes["url.path"], "/actuator")'
+        - 'IsMatch(attributes["http.route"], "/actuator")'
+        - 'name == "security filterchain before"'
+        - 'name == "security filterchain after"'
+        - 'name == "authorize exchange"'
+        - 'name == "secured request"'
+  batch: {}
+
+exporters:
+  otlp:
+    endpoint: jaeger:4317
+    tls:
+      insecure: true
+  debug:
+    verbosity: basic
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+service:
+  extensions: [health_check]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [filter, batch]
+      exporters: [otlp]

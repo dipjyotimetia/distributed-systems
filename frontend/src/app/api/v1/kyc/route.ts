@@ -8,7 +8,10 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
-  return grpcResponse(call('kyc', 'Apply', authorization(request), {
-    fullName: body.fullName, documentReference: body.documentReference,
-  }));
+  return grpcResponse(
+    call('kyc', 'Apply', authorization(request), {
+      fullName: body.fullName,
+      documentReference: body.documentReference,
+    }),
+  );
 }

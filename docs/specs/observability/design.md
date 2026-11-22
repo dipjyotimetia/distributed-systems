@@ -8,16 +8,18 @@ trace and span id, which joins all three signals.
 
 ```mermaid
 flowchart LR
-  svc[Service OTel SDK] -->|Compose| jaeger[Jaeger OTLP receiver]
-  svc -->|Kubernetes| col[otel-collector<br/>filter drops noise] --> jaeger
+  svc[Service OTel SDK] --> col[otel-collector<br/>filter drops noise]
+  col --> jaeger[Jaeger]
 ```
 
-The Kubernetes collector is `kubernetes/observability/otel-collector.yaml`.
+Compose collector config is `config/otel-collector.yaml`. Kubernetes collector
+is `kubernetes/observability/otel-collector.yaml`.
 
 ## Configuration
 
 Shared env (per `architecture.md`): `OTEL_SERVICE_NAME=<service>`,
-`OTEL_EXPORTER_OTLP_ENDPOINT` (`http://jaeger:4317` in Compose, the collector in k8s),
+`OTEL_EXPORTER_OTLP_ENDPOINT` (`http://otel-collector:4317` in Compose,
+`http://otel-collector.observability:4317` in k8s),
 `OTEL_EXPORTER_OTLP_PROTOCOL=grpc`, `OTEL_{TRACES,METRICS,LOGS}_EXPORTER=otlp`,
 `OTEL_TRACES_SAMPLER=always_on`, `OTEL_PROPAGATORS=tracecontext`,
 `OTEL_RESOURCE_ATTRIBUTES=service.namespace=banking-app`.

@@ -2,6 +2,7 @@ const axios = require('axios');
 const { randomUUID } = require('crypto');
 const logger = require('../utils/logger');
 const config = require('../config');
+const { injectTraceHeaders } = require('../utils/tracing');
 const { UsersApi, Configuration: UsersConfiguration } = require('../generated/users/src');
 const { AccountsApi, StatementJobsApi, Configuration: AccountsConfiguration } = require('../generated/accounts/src');
 const { TransactionsApi, Configuration: TransactionsConfiguration } = require('../generated/transactions/src');
@@ -33,12 +34,12 @@ class ApiClient {
   contract(Api, Configuration, base, token, extraHeaders = {}) {
     return new Api(new Configuration({
       basePath: base,
-      headers: {
+      headers: injectTraceHeaders({
         'Content-Type': 'application/json',
         'User-Agent': 'Banking-Simulation-Client/1.0.0',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...extraHeaders,
-      },
+      }),
     }));
   }
 
@@ -46,6 +47,7 @@ class ApiClient {
     // Request interceptor for logging
     this.client.interceptors.request.use(
       (config) => {
+        Object.assign(config.headers, injectTraceHeaders({}));
         logger.debug('API Request', {
           method: config.method?.toUpperCase(),
           url: config.url,
@@ -219,7 +221,7 @@ class ApiClient {
   // Raw request without retry — used for error injection so 5xx responses
   // are not amplified by the retry loop.
   async rawRequest(method, path, data, token) {
-    const headers = { 'Content-Type': 'application/json' };
+    const headers = injectTraceHeaders({ 'Content-Type': 'application/json' });
     if (token) headers.Authorization = `Bearer ${token}`;
     return this.client.request({ method, url: path, data, headers });
   }

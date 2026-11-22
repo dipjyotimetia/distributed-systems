@@ -45,6 +45,12 @@ services:
       SCHEMA_REGISTRY_URL: http://redpanda:8081
       MONGO_URI: mongodb://mongodb:27017
       JWT_SECRET: banking-app-super-secret-key-change-this-in-production-256-bit
+      OTEL_SERVICE_NAME: notification-service
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_PROPAGATORS: tracecontext
+      OTEL_RESOURCE_ATTRIBUTES: service.namespace=banking-app
 
   # Backend Services
   disputes-schema:
@@ -74,7 +80,7 @@ services:
       DISPUTES_OPERATOR_IDS: ${DISPUTES_OPERATOR_IDS:-}
       DISPUTES_INTERNAL_TOKEN: local-disputes-internal
       OTEL_SERVICE_NAME: disputes-service
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
     healthcheck:
       test: ["CMD", "disputes-service", "healthcheck"]
       interval: 5s
@@ -96,7 +102,7 @@ services:
       DATABASE_URL: postgres://disputes_service_user:disputes_service_pass@postgres:5432/banking_app?sslmode=disable
       TEMPORAL_ADDRESS: disputes-temporal:7233
       OTEL_SERVICE_NAME: disputes-worker
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
     healthcheck:
       test: ["CMD", "disputes-service", "healthcheck"]
       interval: 5s
@@ -137,7 +143,7 @@ services:
       - JWT_EXPIRATION=86400000
       # OpenTelemetry Configuration
       - OTEL_SERVICE_NAME=user-service
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
       - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
       - OTEL_TRACES_EXPORTER=otlp
       - OTEL_METRICS_EXPORTER=otlp
@@ -170,7 +176,7 @@ services:
       - JWT_EXPIRATION=86400000
       # OpenTelemetry Configuration
       - OTEL_SERVICE_NAME=accounts-service
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
       - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
       - OTEL_TRACES_EXPORTER=otlp
       - OTEL_METRICS_EXPORTER=otlp
@@ -201,7 +207,7 @@ services:
       DB_NAME: banking_app
       TEMPORAL_ADDRESS: disputes-temporal:7233
       OTEL_SERVICE_NAME: statement-worker
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       OTEL_EXPORTER_OTLP_PROTOCOL: grpc
       OTEL_RESOURCE_ATTRIBUTES: service.namespace=banking-app
       LEDGER_GRPC_ENABLED: "false"
@@ -274,7 +280,7 @@ services:
       - KAFKA_VALUE_FORMAT=avro
       # OpenTelemetry Configuration
       - OTEL_SERVICE_NAME=transactions-service
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
       - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
       - OTEL_TRACES_EXPORTER=otlp
       - OTEL_METRICS_EXPORTER=otlp
@@ -299,6 +305,12 @@ services:
     environment:
       - GRPC_PORT=8080
       - METRICS_PORT=9091
+      - OTEL_SERVICE_NAME=fraud-service
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_PROPAGATORS=tracecontext
+      - OTEL_RESOURCE_ATTRIBUTES=service.namespace=banking-app
     ports:
       - "8086:8080"
     networks:
@@ -337,7 +349,7 @@ services:
       - JWT_EXPIRATION=86400000
       # OpenTelemetry Configuration
       - OTEL_SERVICE_NAME=api-gateway
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
       - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
       - OTEL_TRACES_EXPORTER=otlp
       - OTEL_METRICS_EXPORTER=otlp
@@ -361,6 +373,10 @@ services:
       KYC_OPERATOR_IDS: ${KYC_OPERATOR_IDS:-}
       GRPC_PORT: "8091"
       METRICS_PORT: "9092"
+      OTEL_SERVICE_NAME: kyc-service
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      OTEL_PROPAGATORS: tracecontext
+      OTEL_RESOURCE_ATTRIBUTES: service.namespace=banking-app
     depends_on:
       postgres:
         condition: service_healthy
@@ -375,6 +391,10 @@ services:
       KYC_MODE: worker
       DATABASE_URL: postgres://postgres:password@postgres:5432/banking_app?sslmode=disable
       TEMPORAL_ADDRESS: disputes-temporal:7233
+      OTEL_SERVICE_NAME: kyc-worker
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      OTEL_PROPAGATORS: tracecontext
+      OTEL_RESOURCE_ATTRIBUTES: service.namespace=banking-app
     depends_on:
       kyc-service:
         condition: service_started
@@ -395,6 +415,10 @@ services:
       FRAUD_GRPC_ADDR: fraud-service:8080
       GRPC_PORT: "8092"
       METRICS_PORT: "9093"
+      OTEL_SERVICE_NAME: cards-service
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      OTEL_PROPAGATORS: tracecontext
+      OTEL_RESOURCE_ATTRIBUTES: service.namespace=banking-app
     depends_on:
       postgres:
         condition: service_healthy
@@ -424,7 +448,7 @@ services:
       - TRANSACTIONS_SERVICE_URL=http://transactions-service:8080
       - CLAIM_CHECK_DIR=/tmp/ai-claim-check
       - OTEL_SERVICE_NAME=ai-service
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
       - OTEL_RESOURCE_ATTRIBUTES=service.namespace=banking-app
     ports:
       - "8084:8080"
@@ -455,7 +479,7 @@ services:
       - TRANSACTIONS_SERVICE_URL=http://transactions-service:8080
       - CLAIM_CHECK_DIR=/tmp/ai-claim-check
       - OTEL_SERVICE_NAME=ai-worker
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
       - OTEL_RESOURCE_ATTRIBUTES=service.namespace=banking-app
     ports:
       - "8085:8080"
@@ -488,7 +512,7 @@ services:
       - NODE_ENV=development
       # OpenTelemetry Configuration
       - OTEL_SERVICE_NAME=frontend
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318/v1/traces
       - OTEL_TRACES_EXPORTER=otlp
       - OTEL_METRICS_EXPORTER=otlp
       - OTEL_LOGS_EXPORTER=otlp
@@ -509,14 +533,29 @@ services:
       - banking-network
 
   # Observability Stack
+  # Collector applies the same actuator/Spring Security span filters as
+  # kubernetes/observability/otel-collector.yaml, then forwards to Jaeger.
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.165.0
+    container_name: banking-otel-collector
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./config/otel-collector.yaml:/etc/otelcol/config.yaml:ro
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+      - "13133:13133"
+    depends_on:
+      - jaeger
+    networks:
+      - banking-network
+
   jaeger:
     image: jaegertracing/jaeger:2.23.0
     container_name: banking-jaeger
     ports:
       - "16686:16686"
       - "14268:14268"
-      - "4318:4318"
-      - "4317:4317"
     networks:
       - banking-network
 

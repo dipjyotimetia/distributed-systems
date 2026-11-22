@@ -43,9 +43,7 @@ management:
     health:
       show-details: when-authorized
   tracing:
-    enabled: true
-    sampling:
-      probability: 1.0
+    enabled: false  # Disable Spring Boot tracing; use OpenTelemetry starter only
   metrics:
     export:
       prometheus:

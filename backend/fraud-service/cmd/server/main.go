@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net"
 	"net/http"
@@ -10,11 +11,13 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/keepalive"
 
 	"github.com/dipjyotimetia/distributed-systems/backend/fraud-service/internal/fraud"
+	otelsetup "github.com/dipjyotimetia/distributed-systems/backend/fraud-service/internal/otel"
 
 	fraudv1 "github.com/dipjyotimetia/distributed-systems/backend/fraud-service/gen/fraud/v1"
 )
@@ -22,6 +25,12 @@ import (
 func main() {
 	port := envOrDefault("GRPC_PORT", "8080")
 	metricsPort := envOrDefault("METRICS_PORT", "9091")
+
+	shutdown, err := otelsetup.Init(context.Background(), "fraud-service")
+	if err != nil {
+		log.Fatalf("otel init: %v", err)
+	}
+	defer func() { _ = shutdown(context.Background()) }()
 
 	go serveMetrics(metricsPort)
 
@@ -32,10 +41,13 @@ func main() {
 
 	// ebpf observability: force connections to recycle after 1 minute so nettap can observe the connection
 	// start and allow rrpairs to be correctly identified and parsed
-	options := []grpc.ServerOption{grpc.KeepaliveParams(keepalive.ServerParameters{
-		MaxConnectionAge:      1 * time.Minute,
-		MaxConnectionAgeGrace: 5 * time.Second,
-	})}
+	options := []grpc.ServerOption{
+		grpc.StatsHandler(otelgrpc.NewServerHandler()),
+		grpc.KeepaliveParams(keepalive.ServerParameters{
+			MaxConnectionAge:      1 * time.Minute,
+			MaxConnectionAgeGrace: 5 * time.Second,
+		}),
+	}
 	if os.Getenv("MTLS_ENABLED") == "true" {
 		certificate, err := tls.LoadX509KeyPair(os.Getenv("MTLS_CERT"), os.Getenv("MTLS_KEY"))
 		if err != nil {

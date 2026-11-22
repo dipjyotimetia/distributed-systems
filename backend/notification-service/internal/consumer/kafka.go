@@ -14,9 +14,36 @@ import (
 	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/twmb/franz-go/pkg/sasl"
 	"github.com/twmb/franz-go/pkg/sasl/plain"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/dipjyotimetia/distributed-systems/backend/notification-service/internal/metrics"
 )
+
+type kafkaHeaderCarrier []kgo.RecordHeader
+
+func (c kafkaHeaderCarrier) Get(key string) string {
+	for _, h := range c {
+		if strings.EqualFold(h.Key, key) {
+			return string(h.Value)
+		}
+	}
+	return ""
+}
+
+func (c kafkaHeaderCarrier) Set(key, value string) {
+	// Extract-only carrier; Set is required by TextMapCarrier but unused on consume.
+}
+
+func (c kafkaHeaderCarrier) Keys() []string {
+	keys := make([]string, 0, len(c))
+	for _, h := range c {
+		keys = append(keys, h.Key)
+	}
+	return keys
+}
 
 const ringSize = 1000
 
@@ -209,22 +236,41 @@ func (c *Consumer) Run(ctx context.Context) error {
 }
 
 func (c *Consumer) process(ctx context.Context, message *kgo.Record) error {
+	ctx = otel.GetTextMapPropagator().Extract(ctx, kafkaHeaderCarrier(message.Headers))
+	ctx, span := otel.Tracer("notification-service").Start(ctx, "notification.kafka.consume",
+		trace.WithSpanKind(trace.SpanKindConsumer),
+		trace.WithAttributes(
+			attribute.String("messaging.system", "kafka"),
+			attribute.String("messaging.destination.name", message.Topic),
+			attribute.Int("messaging.kafka.partition", int(message.Partition)),
+			attribute.Int64("messaging.kafka.offset", message.Offset),
+		),
+	)
+	defer span.End()
+
 	event, err := c.decode(ctx, message)
 	if err != nil {
 		metrics.ConsumeErrors.Inc()
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "invalid notification event")
 		log.Printf("invalid notification event (partition=%d offset=%d): %v", message.Partition, message.Offset, err)
 		quarantineCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
 		if qerr := c.store.Quarantine(quarantineCtx, message.Topic, message.Partition, message.Offset, message.Key, message.Value, err.Error()); qerr != nil {
+			span.RecordError(qerr)
 			return fmt.Errorf("quarantine invalid notification event: %w", qerr)
 		}
 		metrics.EventsQuarantined.Inc()
 	} else if event != nil {
 		if err := c.deliver(ctx, event); err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, "deliver failed")
 			return err
 		}
 	}
 	if err := c.commitRecords(ctx, message); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "commit failed")
 		return fmt.Errorf("commit transaction event offset: %w", err)
 	}
 	return nil

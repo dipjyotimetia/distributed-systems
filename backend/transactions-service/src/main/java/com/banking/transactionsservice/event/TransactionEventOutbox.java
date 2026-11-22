@@ -3,6 +3,9 @@ package com.banking.transactionsservice.event;
 import com.banking.transactionsservice.entity.Transaction;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator;
+import io.opentelemetry.context.Context;
+import org.apache.kafka.clients.producer.ProducerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -11,6 +14,7 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -19,6 +23,7 @@ import java.util.concurrent.atomic.AtomicReference;
 @Component
 public class TransactionEventOutbox {
     private static final Logger logger = LoggerFactory.getLogger(TransactionEventOutbox.class);
+    private static final W3CTraceContextPropagator W3C = W3CTraceContextPropagator.getInstance();
 
     private final JdbcTemplate jdbc;
     private final KafkaTemplate<String, byte[]> kafka;
@@ -41,17 +46,17 @@ public class TransactionEventOutbox {
 
     public void enqueue(Transaction transaction) {
         jdbc.update("""
-                INSERT INTO transactions_service.event_outbox (transaction_id, payload)
-                VALUES (?, ?)
-                """, transaction.getId(), payload(transaction));
+                INSERT INTO transactions_service.event_outbox (transaction_id, payload, trace_parent)
+                VALUES (?, ?, ?)
+                """, transaction.getId(), payload(transaction), currentTraceParent());
     }
 
     public void enqueueMovement(UUID movementId, String eventId, String payloadJson) {
         jdbc.update("""
-                INSERT INTO transactions_service.event_outbox (movement_id, topic, payload, event_key)
-                VALUES (?, 'movement-lifecycle-v1', ?, ?)
+                INSERT INTO transactions_service.event_outbox (movement_id, topic, payload, event_key, trace_parent)
+                VALUES (?, 'movement-lifecycle-v1', ?, ?, ?)
                 ON CONFLICT (event_key) DO NOTHING
-                """, movementId, payloadJson, eventId);
+                """, movementId, payloadJson, eventId, currentTraceParent());
     }
 
     @Scheduled(fixedDelayString = "${transactions.outbox.delay-ms:1000}")
@@ -64,7 +69,7 @@ public class TransactionEventOutbox {
                 FROM transactions_service.event_outbox WHERE published_at IS NULL
                 """, Double.class));
         List<Pending> pending = jdbc.query("""
-                SELECT e.id, e.transaction_id, e.movement_id, e.topic, e.payload
+                SELECT e.id, e.transaction_id, e.movement_id, e.topic, e.payload, e.trace_parent
                 FROM transactions_service.event_outbox e
                 WHERE e.published_at IS NULL AND NOT EXISTS (
                     SELECT 1 FROM transactions_service.movement_decisions d
@@ -72,14 +77,18 @@ public class TransactionEventOutbox {
                 )
                 ORDER BY e.id LIMIT 20
                 """, (rs, row) -> new Pending(rs.getLong("id"),
-                rs.getString("transaction_id"), rs.getString("movement_id"), rs.getString("topic"), rs.getString("payload")));
+                rs.getString("transaction_id"), rs.getString("movement_id"), rs.getString("topic"),
+                rs.getString("payload"), rs.getString("trace_parent")));
         for (Pending event : pending) {
             String destination = event.topic() == null ? topic : event.topic();
             try {
                 byte[] value = encoder.encode(destination, event.payload());
-                kafka.send(destination,
-                        event.movementId() == null ? event.transactionId() : event.movementId(), value)
-                        .get(5, TimeUnit.SECONDS);
+                String key = event.movementId() == null ? event.transactionId() : event.movementId();
+                ProducerRecord<String, byte[]> record = new ProducerRecord<>(destination, key, value);
+                if (event.traceParent() != null && !event.traceParent().isBlank()) {
+                    record.headers().add("traceparent", event.traceParent().getBytes(StandardCharsets.US_ASCII));
+                }
+                kafka.send(record).get(5, TimeUnit.SECONDS);
             } catch (Exception failure) {
                 if (failure instanceof InterruptedException) {
                     Thread.currentThread().interrupt();
@@ -109,5 +118,15 @@ public class TransactionEventOutbox {
                 + "\",\"timestamp\":\"" + timestamp + "\"}";
     }
 
-    private record Pending(long id, String transactionId, String movementId, String topic, String payload) {}
+    static String currentTraceParent() {
+        AtomicReference<String> value = new AtomicReference<>();
+        W3C.inject(Context.current(), value, (carrier, key, header) -> {
+            if ("traceparent".equals(key)) {
+                carrier.set(header);
+            }
+        });
+        return value.get();
+    }
+
+    private record Pending(long id, String transactionId, String movementId, String topic, String payload, String traceParent) {}
 }

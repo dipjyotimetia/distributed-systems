@@ -13,7 +13,7 @@ The application implements the three pillars of observability:
 
 ### Trace export (OpenTelemetry)
 
-Services emit OTLP traces. **Docker Compose** sends them straight into Jaeger’s OTLP receiver. **Kubernetes** sends them through the OpenTelemetry Collector (filtering noise spans) before Jaeger.
+Services emit OTLP traces. **Docker Compose** and **Kubernetes** both send OTLP through the OpenTelemetry Collector (same actuator / Spring Security span filters) before Jaeger.
 
 ```mermaid
 flowchart LR
@@ -40,8 +40,8 @@ flowchart LR
 How trace data moves from code to storage:
 
 1. **SDK** — Auto-instrumentation and manual spans run in-process; `tracecontext` propagates IDs across HTTP calls; the sampler decides whether to record; spans are batched (for example `BatchSpanProcessor` with queue and export intervals in Spring config) and exported over **OTLP** (gRPC on `:4317` for Java services, HTTP/protobuf on `:4318` for the frontend where configured).
-2. **Docker Compose** — OTLP goes to **Jaeger all-in-one** (`COLLECTOR_OTLP_ENABLED`); there is no separate collector service in `docker compose.yml`.
-3. **Kubernetes** — OTLP goes to **`otel-collector`** (`kubernetes/observability/otel-collector.yaml`): **receivers** `otlp` (gRPC + HTTP) → **processors** `filter` (drops noisy actuator/security spans) → **exporters** `otlp` → Jaeger. The traces pipeline is `receivers: [otlp] → processors: [filter] → exporters: [otlp]`.
+2. **Collector** — Compose uses [`config/otel-collector.yaml`](config/otel-collector.yaml); Kubernetes uses [`kubernetes/observability/otel-collector.yaml`](kubernetes/observability/otel-collector.yaml). Both traces pipelines are `otlp → filter → otlp` (to Jaeger). Compose adds a `batch` processor; Kubernetes also runs logs/metrics/Speedscale pipelines that Compose does not.
+3. **Jaeger** — receives filtered OTLP from the collector (`jaeger:4317` on the Compose/K8s network). Host OTLP ports `:4317` / `:4318` are published on the collector in Compose.
 
 ```mermaid
 flowchart TB
@@ -54,14 +54,10 @@ flowchart TB
     instr --> prop --> samp --> batch --> export
   end
 
-  export --> route{Deploy target}
-
-  route -->|docker compose| jaeger_in[Jaeger OTLP receiver]
-  route -->|Kubernetes| recv[Collector receiver otlp]
+  export --> recv[Collector receiver otlp]
   recv --> filt[Processor filter]
   filt --> out[Exporter otlp to Jaeger]
   out --> store[(Trace storage)]
-  jaeger_in --> store
   store --> ui[Jaeger UI]
 ```
 
@@ -85,12 +81,13 @@ flowchart LR
 
 ### Starting the Observability Stack
 ```bash
-# Start all monitoring services (Jaeger receives OTLP directly in compose; collector is Kubernetes-only)
-docker compose up -d prometheus grafana jaeger
+# Start monitoring services (collector filters traces, then exports to Jaeger)
+docker compose up -d prometheus grafana jaeger otel-collector
 
 # Verify services are running
 curl http://localhost:9090/api/v1/targets  # Prometheus targets
 curl http://localhost:16686/api/v3/services   # Jaeger services
+curl http://localhost:13133                # Collector health
 curl http://localhost:3001                 # Grafana
 ```
 
@@ -98,7 +95,8 @@ curl http://localhost:3001                 # Grafana
 - **Jaeger UI**: http://localhost:16686 - Distributed tracing
 - **Prometheus**: http://localhost:9090 - Metrics and targets
 - **Grafana**: http://localhost:3001 - Dashboards and visualization
-- **Jaeger OTLP receivers in Compose**: localhost:4317 (gRPC) and localhost:4318 (HTTP)
+- **OTLP (Compose collector)**: localhost:4317 (gRPC) and localhost:4318 (HTTP)
+- **Collector health**: http://localhost:13133
 
 ## Distributed Tracing
 
@@ -106,7 +104,7 @@ curl http://localhost:3001                 # Grafana
 
 | Environment | Java services | Next.js frontend |
 |---|---|---|
-| Compose | `http://jaeger:4317` (gRPC) | `http://jaeger:4318/v1/traces` (HTTP/protobuf) |
+| Compose | `http://otel-collector:4317` (gRPC) | `http://otel-collector:4318/v1/traces` (HTTP/protobuf) |
 | Kubernetes | `http://otel-collector.observability:4317` (gRPC) | `http://otel-collector.observability:4318/v1/traces` (HTTP/protobuf) |
 
 For other services, use the settings in the deployment configuration.
@@ -116,9 +114,23 @@ for logs. See [trace filtering](docs/TRACE_FILTERING.md) for the filter rules.
 
 ### Trace Propagation
 
-HTTP headers automatically propagate trace context:
-- `traceparent`: W3C Trace Context header
-- `tracestate`: Additional trace state information
+HTTP, gRPC, and Kafka headers propagate W3C trace context (`traceparent` / `tracestate`).
+
+End-to-end path: **browser** (`frontend-browser` via `/api/otel`) → **Next.js** proxies
+(`withTraceparent` / `tracedFetch`) → **api-gateway** → backend services → DB / gRPC /
+Kafka / Temporal.
+
+| Surface | Notes |
+|---|---|
+| Frontend browser | Web SDK + fetch instrumentation; OTLP via same-origin `/api/otel` |
+| Frontend Node | `BatchSpanProcessor`, W3C propagator; all `/api/v1/*` proxies inject context |
+| Java services | OTel Spring starter; ledger gRPC uses `GrpcTelemetry`; Kafka outbox stores `trace_parent` |
+| Go services | `otelgrpc` / `otelhttp`; notification extracts Kafka `traceparent` |
+| .NET user-service | ASP.NET Core + OTLP exporter (honors existing `OTEL_*` env) |
+| Temporal | Go: SDK contrib interceptor; Java workers: OpenTracing shim over OTel |
+| Simulation client | Node OTLP HTTP + axios/`create()` header injection |
+
+Verify connected traces with `tests/integration/verify-banking-trace.py` against Jaeger.
 
 ### Custom Instrumentation
 

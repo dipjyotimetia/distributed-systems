@@ -28,7 +28,6 @@ dependencies {
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.13.0")
     implementation("io.opentelemetry.instrumentation:opentelemetry-spring-boot-starter:2.34.0")
     implementation("io.opentelemetry:opentelemetry-exporter-otlp")
-    implementation("io.micrometer:micrometer-tracing-bridge-otel")
     implementation("io.micrometer:micrometer-registry-prometheus")
     developmentOnly("org.springframework.boot:spring-boot-devtools")
     testImplementation("org.springframework.boot:spring-boot-starter-test")

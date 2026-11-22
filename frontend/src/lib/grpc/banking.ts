@@ -1,4 +1,5 @@
 import fs from 'fs';
+import { context, propagation } from '@opentelemetry/api';
 import { createClient, type CallOptions } from '@connectrpc/connect';
 import { createGrpcTransport } from '@connectrpc/connect-node';
 import {
@@ -37,21 +38,31 @@ function endpoint(address: string, tls: boolean) {
 
 function transport(address: string, serverName: string) {
   const tls = process.env.MTLS_ENABLED === 'true';
+  if (!tls) {
+    return createGrpcTransport({ baseUrl: endpoint(address, false) });
+  }
+  const ca = process.env.MTLS_CA;
+  const key = process.env.MTLS_KEY;
+  const cert = process.env.MTLS_CERT;
+  if (!ca || !key || !cert) {
+    throw new Error('MTLS_ENABLED requires MTLS_CA, MTLS_KEY, and MTLS_CERT');
+  }
   return createGrpcTransport({
-    baseUrl: endpoint(address, tls),
-    nodeOptions: tls
-      ? {
-          ca: fs.readFileSync(/*turbopackIgnore: true*/ process.env.MTLS_CA || ''),
-          key: fs.readFileSync(/*turbopackIgnore: true*/ process.env.MTLS_KEY || ''),
-          cert: fs.readFileSync(/*turbopackIgnore: true*/ process.env.MTLS_CERT || ''),
-          servername: serverName,
-        }
-      : undefined,
+    baseUrl: endpoint(address, true),
+    nodeOptions: {
+      ca: fs.readFileSync(/*turbopackIgnore: true*/ ca),
+      key: fs.readFileSync(/*turbopackIgnore: true*/ key),
+      cert: fs.readFileSync(/*turbopackIgnore: true*/ cert),
+      servername: serverName,
+    },
   });
 }
 
 function callOptions(authorization: string | null): CallOptions {
-  return authorization ? { headers: { authorization } } : {};
+  const headers: Record<string, string> = {};
+  if (authorization) headers.authorization = authorization;
+  propagation.inject(context.active(), headers);
+  return Object.keys(headers).length ? { headers } : {};
 }
 
 function responseJson(schema: DescMessage, message: MessageShape<DescMessage>) {

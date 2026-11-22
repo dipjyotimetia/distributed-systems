@@ -8,5 +8,10 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
-  return grpcResponse(call('kyc', 'Decide', authorization(request), { caseId: body.caseId, approve: body.approve }));
+  return grpcResponse(
+    call('kyc', 'Decide', authorization(request), {
+      caseId: body.caseId,
+      approve: body.approve,
+    }),
+  );
 }

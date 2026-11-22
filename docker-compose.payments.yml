@@ -25,7 +25,7 @@ services:
         PAYMENTS_DB_PASSWORD: ${BANKING_PAYMENTS_DB_PASSWORD:?Set the payments database password}
         SPRING_FLYWAY_CREATE_SCHEMAS: "true"
         PAYMENTS_TRACES_EXPORTER: otlp
-        OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
+        OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
         OTEL_EXPORTER_OTLP_PROTOCOL: grpc
       JWT_SECRET: ${BANKING_PAYMENTS_JWT_SECRET:?Set the same JWT secret as the banking services}
       PAYMENTS_OPERATOR_IDS: ${BANKING_PAYMENTS_OPERATOR_IDS:-}
