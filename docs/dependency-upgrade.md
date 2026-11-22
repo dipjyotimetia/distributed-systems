@@ -2,7 +2,7 @@
 
 > Historical engineering record. See the [current project guide](../README.md) for supported workflows.
 
-The upgrade starts from `dipjyotimetia/distributed-systems` `main` at `82bd0f6`. Version checks used official package registries, image registries, and maintainer releases. The application uses Java 25 LTS, Go 1.27.4, .NET 10 LTS, Python 3.15.2, and Node.js 26.13.1 LTS.
+The upgrade starts from `dipjyotimetia/distributed-systems` `main` at `82bd0f6`. Version checks used official package registries, image registries, and maintainer releases. The application uses Java 25 LTS, Go 1.27.4, .NET 10 LTS, Python 3.15.2, and Node.js 26.13.1 LTS. A follow-up pass on 2026-11-22 moved Spring Boot to `4.2.0` / Spring Cloud to `2026.0.0`, Flyway to `12.11.0` (Boot-managed line), OpenAPI Generator to `7.27.0`, Avro to `1.12.2`, AWS SDK to `2.59.7`, NuGet `Newtonsoft.Json`/`Npgsql` patches, Python `watchfiles` to `1.3.0`, and refreshed Go module graphs with `go get -u`.
 
 Redpanda is the Kafka-compatible broker for Compose, Kubernetes, and the integration stack. The Kubernetes DNS name remains `banking-kafka:9092`, with Schema Registry on `banking-kafka:8081`. Event topics default to Confluent Avro (`KAFKA_VALUE_FORMAT=avro`); schemas live under `contracts/avro/`. Producers publish through transactional outboxes (claim, broker ack, then `published_at`; transactions-service also quarantines poison rows). The notification service uses franz-go (plus `twmb/avro` and `franz-go/pkg/sr` for Avro) and commits only after processing a record. MongoDB deduplicates replays using the existing transaction/status unique index. The SASL overlay still accepts PLAIN clients and provisions their bootstrap account through secret references.
 
@@ -16,6 +16,11 @@ Redpanda is the Kafka-compatible broker for Compose, Kubernetes, and the integra
 | Frontend TypeScript | 6.0.3 | 7.0.2 | typescript-eslint 8.73.0 declares TypeScript below 6.1. Upgrade when its parser supports TypeScript 7. |
 | Frontend ESLint | 9.39.5 | 10.15.0 | The Next.js preset includes import, React, and JSX accessibility plugins whose peer ranges stop at 9. Upgrade when the preset ships compatible plugin versions. |
 | ASP.NET Core JWT bearer provider | 10.0.15 | 11.0.0 | The 11 release targets .NET 11. Upgrade with the service's next eligible .NET LTS runtime. |
+| Npgsql EF Core provider | 10.0.4 | 11.0.0 | The 11 line targets .NET 11. Stay on the 10.x line with `net10.0`. |
+| Flyway | 12.11.0 | 13.13.0 | Spring Boot 4.2 manages Flyway 12.11. Stay on the Boot-managed major until Boot moves. |
+| Artemis Jakarta client | 2.44.0 | 2.57.0 | Compose/K8s broker image is still `2.44.0-alpine` (no newer published tag). Keep the client matched to the broker. |
+| OTel Collector Contrib | 0.165.0 | 0.166.0-nightly | No stable `0.166.0` tag yet. |
+| Frontend lucide-react | ^1.76.0 | 1.77.0 | Registry advertises 1.77.0 but npm install currently fails with ETARGET; retry when the tarball is available. |
 | Maven Corretto builder image | 3.10.0-amazoncorretto-25 | Maven 3.10.1 | The registry had no 3.10.1 Corretto 25 variant. Builds already run Maven 3.10.1 through the wrapper. Update the base tag when the variant is published. |
 
 Third-party runtime images (Compose / Kubernetes) checked against registries on 2026-11-22: PostgreSQL `19.0-alpine`, MongoDB `9.0.8`, Redis `8.10.3-alpine`, Redpanda `v26.2.2`, Temporal CLI/dev `1.10.1`, Temporal `auto-setup` `1.29.7`, Artemis `2.44.0-alpine`, Jaeger `2.23.0`, Prometheus `v3.16.0`, Grafana `13.3.1`, Loki `3.7.10`, Alloy `v1.22.0`, OTel Collector Contrib `0.165.0`, Node Exporter `v1.13.1`, BusyBox `1.38.0`, Alpine `3.24.4`, Go `1.27.4-alpine`, Node `26.13.1`, Python `3.15.2-slim`, curl `8.23.0`, and Amazon Corretto `25-alpine` are on the latest published tags for their pinned lines.

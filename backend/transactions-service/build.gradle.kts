@@ -27,7 +27,7 @@ dependencyManagement {
 val avroTools by configurations.creating
 
 dependencies {
-    avroTools("org.apache.avro:avro-tools:1.12.1") { isTransitive = false }
+    avroTools("org.apache.avro:avro-tools:1.12.2") { isTransitive = false }
     implementation("org.springframework.boot:spring-boot-starter-oauth2-client")
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
@@ -54,7 +54,7 @@ dependencies {
     implementation("io.grpc:grpc-stub:1.85.1")
     implementation("com.google.protobuf:protobuf-java:4.36.2")
     implementation("org.springframework.boot:spring-boot-starter-kafka")
-    implementation("org.apache.avro:avro:1.12.1")
+    implementation("org.apache.avro:avro:1.12.2")
     developmentOnly("org.springframework.boot:spring-boot-devtools")
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testImplementation("org.springframework.security:spring-security-test")
