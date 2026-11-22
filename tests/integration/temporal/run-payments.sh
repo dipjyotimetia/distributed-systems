@@ -47,7 +47,8 @@ bash scripts/ci/docker-pull-retry.sh \
   docker.redpanda.com/redpandadata/redpanda:v26.2.2 \
   mongo:9.0.8 \
   redis:8.10.3-alpine \
-  jaegertracing/jaeger:2.23.0
+  jaegertracing/jaeger:2.23.0 \
+  otel/opentelemetry-collector-contrib:0.165.0
 infra_up() {
   local attempt=1
   while (( attempt <= 5 )); do
@@ -75,7 +76,7 @@ print(end.strftime("%H:%M"), end.date().isoformat())
 PY
 )
 export BANKING_SETTLEMENT_CUTOFF BANKING_SETTLEMENT_BUSINESS_DATE
-"${compose[@]}" up -d frontend payments-worker clearing-simulator notification-service jaeger
+"${compose[@]}" up -d frontend payments-worker clearing-simulator notification-service jaeger otel-collector
 export MICROSVC_FRONTEND="http://$("${compose[@]}" port frontend 3000)"
 export MICROSVC_GATEWAY="http://$("${compose[@]}" port api-gateway 8080)"
 export MICROSVC_NOTIFICATIONS="http://$("${compose[@]}" port notification-service 8080)"

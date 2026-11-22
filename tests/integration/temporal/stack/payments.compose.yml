@@ -38,3 +38,13 @@ services:
       banking-network: {}
       test-edge:
         gw_priority: 1
+  otel-collector:
+    container_name: !reset null
+    ports: !override
+      - "127.0.0.1::4317"
+      - "127.0.0.1::4318"
+      - "127.0.0.1::13133"
+    networks: !override
+      banking-network: {}
+      test-edge:
+        gw_priority: 1

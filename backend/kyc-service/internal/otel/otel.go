@@ -37,8 +37,9 @@ func Init(ctx context.Context, defaultService string) (func(context.Context) err
 			namespace = kv[1]
 		}
 	}
-	res, err := resource.Merge(resource.Default(), resource.NewWithAttributes(
-		semconv.SchemaURL,
+	// NewSchemaless avoids Schema URL conflicts with resource.Default()
+	// (SDK default schema vs pinned semconv import).
+	res, err := resource.Merge(resource.Default(), resource.NewSchemaless(
 		semconv.ServiceName(service),
 		semconv.ServiceNamespace(namespace),
 	))
