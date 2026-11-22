@@ -28,6 +28,7 @@ public class TransactionEventOutbox {
     private static final Logger logger = LoggerFactory.getLogger(TransactionEventOutbox.class);
     private static final W3CTraceContextPropagator W3C = W3CTraceContextPropagator.getInstance();
     private static final int ERROR_MAX_LEN = 1000;
+    private static final int BATCH_LIMIT = 20;
 
     private final JdbcTemplate jdbc;
     private final TransactionTemplate transaction;
@@ -84,7 +85,53 @@ public class TransactionEventOutbox {
                 FROM transactions_service.event_outbox
                 WHERE published_at IS NULL AND failed_at IS NULL
                 """, Double.class));
-        transaction.executeWithoutResult(status -> {
+        for (int i = 0; i < BATCH_LIMIT; i++) {
+            Pending event = claimNext();
+            if (event == null) {
+                return;
+            }
+            String destination = event.topic() == null ? topic : event.topic();
+            try {
+                byte[] value = encoder.encode(destination, event.payload());
+                String key = event.movementId() == null ? event.transactionId() : event.movementId();
+                ProducerRecord<String, byte[]> record = new ProducerRecord<>(destination, key, value);
+                if (event.traceParent() != null && !event.traceParent().isBlank()) {
+                    record.headers().add("traceparent", event.traceParent().getBytes(StandardCharsets.US_ASCII));
+                }
+                kafka.send(record).get(5, TimeUnit.SECONDS);
+            } catch (Exception failure) {
+                if (failure instanceof InterruptedException) {
+                    Thread.currentThread().interrupt();
+                }
+                boolean quarantinedRow = recordFailure(event, failure);
+                if (!quarantinedRow) {
+                    logger.warn("Transaction event outbox publish stopped at id {}: {}",
+                            event.id(), failure.toString());
+                    return;
+                }
+                continue;
+            }
+            markPublished(event.id());
+        }
+    }
+
+    @Scheduled(fixedDelayString = "${transactions.outbox.cleanup-delay-ms:3600000}")
+    public void cleanupPublished() {
+        int removed = jdbc.update("""
+                DELETE FROM transactions_service.event_outbox
+                WHERE (published_at IS NOT NULL
+                       AND published_at < CURRENT_TIMESTAMP - CAST(? AS INT) * INTERVAL '1 day')
+                   OR (failed_at IS NOT NULL
+                       AND failed_at < CURRENT_TIMESTAMP - CAST(? AS INT) * INTERVAL '1 day')
+                """, retentionDays, retentionDays);
+        if (removed > 0) {
+            logger.info("Removed {} settled transaction outbox row(s) older than {} day(s)",
+                    removed, retentionDays);
+        }
+    }
+
+    private Pending claimNext() {
+        return transaction.execute(status -> {
             List<Pending> pending = jdbc.query("""
                     SELECT e.id, e.transaction_id, e.movement_id, e.topic, e.payload, e.trace_parent,
                            e.publish_attempts
@@ -93,76 +140,45 @@ public class TransactionEventOutbox {
                         SELECT 1 FROM transactions_service.movement_decisions d
                         WHERE d.ledger_id = e.transaction_id AND NOT d.finalized
                     )
-                    ORDER BY e.id LIMIT 20
+                    ORDER BY e.id LIMIT 1
                     FOR UPDATE OF e SKIP LOCKED
                     """, (rs, row) -> new Pending(rs.getLong("id"),
                     rs.getString("transaction_id"), rs.getString("movement_id"), rs.getString("topic"),
                     rs.getString("payload"), rs.getString("trace_parent"), rs.getInt("publish_attempts")));
-            for (Pending event : pending) {
-                String destination = event.topic() == null ? topic : event.topic();
-                try {
-                    byte[] value = encoder.encode(destination, event.payload());
-                    String key = event.movementId() == null ? event.transactionId() : event.movementId();
-                    ProducerRecord<String, byte[]> record = new ProducerRecord<>(destination, key, value);
-                    if (event.traceParent() != null && !event.traceParent().isBlank()) {
-                        record.headers().add("traceparent", event.traceParent().getBytes(StandardCharsets.US_ASCII));
-                    }
-                    kafka.send(record).get(5, TimeUnit.SECONDS);
-                } catch (Exception failure) {
-                    if (failure instanceof InterruptedException) {
-                        Thread.currentThread().interrupt();
-                    }
-                    recordFailure(event, failure);
-                    if (event.publishAttempts() + 1 < maxAttempts) {
-                        logger.warn("Transaction event outbox publish stopped at id {}: {}",
-                                event.id(), failure.toString());
-                        return;
-                    }
-                    continue;
-                }
-                jdbc.update("""
-                        UPDATE transactions_service.event_outbox SET published_at = CURRENT_TIMESTAMP
-                        WHERE id = ? AND published_at IS NULL
-                        """, event.id());
-            }
+            return pending.isEmpty() ? null : pending.getFirst();
         });
     }
 
-    @Scheduled(fixedDelayString = "${transactions.outbox.cleanup-delay-ms:3600000}")
-    public void cleanupPublished() {
-        if (!publishEnabled) {
-            return;
-        }
-        int removed = jdbc.update("""
-                DELETE FROM transactions_service.event_outbox
-                WHERE published_at IS NOT NULL
-                  AND published_at < CURRENT_TIMESTAMP - CAST(? AS INT) * INTERVAL '1 day'
-                """, retentionDays);
-        if (removed > 0) {
-            logger.info("Removed {} published transaction outbox row(s) older than {} day(s)",
-                    removed, retentionDays);
-        }
+    private void markPublished(long id) {
+        transaction.executeWithoutResult(status -> jdbc.update("""
+                UPDATE transactions_service.event_outbox SET published_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND published_at IS NULL
+                """, id));
     }
 
-    private void recordFailure(Pending event, Exception failure) {
+    /** @return true when the row was quarantined */
+    private boolean recordFailure(Pending event, Exception failure) {
         int attempts = event.publishAttempts() + 1;
         String error = truncate(failure.toString());
-        if (attempts >= maxAttempts) {
+        return Boolean.TRUE.equals(transaction.execute(status -> {
+            if (attempts >= maxAttempts) {
+                jdbc.update("""
+                        UPDATE transactions_service.event_outbox
+                        SET publish_attempts = ?, last_error = ?, failed_at = CURRENT_TIMESTAMP
+                        WHERE id = ? AND published_at IS NULL AND failed_at IS NULL
+                        """, attempts, error, event.id());
+                quarantined.increment();
+                logger.error("Transaction event outbox quarantined id {} after {} attempt(s): {}",
+                        event.id(), attempts, error);
+                return true;
+            }
             jdbc.update("""
                     UPDATE transactions_service.event_outbox
-                    SET publish_attempts = ?, last_error = ?, failed_at = CURRENT_TIMESTAMP
+                    SET publish_attempts = ?, last_error = ?
                     WHERE id = ? AND published_at IS NULL AND failed_at IS NULL
                     """, attempts, error, event.id());
-            quarantined.increment();
-            logger.error("Transaction event outbox quarantined id {} after {} attempt(s): {}",
-                    event.id(), attempts, error);
-            return;
-        }
-        jdbc.update("""
-                UPDATE transactions_service.event_outbox
-                SET publish_attempts = ?, last_error = ?
-                WHERE id = ? AND published_at IS NULL AND failed_at IS NULL
-                """, attempts, error, event.id());
+            return false;
+        }));
     }
 
     private static String truncate(String value) {

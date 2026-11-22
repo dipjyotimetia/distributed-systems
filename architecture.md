@@ -66,8 +66,9 @@ schema as private and should not read another service's tables.
 Completed ledger movements record an `Idempotency-Key` when the client sends
 one, and write `transaction-events` through `transactions_service.event_outbox`
 in the same database transaction as the ledger row. The outbox publisher claims
-rows with `FOR UPDATE SKIP LOCKED`, quarantines poison payloads after repeated
-failures (`failed_at`), and retains published rows only for a configured window.
+one row at a time with a short `FOR UPDATE SKIP LOCKED` transaction (Kafka I/O
+outside the lock), quarantines poison payloads after repeated failures
+(`failed_at`), and deletes published/quarantined rows after a retention window.
 `movement-lifecycle-v1` remains for external consumers (dedupe by `eventId`);
 notification-service consumes `transaction-events` and, on the payments overlay,
 `payment-events.v1`. Fraud screening fails open unless `FRAUD_FAIL_OPEN=false`.

@@ -180,9 +180,10 @@ flowchart TB
 
 Producers write outbox rows in the same database transaction as the domain write, then a
 scheduled relay publishes with broker ack before marking `published_at`. Transactions-service
-claims with `FOR UPDATE SKIP LOCKED`, quarantines poison rows after
-`TRANSACTIONS_OUTBOX_MAX_ATTEMPTS`, and deletes published rows after
-`TRANSACTIONS_OUTBOX_RETENTION_DAYS` (payments-worker uses `PAYMENTS_OUTBOX_RETENTION_DAYS`).
+claims one row per short `FOR UPDATE SKIP LOCKED` transaction (Kafka I/O outside the lock),
+quarantines poison rows after `TRANSACTIONS_OUTBOX_MAX_ATTEMPTS`, and deletes published and
+quarantined rows after `TRANSACTIONS_OUTBOX_RETENTION_DAYS` (payments-worker uses
+`PAYMENTS_OUTBOX_RETENTION_DAYS`; cleanup runs even when publish is off).
 `movement-lifecycle-v1` has no in-repo consumer yet—external consumers should dedupe by
 `eventId`. See [`contracts/avro/`](contracts/avro/README.md) and
 [`docs/money-movement-recovery.md`](docs/money-movement-recovery.md).
