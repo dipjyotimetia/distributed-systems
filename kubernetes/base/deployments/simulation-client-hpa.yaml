@@ -4,7 +4,7 @@ metadata:
   name: simulation-client-hpa
   namespace: banking-app
   labels:
-    app: simulation-client
+    app: banking-sim
     component: autoscaler
 spec:
   scaleTargetRef:

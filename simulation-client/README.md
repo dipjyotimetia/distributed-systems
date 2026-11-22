@@ -8,10 +8,13 @@ A Node.js application that continuously simulates realistic user interactions wi
 - **Pre-existing User Pool**: 80% of traffic uses seeded simulation users, 20% creates new users
 - **Realistic Workflows**: Mimics real user behavior with appropriate delays and actions
 - **Configurable Load**: Adjustable concurrent users, session duration, and transaction patterns
-- **OpenTelemetry Integration**: Full observability with distributed tracing
-- **Workflow mix**: A small share of sessions file a dispute, queue a statement job, and, when `PAYMENTS_ENABLED=true`, submit an outbound payment
-- **Kubernetes Ready**: Production-ready container with resource constraints
+- **Organic burst traffic**: Mean-reverting concurrency with random spikes (`TRAFFIC_*` env vars)
+- **OpenTelemetry Integration**: Full observability with distributed tracing (OTLP HTTP)
+- **Workflow mix**: A small share of sessions file a dispute, queue a statement job, hit AI chat via the frontend BFF (`/api/v1/ai/chat`), and, when `PAYMENTS_ENABLED=true`, submit an outbound payment
+- **Kubernetes Ready**: Deployed as `banking-sim` with resource constraints
 - **Graceful Shutdown**: Proper signal handling and session cleanup
+
+This client generates **live** traffic against a running stack. Offline proxymock replay fixtures live under `backend/*/proxymock/` and are unrelated — they do not record from or depend on simulation-client.
 
 ## Architecture
 
@@ -107,11 +110,23 @@ The simulation client is configured via environment variables:
 - `TARGET_BASE_URL`: Banking application URL
 
 ### Simulation Settings
-- `CONCURRENT_USERS`: Number of concurrent user sessions (default: 10)
+- `CONCURRENT_USERS`: Number of concurrent user sessions when burst mode is off (default: 10)
 - `EXISTING_USER_PERCENTAGE`: Percentage using pre-existing users (default: 80)
-- `SESSION_DURATION_MS`: Average session duration (default: 300000ms/5min)
+- `SESSION_DURATION_MS`: Configured session duration hint (default: 300000ms/5min)
 - `MIN_ACTION_DELAY`/`MAX_ACTION_DELAY`: Delays between user actions
 - `NEW_USER_DELAY`: Delay between starting new sessions
+
+### Organic traffic (burst) Settings
+When `BURST_ENABLED=true` (default), concurrency follows a mean-reverting random walk with occasional spikes — not a fixed square-wave pulse:
+- `BURST_BASE_USERS` / `BURST_PEAK_USERS`: concurrency floor and ceiling
+- `TRAFFIC_MEAN_USERS`: level the walk reverts toward
+- `TRAFFIC_REVERSION` / `TRAFFIC_VOLATILITY`: reversion strength and step size
+- `TRAFFIC_UPDATE_MS` / `TRAFFIC_UPDATE_JITTER`: how often concurrency updates
+- `TRAFFIC_SPIKE_CHANCE` / `TRAFFIC_SPIKE_MAG`: per-update spike probability and magnitude
+
+### Feature toggles
+- `AI_CHAT_ENABLED`, `EXPORT_STATEMENT_ENABLED`, `DISPUTES_ENABLED`, `STATEMENT_JOBS_ENABLED` (default true)
+- `PAYMENTS_ENABLED` (default false — payments overlay only)
 
 ### Transaction Settings
 - `DEPOSIT_PROBABILITY`: Probability of making deposits (default: 0.3)
@@ -242,10 +257,10 @@ make docker-build
 make k8s-logs
 
 # Filter for errors
-kubectl logs -l app=simulation-client -n banking-app | grep ERROR
+kubectl logs -l app=banking-sim -n banking-app | grep ERROR
 
 # Filter for specific user sessions
-kubectl logs -l app=simulation-client -n banking-app | grep "session_"
+kubectl logs -l app=banking-sim -n banking-app | grep "session_"
 ```
 
 ## Production Considerations

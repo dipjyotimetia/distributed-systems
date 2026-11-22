@@ -4,7 +4,7 @@ metadata:
   name: banking-sim-config
   namespace: banking-app
   labels:
-    app: simulation-client
+    app: banking-sim
     component: config
 data:
   # Application configuration
@@ -27,13 +27,17 @@ data:
   MAX_RETRIES: "3"
   RETRY_DELAY: "1000"
 
-  # Burst mode: quiet baseline with periodic traffic spikes
+  # Organic traffic model (Ornstein–Uhlenbeck random walk + spikes)
   BURST_ENABLED: "true"
-  BURST_BASE_USERS: "2"           # quiet: 2 concurrent users
-  BURST_PEAK_USERS: "12"          # spike: 12 concurrent users
-  BURST_INTERVAL_MS: "180000"     # ~3 min between bursts
-  BURST_DURATION_MS: "30000"      # each burst lasts ~30s
-  BURST_JITTER_MS: "60000"        # ±60s randomness on interval
+  BURST_BASE_USERS: "2"           # concurrency floor
+  BURST_PEAK_USERS: "12"          # concurrency ceiling
+  TRAFFIC_MEAN_USERS: "5"         # level the walk reverts toward
+  TRAFFIC_REVERSION: "0.25"       # pull toward mean (0–1)
+  TRAFFIC_VOLATILITY: "2.2"       # random step size per update
+  TRAFFIC_UPDATE_MS: "5000"        # how often concurrency changes
+  TRAFFIC_UPDATE_JITTER: "0.5"      # ±50% on update cadence
+  TRAFFIC_SPIKE_CHANCE: "0.07"    # per-update probability of a spike
+  TRAFFIC_SPIKE_MAG: "8"          # max extra users on a spike
 
   # Per session, chance of running one injected "unhappy path". One of five is the
   # null-description deposit (the Replay Lab 400 fixture), so failing deposits land
@@ -59,10 +63,10 @@ data:
   AI_CHAT_ENABLED: "true"
   EXPORT_STATEMENT_ENABLED: "true"
 
-  # OpenTelemetry configuration
+  # OpenTelemetry configuration (simulation-client uses OTLP HTTP exporter)
   OTEL_SERVICE_NAME: "simulation-client"
-  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector.observability:4317"
-  OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector.observability:4318"
+  OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf"
   OTEL_TRACES_EXPORTER: "otlp"
   OTEL_METRICS_EXPORTER: "otlp"
   OTEL_LOGS_EXPORTER: "otlp"

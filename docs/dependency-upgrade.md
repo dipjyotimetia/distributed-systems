@@ -20,7 +20,7 @@ Redpanda is the Kafka-compatible broker for Compose, Kubernetes, and the integra
 
 Third-party runtime images (Compose / Kubernetes) checked against registries on 2026-11-22: PostgreSQL `19.0-alpine`, MongoDB `9.0.8`, Redis `8.10.3-alpine`, Redpanda `v26.2.2`, Temporal CLI/dev `1.10.1`, Temporal `auto-setup` `1.29.7`, Artemis `2.44.0-alpine`, Jaeger `2.23.0`, Prometheus `v3.16.0`, Grafana `13.3.1`, Loki `3.7.10`, Alloy `v1.22.0`, OTel Collector Contrib `0.165.0`, Node Exporter `v1.13.1`, BusyBox `1.38.0`, Alpine `3.24.4`, Go `1.27.4-alpine`, Node `26.13.1`, Python `3.15.2-slim`, curl `8.23.0`, and Amazon Corretto `25-alpine` are on the latest published tags for their pinned lines.
 
-`simulation-client/go.mod` is an unused manifest. The directory has no Go source and its entry points use Node.js. Production npm audits were clear. The Python, NuGet, and final Maven audits reported no known findings. Go scans reported no reachable findings in the services or Temporal harness. Full frontend and simulation audits still report moderate findings in development dependencies, mainly Jest's glob/minimatch chain. Update the test toolchain when it resolves patched releases within supported dependency ranges.
+`simulation-client` is Node.js only (the unused `go.mod` was removed). Production npm audits were clear. The Python, NuGet, and final Maven audits reported no known findings. Go scans reported no reachable findings in the services or Temporal harness. Full frontend and simulation audits still report moderate findings in development dependencies, mainly Jest's glob/minimatch chain. Update the test toolchain when it resolves patched releases within supported dependency ranges.
 
 ## Stateful upgrade evidence
 

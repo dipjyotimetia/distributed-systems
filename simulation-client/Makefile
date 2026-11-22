@@ -14,6 +14,8 @@ PLATFORM = linux/amd64,linux/arm64
 # Kubernetes configuration
 NAMESPACE = banking-app
 KUSTOMIZE_DIR = ../kubernetes/base
+DEPLOYMENT = banking-sim
+APP_LABEL = banking-sim
 
 .PHONY: help
 help: ## Show this help message
@@ -99,34 +101,34 @@ k8s-apply: ## Apply Kubernetes manifests (deploys entire banking app including s
 .PHONY: k8s-delete
 k8s-delete: ## Delete Kubernetes resources (simulation client only)
 	@echo "Deleting simulation client resources..."
-	kubectl delete deployment simulation-client -n $(NAMESPACE) --ignore-not-found=true
-	kubectl delete configmap simulation-client-config -n $(NAMESPACE) --ignore-not-found=true
-	kubectl delete secret simulation-client-secret -n $(NAMESPACE) --ignore-not-found=true
+	kubectl delete deployment $(DEPLOYMENT) -n $(NAMESPACE) --ignore-not-found=true
+	kubectl delete configmap banking-sim-config -n $(NAMESPACE) --ignore-not-found=true
+	kubectl delete secret banking-sim-secret -n $(NAMESPACE) --ignore-not-found=true
 	kubectl delete hpa simulation-client-hpa -n $(NAMESPACE) --ignore-not-found=true
 
 .PHONY: k8s-restart
 k8s-restart: ## Restart Kubernetes deployment
-	kubectl rollout restart deployment/simulation-client -n $(NAMESPACE)
+	kubectl rollout restart deployment/$(DEPLOYMENT) -n $(NAMESPACE)
 
 .PHONY: k8s-status
 k8s-status: ## Show Kubernetes deployment status
 	@echo "Simulation Client deployment status:"
-	kubectl get pods -l app=simulation-client -n $(NAMESPACE)
+	kubectl get pods -l app=$(APP_LABEL) -n $(NAMESPACE)
 	@echo ""
 	@echo "Recent events:"
-	kubectl get events --field-selector involvedObject.name=simulation-client -n $(NAMESPACE) --sort-by='.lastTimestamp' | tail -5
+	kubectl get events --field-selector involvedObject.name=$(DEPLOYMENT) -n $(NAMESPACE) --sort-by='.lastTimestamp' | tail -5
 
 .PHONY: k8s-logs
 k8s-logs: ## Show Kubernetes pod logs
-	kubectl logs -l app=simulation-client -n $(NAMESPACE) --tail=100 -f
+	kubectl logs -l app=$(APP_LABEL) -n $(NAMESPACE) --tail=100 -f
 
 .PHONY: k8s-describe
 k8s-describe: ## Describe Kubernetes deployment
-	kubectl describe deployment simulation-client -n $(NAMESPACE)
+	kubectl describe deployment $(DEPLOYMENT) -n $(NAMESPACE)
 
 .PHONY: k8s-scale
 k8s-scale: ## Scale deployment (usage: make k8s-scale REPLICAS=3)
-	kubectl scale deployment simulation-client --replicas=$(REPLICAS) -n $(NAMESPACE)
+	kubectl scale deployment $(DEPLOYMENT) --replicas=$(REPLICAS) -n $(NAMESPACE)
 
 # Database migration targets
 .PHONY: migrate-simulation-users
@@ -144,58 +146,86 @@ check-simulation-users: ## Check if simulation users exist
 # Monitoring targets
 .PHONY: metrics
 metrics: ## Show simulation metrics from logs
-	kubectl logs -l app=simulation-client -n $(NAMESPACE) --tail=50 | grep -E "(metrics|session|transaction)"
+	kubectl logs -l app=$(APP_LABEL) -n $(NAMESPACE) --tail=50 | grep -E "(metrics|session|transaction)"
 
 .PHONY: health
 health: ## Check simulation client health
 	@echo "Checking simulation client health..."
-	kubectl get pods -l app=simulation-client -n $(NAMESPACE)
+	kubectl get pods -l app=$(APP_LABEL) -n $(NAMESPACE)
 
 # Environment setup
 .PHONY: env-example
 env-example: ## Create example environment file
 	@echo "Creating .env.example file..."
 	@cat > .env.example << 'EOF'
-	# Application settings
-	NODE_ENV=development
-	LOG_LEVEL=info
-	LOG_FORMAT=json
-	
-	# Target application
-	TARGET_BASE_URL=http://localhost:3000
-	REQUEST_TIMEOUT=10000
-	
-	# Simulation settings
-	CONCURRENT_USERS=3
-	EXISTING_USER_PERCENTAGE=80
-	SESSION_DURATION_MS=300000
-	MIN_ACTION_DELAY=1000
-	MAX_ACTION_DELAY=5000
-	NEW_USER_DELAY=2000
-	MAX_RETRIES=3
-	RETRY_DELAY=1000
-	
-	# User pool
-	TOTAL_USERS=1000
-	SIM_USER_PASSWORD=SimUser123!
-	
-	# Transaction simulation
-	DEPOSIT_PROBABILITY=0.3
-	WITHDRAWAL_PROBABILITY=0.2
-	TRANSFER_PROBABILITY=0.1
-	MIN_DEPOSIT=10.00
-	MAX_DEPOSIT=1000.00
-	MIN_WITHDRAWAL=5.00
-	MAX_WITHDRAWAL=500.00
-	MIN_TRANSFER=10.00
-	MAX_TRANSFER=250.00
-	
-	# OpenTelemetry
-	OTEL_SERVICE_NAME=simulation-client
-	OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
-	OTEL_EXPORTER_OTLP_PROTOCOL=grpc
-	METRICS_INTERVAL=30000
-	EOF
+# Application settings
+NODE_ENV=development
+LOG_LEVEL=info
+LOG_FORMAT=json
+
+# Target application
+TARGET_BASE_URL=http://localhost:3000
+NOTIFICATION_SERVICE_URL=http://localhost:8085
+REQUEST_TIMEOUT=10000
+
+# Simulation settings
+CONCURRENT_USERS=3
+EXISTING_USER_PERCENTAGE=80
+SESSION_DURATION_MS=300000
+MIN_ACTION_DELAY=1000
+MAX_ACTION_DELAY=5000
+NEW_USER_DELAY=2000
+MAX_RETRIES=3
+RETRY_DELAY=1000
+
+# Organic traffic model (Ornstein–Uhlenbeck)
+BURST_ENABLED=true
+BURST_BASE_USERS=2
+BURST_PEAK_USERS=12
+TRAFFIC_MEAN_USERS=5
+TRAFFIC_REVERSION=0.25
+TRAFFIC_VOLATILITY=2.2
+TRAFFIC_UPDATE_MS=5000
+TRAFFIC_UPDATE_JITTER=0.5
+TRAFFIC_SPIKE_CHANCE=0.07
+TRAFFIC_SPIKE_MAG=8
+
+# Error injection
+ERROR_INJECTION_ENABLED=true
+ERROR_INJECTION_PROBABILITY=0.05
+ERROR_SPIKE_ENABLED=true
+ERROR_SPIKE_PROBABILITY=0.6
+ERROR_SPIKE_MINUTES=10,40
+ERROR_SPIKE_DURATION=2
+
+# Feature toggles
+AI_CHAT_ENABLED=true
+EXPORT_STATEMENT_ENABLED=true
+DISPUTES_ENABLED=true
+STATEMENT_JOBS_ENABLED=true
+PAYMENTS_ENABLED=false
+
+# User pool
+TOTAL_USERS=1000
+SIM_USER_PASSWORD=SimUser123!
+
+# Transaction simulation
+DEPOSIT_PROBABILITY=0.3
+WITHDRAWAL_PROBABILITY=0.2
+TRANSFER_PROBABILITY=0.1
+MIN_DEPOSIT=10.00
+MAX_DEPOSIT=1000.00
+MIN_WITHDRAWAL=5.00
+MAX_WITHDRAWAL=500.00
+MIN_TRANSFER=10.00
+MAX_TRANSFER=250.00
+
+# OpenTelemetry (OTLP HTTP — matches tracing.js)
+OTEL_SERVICE_NAME=simulation-client
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+METRICS_INTERVAL=30000
+EOF
 
 # All-in-one targets
 .PHONY: build-and-deploy

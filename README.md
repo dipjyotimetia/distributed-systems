@@ -317,15 +317,14 @@ protoc-gen-go 1.36.12.
 
 ### CI Replay Validation
 
-The required `proxymock-validation` CI job checks user-service against the recordings in `backend/user-service/proxymock/recorded-complete/`. Run the same check locally from the repository root:
+Proxymock is an **offline** recording-driven integration path (Speedscale CLI). It is independent of `simulation-client`, which only generates live Kubernetes load. Checked-in fixtures today cover:
 
-```bash
-make proxymock-validation
-# If local Postgres occupies port 5432:
-make proxymock-validation-docker
-```
+| Service | Fixtures | Local command |
+|---------|----------|---------------|
+| `user-service` | `backend/user-service/proxymock/recorded-complete/` | `make proxymock-validation` (or `make proxymock-validation-docker` if port 5432 is busy) |
+| `api-gateway` | `backend/api-gateway/proxymock/recorded-golden/` | `make proxymock-replay` |
 
-These fixtures and validation scripts support application tests. Keep optional recordings, standalone traffic-analysis tools, and internal demonstration workflows outside this repository.
+The required `proxymock-validation` and `replay-gate` CI jobs consume those fixtures. Keep optional recordings, standalone traffic-analysis tools, and internal demonstration workflows outside this repository.
 
 ## Key Features
 
