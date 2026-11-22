@@ -134,7 +134,7 @@ jobs:
           "$RUNNER_TEMP/movement-contract/bin/pip" install openapi-spec-validator==0.7.2 openapi-schema-validator==0.6.3
           "$RUNNER_TEMP/movement-contract/bin/python" scripts/check-movement-contract.py
       - name: Cache openapi-generator CLI
-        uses: actions/cache@v4
+        uses: actions/cache@v6.1.0
         with:
           path: ~/.cache/openapi-generator
           key: openapi-generator-cli-7.14.0
