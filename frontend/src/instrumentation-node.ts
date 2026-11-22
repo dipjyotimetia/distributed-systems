@@ -102,13 +102,13 @@ export async function registerNode() {
 
     process.on('SIGTERM', () => {
       log('Shutting down OpenTelemetry tracer provider...');
-      tracerProvider
+      // Flush spans only; let Next.js finish in-flight requests and exit.
+      void tracerProvider
         .shutdown()
         .then(() => log('OpenTelemetry tracer provider shutdown successfully'))
         .catch(error =>
           log('Error shutting down OpenTelemetry tracer provider:', error),
-        )
-        .finally(() => process.exit(0));
+        );
     });
 
     const getCurrentTraceContext = () => {

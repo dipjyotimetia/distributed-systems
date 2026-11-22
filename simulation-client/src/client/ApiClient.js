@@ -221,7 +221,7 @@ class ApiClient {
   // Raw request without retry — used for error injection so 5xx responses
   // are not amplified by the retry loop.
   async rawRequest(method, path, data, token) {
-    const headers = { 'Content-Type': 'application/json' };
+    const headers = injectTraceHeaders({ 'Content-Type': 'application/json' });
     if (token) headers.Authorization = `Bearer ${token}`;
     return this.client.request({ method, url: path, data, headers });
   }

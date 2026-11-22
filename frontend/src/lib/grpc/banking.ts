@@ -38,16 +38,23 @@ function endpoint(address: string, tls: boolean) {
 
 function transport(address: string, serverName: string) {
   const tls = process.env.MTLS_ENABLED === 'true';
+  if (!tls) {
+    return createGrpcTransport({ baseUrl: endpoint(address, false) });
+  }
+  const ca = process.env.MTLS_CA;
+  const key = process.env.MTLS_KEY;
+  const cert = process.env.MTLS_CERT;
+  if (!ca || !key || !cert) {
+    throw new Error('MTLS_ENABLED requires MTLS_CA, MTLS_KEY, and MTLS_CERT');
+  }
   return createGrpcTransport({
-    baseUrl: endpoint(address, tls),
-    nodeOptions: tls
-      ? {
-          ca: fs.readFileSync(/*turbopackIgnore: true*/ process.env.MTLS_CA || ''),
-          key: fs.readFileSync(/*turbopackIgnore: true*/ process.env.MTLS_KEY || ''),
-          cert: fs.readFileSync(/*turbopackIgnore: true*/ process.env.MTLS_CERT || ''),
-          servername: serverName,
-        }
-      : undefined,
+    baseUrl: endpoint(address, true),
+    nodeOptions: {
+      ca: fs.readFileSync(/*turbopackIgnore: true*/ ca),
+      key: fs.readFileSync(/*turbopackIgnore: true*/ key),
+      cert: fs.readFileSync(/*turbopackIgnore: true*/ cert),
+      servername: serverName,
+    },
   });
 }
 

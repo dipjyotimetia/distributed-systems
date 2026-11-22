@@ -26,7 +26,7 @@ async function forward(
   const authorization = request.headers.get('authorization');
   if (!authorization) return new NextResponse(null, { status: 401 });
   headers.set('authorization', authorization);
-  proxy = withTraceparent(request, headers, 'frontend.proxy');
+  const proxy = withTraceparent(request, headers, 'frontend.proxy');
 
   try {
     let body: Uint8Array<ArrayBuffer> | undefined;
@@ -35,14 +35,21 @@ async function forward(
         request.headers.get('content-type')?.split(';')[0].trim() !==
         'application/json'
       ) {
+        proxy.end(415);
         return new NextResponse(null, { status: 415 });
       }
       const key = request.headers.get('idempotency-key');
-      if (!key) return new NextResponse(null, { status: 400 });
+      if (!key) {
+        proxy.end(400);
+        return new NextResponse(null, { status: 400 });
+      }
       headers.set('idempotency-key', key);
       headers.set('content-type', 'application/json');
       const reader = request.body?.getReader();
-      if (!reader) return new NextResponse(null, { status: 400 });
+      if (!reader) {
+        proxy.end(400);
+        return new NextResponse(null, { status: 400 });
+      }
       body = new Uint8Array(maxRequestBytes);
       let filled = 0;
       for (;;) {
@@ -50,6 +57,7 @@ async function forward(
         if (done) break;
         if (filled + value.byteLength > maxRequestBytes) {
           void reader.cancel().catch(() => undefined);
+          proxy.end(413);
           return new NextResponse(null, { status: 413 });
         }
         body.set(value, filled);
@@ -79,7 +87,7 @@ async function forward(
       headers: resultHeaders,
     });
   } catch (error) {
-    proxy?.end(undefined, error);
+    proxy.end(undefined, error);
     return NextResponse.json(
       { message: 'Payments are temporarily unavailable' },
       { status: 502 },

@@ -28,6 +28,7 @@ export async function forwardFinancialRequest(
         .trim();
       const reader = request.body?.getReader();
       if (mediaType !== 'application/json' || !reader) {
+        proxy.end(400);
         return NextResponse.json({ code: 'INVALID_INPUT' }, { status: 400 });
       }
       headers.set('content-type', mediaType);
@@ -38,6 +39,7 @@ export async function forwardFinancialRequest(
         if (done) break;
         if (length + value.byteLength > bodyLimit) {
           void reader.cancel().catch(() => undefined);
+          proxy.end(400);
           return NextResponse.json({ code: 'INVALID_INPUT' }, { status: 400 });
         }
         body.set(value, length);
