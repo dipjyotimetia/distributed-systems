@@ -1,5 +1,5 @@
 # Multi-stage build for API Gateway
-FROM --platform=$BUILDPLATFORM amazoncorretto:25 AS builder
+FROM --platform=$BUILDPLATFORM amazoncorretto:27 AS builder
 RUN yum install -y findutils && yum clean all
 WORKDIR /app
 COPY gradlew settings.gradle.kts build.gradle.kts gradle.properties ./
@@ -16,7 +16,7 @@ RUN --mount=type=cache,id=gradle-api-gateway-${GRADLE_CACHE_SUFFIX},target=/root
     sh scripts/docker-bootjar.sh :api-gateway:bootJar
 RUN java -Djarmode=tools -jar backend/api-gateway/build/libs/application.jar extract --layers --destination extracted
 
-FROM --platform=$TARGETPLATFORM amazoncorretto:25-alpine@sha256:1124f698f69d2185828dbd1a1ebeb9aee21884ac64bed7af3deeafd20b21a9dc
+FROM --platform=$TARGETPLATFORM amazoncorretto:27-alpine@sha256:2a1963f0f2748128ca5ca81cc9ea69f26f1af4be481997afb04e8fb32f19aa4f
 
 WORKDIR /app
 
