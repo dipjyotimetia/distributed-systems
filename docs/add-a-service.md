@@ -1,6 +1,6 @@
 # Add a service
 
-Use this when the playground needs another backend. Cards and KYC are Go gRPC services. Their mutual TLS overlay is `docker-compose.mtls.yml`.
+Use this when the playground needs another backend. Cards and KYC are Go gRPC services. Their mutual TLS overlay is `docker-compose.mtls.yml`. `knowledge-service` is the Python FastAPI document vault + retrieval example (MinIO/S3, fixture embeddings, MCP via the official [python-sdk](https://github.com/modelcontextprotocol/python-sdk)). Python services use **uv** only (`pyproject.toml` + `uv.lock`, `uv sync` / `uv run` in Docker and CI — no pip/`requirements.txt`).
 
 ## 1. Code and contract
 

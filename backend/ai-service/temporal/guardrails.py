@@ -18,6 +18,8 @@ ALLOWED_TOOLS = frozenset(
         "list_transactions",
         "get_kyc_status",
         "get_dispute_status",
+        "search_knowledge",
+        "get_document_excerpt",
     }
 )
 

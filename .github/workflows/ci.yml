@@ -47,6 +47,7 @@ jobs:
           CREATE SCHEMA IF NOT EXISTS accounts_service;
           CREATE SCHEMA IF NOT EXISTS transactions_service;
           CREATE SCHEMA IF NOT EXISTS payments;
+          CREATE SCHEMA IF NOT EXISTS knowledge_service;
         "
         createdb -h localhost -U postgres microsvc_accounts_test
         createdb -h localhost -U postgres microsvc_transactions_test
@@ -150,11 +151,14 @@ jobs:
         go-version-file: backend/notification-service/go.mod
         cache-dependency-path: backend/notification-service/go.sum
 
-    - name: Set up Python
+    - name: Set up uv (Python services)
       if: matrix.service == 'ai-service'
-      uses: actions/setup-python@v7.1.0
+      uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
       with:
-        python-version: '3.12'
+        version: "0.11.9"
+        enable-cache: true
+        python-version: "3.15.2"
+        cache-dependency-glob: backend/ai-service/uv.lock
 
     - name: Replay WireMock suite for ${{ matrix.service }}
       env:
@@ -245,6 +249,7 @@ jobs:
           - transactions-service
           - api-gateway
           - ai-service
+          - knowledge-service
           - frontend
           - simulation-client
           - fraud-service

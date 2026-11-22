@@ -15,6 +15,7 @@ These capabilities landed after the numbered Phase 9 checklist and are part of t
 - **Optional payments** — Compose/K8s overlays with Artemis clearing and reconciliation
 - **Provider isolation** — `kubernetes/overlays/provider-isolation` with first-party `provider-fixtures` (Speedscale removed)
 - **Offline replay** — WireMock request suites under `tests/replay/` for api-gateway and user-service CI gates
+- **Knowledge vault** — `knowledge-service` document store + fixture embeddings, AI `search_knowledge` / `get_document_excerpt` tools, thin MCP stdio server
 
 ## Phase 1: Project Setup & Infrastructure ✅ COMPLETED
 - [x] Create monorepo structure with backend services, frontend, and infrastructure directories

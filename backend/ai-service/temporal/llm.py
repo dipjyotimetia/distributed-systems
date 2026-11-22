@@ -80,6 +80,40 @@ READ_ONLY_TOOLS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "search_knowledge",
+            "description": "Search bank policy and owned documents (RAG). Use for dispute timeframes, KYC checklists, and evidence.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string"},
+                    "doc_type": {
+                        "type": "string",
+                        "enum": ["POLICY", "KYC_EVIDENCE", "DISPUTE_EVIDENCE", "STATEMENT", "OTHER"],
+                    },
+                    "limit": {"type": "integer", "default": 5},
+                },
+                "required": ["query"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_document_excerpt",
+            "description": "Fetch a citable excerpt for a knowledge document id returned by search_knowledge.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "document_id": {"type": "string"},
+                    "max_chars": {"type": "integer", "default": 1200},
+                },
+                "required": ["document_id"],
+            },
+        },
+    },
 ]
 
 
@@ -162,7 +196,7 @@ def _fixture_reply(req: LlmRequest) -> LlmResponse:
             }
         )
         content = ""
-    elif "dispute" in lowered:
+    elif "dispute" in lowered and "timeframe" not in lowered and "policy" not in lowered:
         tool_calls.append(
             {
                 "id": "call_fixture_dispute",
@@ -170,6 +204,18 @@ def _fixture_reply(req: LlmRequest) -> LlmResponse:
                 "function": {
                     "name": "get_dispute_status",
                     "arguments": json.dumps({"case_id": 1}),
+                },
+            }
+        )
+        content = ""
+    elif any(word in lowered for word in ("policy", "timeframe", "kyc document", "knowledge")):
+        tool_calls.append(
+            {
+                "id": "call_fixture_knowledge",
+                "type": "function",
+                "function": {
+                    "name": "search_knowledge",
+                    "arguments": json.dumps({"query": last_user[:200], "doc_type": "POLICY", "limit": 3}),
                 },
             }
         )

@@ -19,6 +19,7 @@ with workflow.unsafe.imports_passed_through():
         LlmMessage,
         LlmRequest,
         LlmResponse,
+        ToolResult,
     )
     from temporal.structured import DISPUTE_DRAFT_SCHEMA, draft_to_dict, parse_dispute_draft
 
@@ -81,6 +82,25 @@ class DisputeResearchWorkflow:
                 return f"{role} blocked by guardrail: {verdict.reason}"
             return resp.content or ""
 
+        # Ground the policy agent in knowledge-service RAG (seeded bank policies).
+        policy_hits = await workflow.execute_activity(
+            "executeTool",
+            {
+                "name": "search_knowledge",
+                "arguments": {
+                    "query": f"dispute policy unauthorized transfer timeframe case {inp.case_id}",
+                    "doc_type": "POLICY",
+                    "limit": 3,
+                },
+                "call_id": "research-policy-rag",
+                "auth_token": "",
+            },
+            result_type=ToolResult,
+            start_to_close_timeout=timedelta(seconds=15),
+            retry_policy=RetryPolicy(maximum_attempts=3),
+        )
+        policy_corpus = policy_hits.content or policy_hits.error or ""
+
         ledger_notes, evidence_notes, policy_notes = await asyncio.gather(
             _agent(
                 "ledger",
@@ -92,7 +112,9 @@ class DisputeResearchWorkflow:
             ),
             _agent(
                 "policy",
-                "You are a banking policy advisor. Recommend REQUEST_EVIDENCE, REFUND, DENY, ESCALATE, or NEED_MORE_INFO.",
+                "You are a banking policy advisor. Cite the retrieved policy corpus. "
+                "Recommend REQUEST_EVIDENCE, REFUND, DENY, ESCALATE, or NEED_MORE_INFO.\n"
+                f"Retrieved policy corpus:\n{policy_corpus}",
             ),
         )
 

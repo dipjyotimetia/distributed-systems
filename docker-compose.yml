@@ -341,6 +341,7 @@ services:
       - ACCOUNTS_SERVICE_URL=http://accounts-service:8080
       - TRANSACTIONS_SERVICE_URL=http://transactions-service:8080
       - DISPUTES_SERVICE_URL=http://disputes-service:8080
+      - KNOWLEDGE_SERVICE_URL=http://knowledge-service:8080
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - FAULT_INJECTION_RATE=${FAULT_INJECTION_RATE:-0}
@@ -431,11 +432,78 @@ services:
     ports: ["8092:8092"]
     networks: [banking-network]
 
+  minio:
+    image: minio/minio:RELEASE.2024-12-18T13-15-44Z
+    container_name: banking-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:9000/minio/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    networks:
+      - banking-network
+
+  knowledge-schema:
+    image: postgres:19.0-alpine
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: password
+    command: ["psql", "-h", "postgres", "-U", "postgres", "-d", "banking_app", "-v", "knowledge_password=knowledge_service_pass", "-f", "/migrations/bootstrap.sql"]
+    volumes:
+      - ./backend/knowledge-service/migrations:/migrations:ro
+    networks:
+      - banking-network
+
+  knowledge-service:
+    build: ./backend/knowledge-service
+    container_name: banking-knowledge
+    depends_on:
+      knowledge-schema:
+        condition: service_completed_successfully
+      minio:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgres://knowledge_service_user:knowledge_service_pass@postgres:5432/banking_app?sslmode=disable
+      - KNOWLEDGE_STORE=postgres
+      - STORAGE_BACKEND=s3
+      - AWS_S3_BUCKET=knowledge
+      - AWS_S3_ENDPOINT_URL=http://minio:9000
+      - AWS_ACCESS_KEY_ID=minioadmin
+      - AWS_SECRET_ACCESS_KEY=minioadmin
+      - AWS_REGION=us-east-1
+      - JWT_SECRET=banking-app-super-secret-key-change-this-in-production-256-bit
+      - KNOWLEDGE_INTERNAL_TOKEN=local-knowledge-internal
+      - OTEL_SERVICE_NAME=knowledge-service
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - OTEL_RESOURCE_ATTRIBUTES=service.namespace=banking-app
+    ports:
+      - "8093:8080"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/api/v1/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    networks:
+      - banking-network
+
   ai-service:
     build: ./backend/ai-service
     container_name: banking-ai
     depends_on:
       disputes-temporal:
+        condition: service_healthy
+      knowledge-service:
         condition: service_healthy
     environment:
       - AI_PROVIDER_MODE=fixture
@@ -446,6 +514,8 @@ services:
       - DISPUTES_INTERNAL_TOKEN=local-disputes-internal
       - ACCOUNTS_SERVICE_URL=http://accounts-service:8080
       - TRANSACTIONS_SERVICE_URL=http://transactions-service:8080
+      - KNOWLEDGE_SERVICE_URL=http://knowledge-service:8080
+      - KNOWLEDGE_INTERNAL_TOKEN=local-knowledge-internal
       - CLAIM_CHECK_DIR=/tmp/ai-claim-check
       - OTEL_SERVICE_NAME=ai-service
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
@@ -468,6 +538,8 @@ services:
         condition: service_healthy
       disputes-temporal:
         condition: service_healthy
+      knowledge-service:
+        condition: service_healthy
     environment:
       - AI_PROVIDER_MODE=fixture
       - AI_MODE=worker
@@ -477,6 +549,8 @@ services:
       - DISPUTES_INTERNAL_TOKEN=local-disputes-internal
       - ACCOUNTS_SERVICE_URL=http://accounts-service:8080
       - TRANSACTIONS_SERVICE_URL=http://transactions-service:8080
+      - KNOWLEDGE_SERVICE_URL=http://knowledge-service:8080
+      - KNOWLEDGE_INTERNAL_TOKEN=local-knowledge-internal
       - CLAIM_CHECK_DIR=/tmp/ai-claim-check
       - OTEL_SERVICE_NAME=ai-worker
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
@@ -506,6 +580,7 @@ services:
       - NEXT_PUBLIC_API_URL=http://localhost:8080
       - API_GATEWAY_URL=http://api-gateway:8080
       - AI_SERVICE_URL=http://ai-service:8080
+      - KNOWLEDGE_SERVICE_URL=http://knowledge-service:8080
       - NOTIFICATION_SERVICE_URL=http://notification-service:8080
       - KYC_GRPC_ADDR=kyc-service:8091
       - CARDS_GRPC_ADDR=cards-service:8092
@@ -588,6 +663,7 @@ volumes:
   disputes_temporal_data:
   grafana_data:
   mongodb_data:
+  minio_data:
 
 networks:
   banking-network:

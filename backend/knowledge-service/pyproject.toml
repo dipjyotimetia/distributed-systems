@@ -1,0 +1,36 @@
+[project]
+name = "knowledge-service"
+version = "0.0.0"
+description = "Document vault and retrieval for banking RAG / MCP"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi==0.165.0",
+  "uvicorn[standard]==0.54.0",
+  "httpx==0.28.1",
+  "python-multipart==0.0.34",
+  "PyJWT==2.15.1",
+  "psycopg[binary]==3.3.9",
+  "boto3==1.44.9",
+  "prometheus-client==0.26.0",
+  "opentelemetry-api==1.45.2",
+  "opentelemetry-sdk==1.45.2",
+  "opentelemetry-exporter-otlp-proto-http==1.45.2",
+  "opentelemetry-instrumentation-fastapi==0.66b2",
+  "mcp[cli]==2.3.0",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=9.2.0",
+  "pytest-asyncio>=1.5.0",
+]
+
+[tool.uv]
+package = false
+required-version = ">=0.11.9"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+pythonpath = ["."]
+testpaths = ["tests"]

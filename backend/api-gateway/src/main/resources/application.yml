@@ -62,6 +62,8 @@ services:
     url: ${PAYMENTS_SERVICE_URL:}
   disputes-service:
     url: ${DISPUTES_SERVICE_URL:http://localhost:8087}
+  knowledge-service:
+    url: ${KNOWLEDGE_SERVICE_URL:http://localhost:8093}
   transactions-service:
     url: ${TRANSACTIONS_SERVICE_URL:http://localhost:8083}
 

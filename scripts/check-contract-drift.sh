@@ -22,9 +22,15 @@ protoc -I contracts/proto/disputes \
   contracts/proto/disputes/research.proto
 diff -ru backend/disputes-service/gen "$generated/disputes/gen"
 
-python3 -m grpc_tools.protoc -I contracts/proto/disputes \
+# Prefer uv for Python tooling (matches ai-service / knowledge-service).
+if command -v uv >/dev/null 2>&1; then
+  PY=(uv run --with 'grpcio-tools==1.83.2' python)
+else
+  PY=(python3)
+fi
+"${PY[@]}" -m grpc_tools.protoc -I contracts/proto/disputes \
   --python_out="$generated/ai" --grpc_python_out="$generated/ai" contracts/proto/disputes/research.proto
-python3 - <<PY
+"${PY[@]}" - <<PY
 from pathlib import Path
 path = Path("$generated/ai/research_pb2_grpc.py")
 path.write_text(path.read_text().replace("import research_pb2 as research__pb2", "from gen import research_pb2 as research__pb2"))
@@ -33,7 +39,7 @@ diff -ru backend/ai-service/gen/research_pb2.py "$generated/ai/research_pb2.py"
 diff -ru backend/ai-service/gen/research_pb2_grpc.py "$generated/ai/research_pb2_grpc.py"
 
 oapi-codegen -generate types,std-http-server -package api -o "$generated/notifications.go" contracts/openapi/notifications.yaml
-python3 - <<PY
+"${PY[@]}" - <<PY
 from pathlib import Path
 path = Path("$generated/notifications.go")
 text = path.read_text()
