@@ -35,14 +35,6 @@ data:
   providers.yaml: |
     apiVersion: 1
     providers:
-      - name: speedscale-byoc
-        orgId: 1
-        folder: Speedscale BYOC
-        type: file
-        disableDeletion: false
-        editable: false
-        options:
-          path: /var/lib/grafana/dashboards/byoc
       - name: banking-app
         orgId: 1
         folder: Banking App
@@ -105,8 +97,6 @@ spec:
               mountPath: /etc/grafana/provisioning/datasources
             - name: dashboard-providers
               mountPath: /etc/grafana/provisioning/dashboards
-            - name: dashboards-byoc
-              mountPath: /var/lib/grafana/dashboards/byoc
             - name: dashboards-app
               mountPath: /var/lib/grafana/dashboards/app
             - name: dashboards-app-details
@@ -132,9 +122,6 @@ spec:
         - name: dashboard-providers
           configMap:
             name: grafana-dashboard-providers
-        - name: dashboards-byoc
-          configMap:
-            name: grafana-dashboards-byoc
         - name: dashboards-app
           configMap:
             name: grafana-dashboards-app

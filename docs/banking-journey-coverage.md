@@ -77,7 +77,7 @@ processing. The Kubernetes smoke additionally checks the W3C trace in Jaeger.
 | Payments | Local stubs receive the expected payment fan-out | Temporal | `LedgerJourney.VerifyPayments` checks correlated Stripe, PayPal and ComplyAdvantage requests |
 | Broker and notification providers | One matching event and one request to each notification provider | Temporal | `Journey.VerifyKafka` reads Kafka independently and `VerifyDeliveries` checks each provider’s request and status |
 | MongoDB and consumer recovery | Persist the event and handle restart, duplicates, and provider failures | Temporal recovery | `VerifyMongo` queries the database. `RecoveryJourney` checks offsets, restarts, duplicate delivery and an HTTP 503 |
-| Kubernetes, trace propagation, and traffic replay | Smoke and trace checks pass, and replay reports success or an infrastructure skip | Scheduled and manual CI | `kubernetes-smoke.py` checks the deployed frontend and Jaeger trace. The replay job runs `make proxymock-replay` or records why it skipped |
+| Kubernetes, trace propagation, and traffic replay | Smoke and trace checks pass, and offline WireMock replay succeeds | Scheduled and manual CI | `kubernetes-smoke.py` checks the deployed frontend and Jaeger trace. The replay job runs `make replay-gate` |
 
 ## ActiveMQ Artemis development components
 

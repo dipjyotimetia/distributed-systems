@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: provider-fixtures
+  namespace: banking-app
+  labels:
+    app.kubernetes.io/name: banking-app
+    app.kubernetes.io/component: fixtures
+    app.kubernetes.io/service: provider-fixtures
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: provider-fixtures
+  template:
+    metadata:
+      labels:
+        app: provider-fixtures
+        app.kubernetes.io/name: banking-app
+        app.kubernetes.io/component: fixtures
+        app.kubernetes.io/service: provider-fixtures
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: provider-fixtures
+          image: ghcr.io/dipjyotimetia/distributed-systems/provider-fixtures:v1.4.140
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8081
+              name: http
+          readinessProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 25m
+              memory: 24Mi
+            limits:
+              memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: provider-fixtures
+  namespace: banking-app
+  labels:
+    app.kubernetes.io/name: banking-app
+    app.kubernetes.io/component: fixtures
+spec:
+  selector:
+    app: provider-fixtures
+  ports:
+    - name: http
+      port: 8081
+      targetPort: http

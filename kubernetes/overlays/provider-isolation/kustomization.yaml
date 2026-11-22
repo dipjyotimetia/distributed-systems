@@ -1,0 +1,30 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+- ../../base
+- ../../observability
+# First-party third-party mocks: every outbound provider call is redirected to
+# provider-fixtures (fail-closed 404 on unknown paths). Dummy keys from the base
+# secret are fine — real egress is not required.
+- provider-fixtures.yaml
+
+patches:
+- target:
+    version: v1
+    kind: Namespace
+    name: banking-app
+  patch: |-
+    - op: add
+      path: /metadata/labels/provider-isolation
+      value: "true"
+    - op: add
+      path: /metadata/labels/istio-injection
+      value: enabled
+- path: accounts-service-fixture-env.yaml
+- path: transactions-service-fixture-env.yaml
+- path: fraud-service-fixture-env.yaml
+- path: notification-service-fixture-env.yaml
+- path: user-service-fixture-env.yaml
+- path: ai-service-fixture-env.yaml
+- path: simulation-client-export-off.yaml

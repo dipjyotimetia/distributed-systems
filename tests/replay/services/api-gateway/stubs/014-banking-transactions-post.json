@@ -1,0 +1,13 @@
+{
+  "request": {
+    "method": "POST",
+    "urlPath": "/api/v1/transactions/create"
+  },
+  "response": {
+    "status": 201,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": "{\n  \"id\": 2586077,\n  \"userId\": 872336,\n  \"fromAccountId\": null,\n  \"toAccountId\": 589224,\n  \"amount\": 259.24,\n  \"type\": \"DEPOSIT\",\n  \"description\": \"Initial deposit for new user\",\n  \"status\": \"COMPLETED\",\n  \"createdAt\": \"2026-10-25T14:31:38.096288\",\n  \"processedAt\": \"2026-10-25T14:31:38.09591698\"\n}"
+  }
+}

@@ -14,7 +14,7 @@ A Node.js application that continuously simulates realistic user interactions wi
 - **Kubernetes Ready**: Deployed as `banking-sim` with resource constraints
 - **Graceful Shutdown**: Proper signal handling and session cleanup
 
-This client generates **live** traffic against a running stack. Offline proxymock replay fixtures live under `backend/*/proxymock/` and are unrelated — they do not record from or depend on simulation-client.
+This client generates **live** traffic against a running stack. Offline WireMock replay fixtures live under `tests/replay/` and are unrelated — they do not record from or depend on simulation-client.
 
 ## Architecture
 

@@ -178,22 +178,23 @@ flowchart TB
   notif -.->|decode| sr
 ```
 
-## Traffic Replay
+## Provider Isolation (zero third-party egress)
 
-The `speedscale` overlay requires an installed Speedscale operator and binds six workloads to recorded snapshots via responder-only `TrafficReplay` resources:
+The `provider-isolation` overlay deploys first-party [`provider-fixtures`](tests/integration/temporal/cmd/provider-fixtures) and redirects outbound third-party URLs for six workloads to that in-cluster mock (fail-closed 404 on unknown paths):
 
-| Workload | Recorded snapshot serves |
+| Workload | Mocked providers |
 |---|---|
-| `banking-ai` | All 5 LLM provider responses |
-| `banking-accounts` | Plaid balance lookups |
+| `banking-ai` | Anthropic, OpenAI, Gemini, xAI, OpenRouter |
+| `banking-accounts` | Plaid, Open Exchange Rates, Moody's |
 | `banking-transactions` | Stripe, PayPal, ComplyAdvantage |
 | `banking-fraud` | Sift, MaxMind, Stripe Radar |
 | `banking-notification` | Slack, SendGrid, Twilio |
-| `banking-user` | Auth dependencies |
+| `banking-user` | Socure, Jumio, Have I Been Pwned |
 
-The operator's mutating webhook injects a `speedscale-initproxy-responder` init container into each app pod, which rewrites `/etc/hosts` so outbound third-party hostnames resolve to the in-cluster responder. The responder matches each outbound request by signature (host + method + URL path + body shape) and serves the recorded response.
-
-A PostSync hook (`kubernetes/overlays/speedscale/responders/tr-postsync-reroll.yaml`) rolls any workload whose pods are missing the responder init container after every ArgoCD sync, so a webhook race during a rolling deploy can't silently disable the responder for one of the services.
+```bash
+make provider-isolation-deploy
+# or: kubectl apply -k kubernetes/overlays/provider-isolation/
+```
 
 ## Development
 
@@ -317,20 +318,20 @@ protoc-gen-go 1.36.12.
 
 ### CI Replay Validation
 
-Proxymock is an **offline** recording-driven integration path (Speedscale CLI). It is independent of `simulation-client`, which only generates live Kubernetes load. Checked-in fixtures today cover:
+Offline WireMock replay gates are independent of `simulation-client` (live K8s load only). Committed fixtures live under [`tests/replay/`](tests/replay/):
 
 | Service | Fixtures | Local command |
 |---------|----------|---------------|
-| `user-service` | `backend/user-service/proxymock/recorded-complete/` | `make proxymock-validation` (or `make proxymock-validation-docker` if port 5432 is busy) |
-| `api-gateway` | `backend/api-gateway/proxymock/recorded-golden/` | `make proxymock-replay` |
+| `user-service` | `tests/replay/services/user-service/` | `make replay-validation` (needs Postgres on `:5432`) |
+| `api-gateway` | `tests/replay/services/api-gateway/` | `make replay-gate` |
 
-The required `proxymock-validation` and `replay-gate` CI jobs consume those fixtures. Keep optional recordings, standalone traffic-analysis tools, and internal demonstration workflows outside this repository.
+The required `replay-validation` and `replay-gate` CI jobs consume those fixtures. Keep optional recordings, standalone traffic-analysis tools, and internal demonstration workflows outside this repository.
 
 ## Key Features
 
 - **Authentication**: JWT-based authentication with HttpOnly cookies
 - **Observability**: Distributed tracing (OTel + Jaeger), Prometheus metrics, Loki logs, Grafana dashboards
-- **Speedscale integration**: Responder mocks for configured third-party integrations
+- **Provider isolation**: First-party `provider-fixtures` mocks for configured third-party integrations
 - **Development Tools**: Service-specific build and test commands
 - **Container Ready**: Docker and Kubernetes deployment configurations
 - **Load generation**: Simulation client drives realistic burst traffic with configurable negative-path coverage

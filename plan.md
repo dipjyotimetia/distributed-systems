@@ -12,7 +12,8 @@ These capabilities landed after the numbered Phase 9 checklist and are part of t
 - **Temporal workers** — disputes, statement exports, KYC review, AI banking agent (payments worker on overlay)
 - **Internal gRPC mesh** — accounts ledger `:9092`, transactions query `:9095`, dispute research proto
 - **Optional payments** — Compose/K8s overlays with Artemis clearing and reconciliation
-- **Speedscale** — optional Kubernetes traffic-replay overlay (OTel no longer depends on Speedscale)
+- **Provider isolation** — `kubernetes/overlays/provider-isolation` with first-party `provider-fixtures` (Speedscale removed)
+- **Offline replay** — WireMock request suites under `tests/replay/` for api-gateway and user-service CI gates
 
 ## Phase 1: Project Setup & Infrastructure ✅ COMPLETED
 - [x] Create monorepo structure with backend services, frontend, and infrastructure directories

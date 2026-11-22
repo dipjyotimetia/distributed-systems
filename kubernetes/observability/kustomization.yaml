@@ -31,7 +31,3 @@ configMapGenerator:
       - banking-app-errors.json=dashboards/banking-app-errors.json
       - banking-app-perf.json=dashboards/banking-app-perf.json
       - banking-app-infra.json=dashboards/banking-app-infra.json
-  - name: grafana-dashboards-byoc
-    files:
-      - speedscale-byoc.json=dashboards/speedscale-byoc.json
-      - speedscale-traffic.json=dashboards/speedscale-traffic.json

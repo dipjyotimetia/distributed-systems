@@ -101,9 +101,22 @@ jobs:
     - name: Verify frontend isolation
       run: ./scripts/verify-frontend-isolation.sh
 
-  proxymock-validation:
+  replay-validation:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:19.0
+        env:
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: banking_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
 
     steps:
     - uses: actions/checkout@v7.0.1
@@ -113,26 +126,16 @@ jobs:
       with:
         dotnet-version: '10.0.404'
 
-    - name: Cache proxymock binary
-      uses: actions/cache@v6.1.0
-      with:
-        path: ~/.speedscale
-        key: proxymock-${{ runner.os }}-v1
-        restore-keys: |
-          proxymock-${{ runner.os }}-
-
-    - name: Proxymock validation (install, init, build, mock+replay)
+    - name: User-service WireMock + Postgres replay
       env:
-        PROXYMOCK_API_KEY: ${{ secrets.PROXYMOCK_API_KEY }}
-        # Fork PRs get no secret and skip; everywhere else a missing proxymock fails the job.
-        PROXYMOCK_REQUIRED: ${{ secrets.PROXYMOCK_API_KEY != '' && '1' || '' }}
-      run: ./scripts/run-proxymock-validation.sh
-  
-  # Replays recorded traffic against a service built from this change, with its
-  # dependencies mocked, so a regression is caught before merge.
+        PGPASSWORD: password
+      run: ./scripts/replay/run-user-service-validation.sh
+
+  # Replays committed request suites against a service built from this change, with
+  # WireMock serving downstream stubs, so a regression is caught before merge.
   replay-gate:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -144,28 +147,8 @@ jobs:
     - name: Set up Java 25
       uses: ./.github/actions/setup-java-gradle
 
-    - name: Cache proxymock binary
-      uses: actions/cache@v6.1.0
-      with:
-        path: ~/.speedscale
-        key: proxymock-${{ runner.os }}-v1
-        restore-keys: |
-          proxymock-${{ runner.os }}-
-
-    - name: Install proxymock
-      run: |
-        export PATH="${HOME}/.speedscale:${PATH}"
-        if ! command -v proxymock >/dev/null 2>&1; then
-          curl -Lfs https://downloads.speedscale.com/proxymock/install-proxymock | sh
-        fi
-        echo "${HOME}/.speedscale" >> "$GITHUB_PATH"
-
     - name: Replay recorded traffic against ${{ matrix.service }}
-      env:
-        PROXYMOCK_API_KEY: ${{ secrets.PROXYMOCK_API_KEY }}
-        # Fork PRs get no secret and skip; everywhere else a missing proxymock fails the job.
-        PROXYMOCK_REQUIRED: ${{ secrets.PROXYMOCK_API_KEY != '' && '1' || '' }}
-      run: ./scripts/proxymock/replay-service.sh ${{ matrix.service }}
+      run: ./scripts/replay/replay-service.sh ${{ matrix.service }}
 
   test-go-services:
     runs-on: ubuntu-latest
@@ -230,8 +213,8 @@ jobs:
 
   build-and-push:
     # e2e runs in parallel; ci-gate still requires it. Decoupling starts the
-    # image matrix as soon as unit/proxymock gates pass.
-    needs: [test-backend, test-frontend, test-go-services, proxymock-validation, replay-gate]
+    # image matrix as soon as unit/replay gates pass.
+    needs: [test-backend, test-frontend, test-go-services, replay-validation, replay-gate]
     runs-on: ubuntu-latest
     # Runs on PRs too (amd64-only, no push) so the image build gates the merge,
     # and on push to master (full multi-arch, pushed). Platforms/push are set
@@ -450,7 +433,7 @@ jobs:
       - test-backend
       - test-frontend
       - test-go-services
-      - proxymock-validation
+      - replay-validation
       - replay-gate
       - e2e-test
       - build-and-push
@@ -464,7 +447,7 @@ jobs:
           echo "  test-backend=${{ needs.test-backend.result }}"
           echo "  test-frontend=${{ needs.test-frontend.result }}"
           echo "  test-go-services=${{ needs.test-go-services.result }}"
-          echo "  proxymock-validation=${{ needs.proxymock-validation.result }}"
+          echo "  replay-validation=${{ needs.replay-validation.result }}"
           echo "  replay-gate=${{ needs.replay-gate.result }}"
           echo "  e2e-test=${{ needs.e2e-test.result }}"
           echo "  build-and-push=${{ needs.build-and-push.result }}"

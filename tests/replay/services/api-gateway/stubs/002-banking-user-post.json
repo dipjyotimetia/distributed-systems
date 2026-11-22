@@ -1,0 +1,13 @@
+{
+  "request": {
+    "method": "POST",
+    "urlPath": "/api/v1/users/login"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": "{\n  \"token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJvc2Nhci5sYXJzc29uLjY1NSIsInVzZXJJZCI6IjI0MjY0MCIsInJvbGVzIjoiVVNFUiIsImV4cCI6MTc5MzAyNTA5Nn0.REDACTED\",\n  \"type\": \"Bearer\",\n  \"id\": 242640,\n  \"username\": \"oscar.larsson.655\",\n  \"email\": \"oscar.larsson.655@northbridge.example\",\n  \"roles\": \"USER\"\n}"
+  }
+}

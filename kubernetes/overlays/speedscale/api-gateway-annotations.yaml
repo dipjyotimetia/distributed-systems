@@ -1,8 +1,0 @@
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: banking-gateway
-  namespace: banking-app
-  annotations:
-    capture.speedscale.com/enabled: "true"
-    capture.speedscale.com/java-agent: "true"
