@@ -1,0 +1,309 @@
+# Dependabot for the banking monorepo.
+# Weekly grouped updates across Gradle, Go, npm, NuGet, pip, Actions, Compose, and Dockerfiles.
+# Major bumps held in docs/dependency-upgrade.md are ignored here.
+
+version: 2
+
+updates:
+  # --- GitHub Actions ---
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Australia/Sydney
+    open-pull-requests-limit: 5
+    labels: [dependencies, github-actions]
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      github-actions:
+        patterns: ["*"]
+
+  # --- Java / Gradle (root multi-project) ---
+  - package-ecosystem: gradle
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Australia/Sydney
+    open-pull-requests-limit: 8
+    labels: [dependencies, java]
+    commit-message:
+      prefix: chore
+      include: scope
+    ignore:
+      # Stay on Boot-managed Flyway 12.x until Boot moves.
+      - dependency-name: "org.flywaydb*"
+        update-types: ["version-update:semver-major"]
+      # Keep Artemis client matched to Compose/K8s broker image 2.44.x.
+      - dependency-name: "org.apache.activemq*"
+        update-types: ["version-update:semver-major"]
+    groups:
+      spring-boot:
+        patterns:
+          - "org.springframework*"
+          - "io.spring*"
+      opentelemetry-java:
+        patterns:
+          - "io.opentelemetry*"
+      grpc-protobuf:
+        patterns:
+          - "io.grpc*"
+          - "com.google.protobuf*"
+      temporal-java:
+        patterns:
+          - "io.temporal*"
+      aws-sdk:
+        patterns:
+          - "software.amazon.awssdk*"
+      other-java:
+        patterns: ["*"]
+        exclude-patterns:
+          - "org.springframework*"
+          - "io.spring*"
+          - "io.opentelemetry*"
+          - "io.grpc*"
+          - "com.google.protobuf*"
+          - "io.temporal*"
+          - "software.amazon.awssdk*"
+
+  # --- .NET (user-service) ---
+  - package-ecosystem: nuget
+    directory: /backend/user-service
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Australia/Sydney
+    open-pull-requests-limit: 5
+    labels: [dependencies, dotnet]
+    commit-message:
+      prefix: chore
+      include: scope
+    ignore:
+      # Stay on .NET 10 package lines until the service moves to net11.
+      - dependency-name: "Microsoft.AspNetCore.*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "Npgsql.EntityFrameworkCore.PostgreSQL"
+        update-types: ["version-update:semver-major"]
+    groups:
+      opentelemetry-dotnet:
+        patterns:
+          - "OpenTelemetry*"
+      other-nuget:
+        patterns: ["*"]
+        exclude-patterns:
+          - "OpenTelemetry*"
+
+  # --- Python (ai-service) ---
+  - package-ecosystem: pip
+    directory: /backend/ai-service
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Australia/Sydney
+    open-pull-requests-limit: 5
+    labels: [dependencies, python]
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      opentelemetry-python:
+        patterns:
+          - "opentelemetry-*"
+      other-python:
+        patterns: ["*"]
+        exclude-patterns:
+          - "opentelemetry-*"
+
+  # --- Go modules ---
+  - package-ecosystem: gomod
+    directories:
+      - /backend/cards-service
+      - /backend/disputes-service
+      - /backend/fraud-service
+      - /backend/kyc-service
+      - /backend/notification-service
+      - /tests/integration/temporal
+      - /tests/integration/temporal/cmd/provider-fixtures
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Australia/Sydney
+    open-pull-requests-limit: 8
+    labels: [dependencies, go]
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      opentelemetry-go:
+        patterns:
+          - "go.opentelemetry.io/*"
+      temporal-go:
+        patterns:
+          - "go.temporal.io/*"
+      grpc-go:
+        patterns:
+          - "google.golang.org/grpc"
+          - "google.golang.org/protobuf"
+          - "google.golang.org/genproto*"
+      other-go:
+        patterns: ["*"]
+        exclude-patterns:
+          - "go.opentelemetry.io/*"
+          - "go.temporal.io/*"
+          - "google.golang.org/grpc"
+          - "google.golang.org/protobuf"
+          - "google.golang.org/genproto*"
+
+  # --- npm: frontend ---
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Australia/Sydney
+    open-pull-requests-limit: 8
+    labels: [dependencies, npm, frontend]
+    commit-message:
+      prefix: chore
+      include: scope
+    ignore:
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "eslint-config-next"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "typescript-eslint"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@opentelemetry/*"
+        update-types: ["version-update:semver-major"]
+    groups:
+      next-react:
+        patterns:
+          - "next"
+          - "react"
+          - "react-dom"
+          - "eslint-config-next"
+          - "@types/react"
+          - "@types/react-dom"
+      opentelemetry-js:
+        patterns:
+          - "@opentelemetry/*"
+      testing:
+        patterns:
+          - "jest*"
+          - "@testing-library/*"
+          - "@playwright/*"
+          - "@types/jest"
+      other-npm:
+        patterns: ["*"]
+        exclude-patterns:
+          - "next"
+          - "react"
+          - "react-dom"
+          - "eslint-config-next"
+          - "@types/react"
+          - "@types/react-dom"
+          - "@opentelemetry/*"
+          - "jest*"
+          - "@testing-library/*"
+          - "@playwright/*"
+          - "@types/jest"
+
+  # --- npm: simulation-client ---
+  - package-ecosystem: npm
+    directory: /simulation-client
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Australia/Sydney
+    open-pull-requests-limit: 5
+    labels: [dependencies, npm, simulation]
+    commit-message:
+      prefix: chore
+      include: scope
+    ignore:
+      - dependency-name: "@opentelemetry/*"
+        update-types: ["version-update:semver-major"]
+    groups:
+      opentelemetry-js:
+        patterns:
+          - "@opentelemetry/*"
+      other-npm:
+        patterns: ["*"]
+        exclude-patterns:
+          - "@opentelemetry/*"
+
+  # --- npm: Kubernetes journey helpers ---
+  - package-ecosystem: npm
+    directory: /kubernetes/testing
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Australia/Sydney
+    open-pull-requests-limit: 3
+    labels: [dependencies, npm]
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      k8s-testing-npm:
+        patterns: ["*"]
+
+  # --- Docker Compose (root compose*.yml / docker-compose*.yml) ---
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Australia/Sydney
+    open-pull-requests-limit: 5
+    labels: [dependencies, docker]
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      compose-images:
+        patterns: ["*"]
+
+  # --- Service Dockerfiles ---
+  - package-ecosystem: docker
+    directories:
+      - /backend/accounts-service
+      - /backend/ai-service
+      - /backend/api-gateway
+      - /backend/cards-service
+      - /backend/disputes-service
+      - /backend/fraud-service
+      - /backend/kyc-service
+      - /backend/notification-service
+      - /backend/payments-service
+      - /backend/transactions-service
+      - /backend/user-service
+      - /frontend
+      - /simulation-client
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Australia/Sydney
+    open-pull-requests-limit: 5
+    labels: [dependencies, docker]
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      service-base-images:
+        patterns: ["*"]

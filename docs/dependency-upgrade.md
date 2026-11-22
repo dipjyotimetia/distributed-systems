@@ -6,6 +6,8 @@ The upgrade starts from `dipjyotimetia/distributed-systems` `main` at `82bd0f6`.
 
 Redpanda is the Kafka-compatible broker for Compose, Kubernetes, and the integration stack. The Kubernetes DNS name remains `banking-kafka:9092`, with Schema Registry on `banking-kafka:8081`. Event topics default to Confluent Avro (`KAFKA_VALUE_FORMAT=avro`); schemas live under `contracts/avro/`. Producers publish through transactional outboxes (claim, broker ack, then `published_at`; transactions-service also quarantines poison rows). The notification service uses franz-go (plus `twmb/avro` and `franz-go/pkg/sr` for Avro) and commits only after processing a record. MongoDB deduplicates replays using the existing transaction/status unique index. The SASL overlay still accepts PLAIN clients and provisions their bootstrap account through secret references.
 
+Automated version PRs are driven by [`.github/dependabot.yml`](../.github/dependabot.yml): weekly (Monday, Australia/Sydney), grouped by ecosystem, with ignores for the held majors below. Prefer reviewing Dependabot groups over one-off manual bumps unless a security alert needs an immediate patch.
+
 ## Versions held below latest
 
 | Dependency | Installed | Latest checked | Blocker and upgrade step |

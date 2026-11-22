@@ -144,3 +144,4 @@ Policy: [AGENTS.md](AGENTS.md#version-bump-policy).
 | [docs/money-movement-recovery.md](docs/money-movement-recovery.md) | Movements, outbox, recovery |
 | [AGENTS.md](AGENTS.md) | Guidance for automated agents |
 | [docs/dependency-upgrade.md](docs/dependency-upgrade.md) | Dependency baseline and held versions |
+| [`.github/dependabot.yml`](.github/dependabot.yml) | Weekly grouped dependency updates |
