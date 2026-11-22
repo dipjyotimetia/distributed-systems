@@ -1,0 +1,20 @@
+{
+  "request": {
+    "method": "POST",
+    "urlPath": "/searches"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "content": {
+        "data": {
+          "total_matches": 0,
+          "risk_level": "low"
+        }
+      }
+    }
+  }
+}

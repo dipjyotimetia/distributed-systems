@@ -322,10 +322,14 @@ Offline WireMock replay gates are independent of `simulation-client` (live K8s l
 
 | Service | Fixtures | Local command |
 |---------|----------|---------------|
-| `user-service` | `tests/replay/services/user-service/` | `make replay-validation` (needs Postgres on `:5432`) |
 | `api-gateway` | `tests/replay/services/api-gateway/` | `make replay-gate` |
+| `user-service` | `tests/replay/services/user-service/` | `make replay-validation` (needs Postgres on `:5432`) |
+| `accounts-service` | `tests/replay/services/accounts-service/` | `make replay-gate SERVICE=accounts-service` |
+| `transactions-service` | `tests/replay/services/transactions-service/` | `make replay-gate SERVICE=transactions-service` |
+| `notification-service` | `tests/replay/services/notification-service/` | `make replay-gate SERVICE=notification-service` |
+| `ai-service` | `tests/replay/services/ai-service/` | `make replay-gate SERVICE=ai-service` |
 
-The required `replay-validation` and `replay-gate` CI jobs consume those fixtures. Keep optional recordings, standalone traffic-analysis tools, and internal demonstration workflows outside this repository.
+The required `replay-gate` CI matrix job runs all six suites. Keep optional recordings, standalone traffic-analysis tools, and internal demonstration workflows outside this repository.
 
 ## Key Features
 

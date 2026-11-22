@@ -11,9 +11,15 @@ import sys
 _NUM_SEG = re.compile(r"^\d+$")
 
 
+_TEMPLATE_SEG = re.compile(r"^\$\{[^}]+\}$|^\{[^}]+\}$")
+
+
 def url_pattern(url: str) -> str:
     path = url.split("?", 1)[0]
-    segs = [("{id}" if _NUM_SEG.match(s) else s) for s in path.split("/")]
+    segs = [
+        ("{id}" if _NUM_SEG.match(s) or _TEMPLATE_SEG.match(s) else s)
+        for s in path.split("/")
+    ]
     return "/".join(segs)
 
 

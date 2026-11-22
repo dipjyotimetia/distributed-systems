@@ -101,9 +101,21 @@ jobs:
     - name: Verify frontend isolation
       run: ./scripts/verify-frontend-isolation.sh
 
-  replay-validation:
+  # Replays committed request suites against each HTTP service with WireMock
+  # (and Postgres / Mongo / Kafka companions when the service config requires them).
+  replay-gate:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - api-gateway
+          - user-service
+          - accounts-service
+          - transactions-service
+          - notification-service
+          - ai-service
     services:
       postgres:
         image: postgres:19.0
@@ -121,33 +133,32 @@ jobs:
     steps:
     - uses: actions/checkout@v7.0.1
 
+    - name: Set up Java 25
+      if: contains(fromJSON('["api-gateway","accounts-service","transactions-service"]'), matrix.service)
+      uses: ./.github/actions/setup-java-gradle
+
     - name: Set up .NET 10
+      if: matrix.service == 'user-service'
       uses: actions/setup-dotnet@v6.1.0
       with:
         dotnet-version: '10.0.404'
 
-    - name: User-service WireMock + Postgres replay
+    - name: Set up Go
+      if: matrix.service == 'notification-service'
+      uses: actions/setup-go@v7.1.0
+      with:
+        go-version-file: backend/notification-service/go.mod
+        cache-dependency-path: backend/notification-service/go.sum
+
+    - name: Set up Python
+      if: matrix.service == 'ai-service'
+      uses: actions/setup-python@v7.1.0
+      with:
+        python-version: '3.12'
+
+    - name: Replay WireMock suite for ${{ matrix.service }}
       env:
         PGPASSWORD: password
-      run: ./scripts/replay/run-user-service-validation.sh
-
-  # Replays committed request suites against a service built from this change, with
-  # WireMock serving downstream stubs, so a regression is caught before merge.
-  replay-gate:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        service: [api-gateway]
-
-    steps:
-    - uses: actions/checkout@v7.0.1
-
-    - name: Set up Java 25
-      uses: ./.github/actions/setup-java-gradle
-
-    - name: Replay recorded traffic against ${{ matrix.service }}
       run: ./scripts/replay/replay-service.sh ${{ matrix.service }}
 
   test-go-services:
@@ -214,7 +225,7 @@ jobs:
   build-and-push:
     # e2e runs in parallel; ci-gate still requires it. Decoupling starts the
     # image matrix as soon as unit/replay gates pass.
-    needs: [test-backend, test-frontend, test-go-services, replay-validation, replay-gate]
+    needs: [test-backend, test-frontend, test-go-services, replay-gate]
     runs-on: ubuntu-latest
     # Runs on PRs too (amd64-only, no push) so the image build gates the merge,
     # and on push to master (full multi-arch, pushed). Platforms/push are set
@@ -433,7 +444,6 @@ jobs:
       - test-backend
       - test-frontend
       - test-go-services
-      - replay-validation
       - replay-gate
       - e2e-test
       - build-and-push
@@ -447,7 +457,6 @@ jobs:
           echo "  test-backend=${{ needs.test-backend.result }}"
           echo "  test-frontend=${{ needs.test-frontend.result }}"
           echo "  test-go-services=${{ needs.test-go-services.result }}"
-          echo "  replay-validation=${{ needs.replay-validation.result }}"
           echo "  replay-gate=${{ needs.replay-gate.result }}"
           echo "  e2e-test=${{ needs.e2e-test.result }}"
           echo "  build-and-push=${{ needs.build-and-push.result }}"

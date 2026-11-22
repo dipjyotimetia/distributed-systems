@@ -99,16 +99,19 @@ validate-e2e: test-e2e
 
 test-all: test-backend test-frontend test-e2e
 
-# Offline WireMock replay gates (api-gateway + user-service). No vendor API key required.
+# Offline WireMock replay gates. No vendor API key required.
+# SERVICE= selects the matrix leg (default: api-gateway). Examples:
+#   make replay-gate
+#   make replay-gate SERVICE=accounts-service
 .PHONY: replay-validation
 replay-validation:
-	./scripts/replay/run-user-service-validation.sh
+	./scripts/replay/replay-service.sh user-service
 
 .PHONY: replay-gate
 replay-gate:
-	./scripts/replay/replay-service.sh api-gateway
+	./scripts/replay/replay-service.sh $(or $(SERVICE),api-gateway)
 
-# Enable the tracked pre-commit hook (runs the api-gateway replay when the gateway changes).
+# Enable the tracked pre-commit hook (runs offline replay for changed services with suites).
 .PHONY: install-git-hooks
 install-git-hooks:
 	git config core.hooksPath .githooks
@@ -255,7 +258,7 @@ help:
 	@echo "  validate-e2e       - Validate E2E tests (alias for test-e2e)"
 	@echo "  test-all           - Run all tests (backend, frontend, e2e)"
 	@echo "  replay-validation  - user-service WireMock + Postgres replay gate"
-	@echo "  replay-gate        - api-gateway WireMock offline replay gate"
+	@echo "  replay-gate        - WireMock offline replay (SERVICE=api-gateway|user-service|accounts-service|transactions-service|notification-service|ai-service)"
 	@echo ""
 	@echo "Kubernetes:"
 	@echo "  k8s-deploy         - Deploy banking application to Kubernetes"

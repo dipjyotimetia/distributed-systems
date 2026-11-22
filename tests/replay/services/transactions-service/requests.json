@@ -1,0 +1,35 @@
+[
+  {
+    "id": "health-liveness",
+    "method": "GET",
+    "url": "/actuator/health/liveness",
+    "headers": {},
+    "body": null,
+    "expectedStatus": "200",
+    "expectedBody": {
+      "status": "UP"
+    }
+  },
+  {
+    "id": "list-unauthorized",
+    "method": "GET",
+    "url": "/api/v1/transactions",
+    "headers": {
+      "Accept": "application/json"
+    },
+    "body": null,
+    "expectedStatus": "401"
+  },
+  {
+    "id": "list-transactions",
+    "method": "GET",
+    "url": "/api/v1/transactions",
+    "headers": {
+      "Accept": "application/json",
+      "Authorization": "Bearer __REPLAY_JWT__"
+    },
+    "body": null,
+    "expectedStatus": "200",
+    "expectedBody": []
+  }
+]

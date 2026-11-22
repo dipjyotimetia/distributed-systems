@@ -2,7 +2,9 @@
 # Repo pre-commit hook. Tracked in .githooks/ and enabled with:
 #   git config core.hooksPath .githooks      (or: make install-git-hooks)
 #
-# For each service with a committed request suite under tests/replay/services/<service>/,
+# For each service that has both:
+#   tests/replay/services/<service>/requests.json
+#   scripts/replay/services/<service>.env
 # if the commit touches that service's backend tree, run the offline WireMock replay gate.
 #
 # Skip for a single commit with:  SKIP_REPLAY=1 git commit ...
@@ -16,6 +18,7 @@ fi
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 SUITE_ROOT="${REPO_ROOT}/tests/replay/services"
+CONFIG_ROOT="${REPO_ROOT}/scripts/replay/services"
 [ -d "$SUITE_ROOT" ] || exit 0
 
 CHANGED="$(git diff --cached --name-only)"
@@ -24,8 +27,7 @@ rc=0
 for suite in "$SUITE_ROOT"/*/requests.json; do
   [ -e "$suite" ] || continue
   service="$(basename "$(dirname "$suite")")"
-  # user-service uses a dedicated Postgres-backed script; hook covers api-gateway.
-  if [ "$service" != "api-gateway" ]; then
+  if [ ! -f "${CONFIG_ROOT}/${service}.env" ]; then
     continue
   fi
   rel="backend/${service}"

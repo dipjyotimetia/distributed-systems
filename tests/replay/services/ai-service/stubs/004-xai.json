@@ -1,0 +1,21 @@
+{
+  "request": {
+    "method": "POST",
+    "urlPath": "/ai/xai"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "choices": [
+        {
+          "message": {
+            "content": "Your checking balance is $1,234.56."
+          }
+        }
+      ]
+    }
+  }
+}

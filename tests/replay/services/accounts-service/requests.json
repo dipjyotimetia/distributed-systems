@@ -1,0 +1,91 @@
+[
+  {
+    "id": "health-liveness",
+    "method": "GET",
+    "url": "/actuator/health/liveness",
+    "headers": {},
+    "body": null,
+    "expectedStatus": "200",
+    "expectedBody": {
+      "status": "UP"
+    }
+  },
+  {
+    "id": "list-unauthorized",
+    "method": "GET",
+    "url": "/api/v1/accounts",
+    "headers": {
+      "Accept": "application/json"
+    },
+    "body": null,
+    "expectedStatus": "401"
+  },
+  {
+    "id": "create-checking",
+    "method": "POST",
+    "url": "/api/v1/accounts",
+    "headers": {
+      "Accept": "application/json",
+      "Content-Type": "application/json",
+      "Authorization": "Bearer __REPLAY_JWT__"
+    },
+    "body": {
+      "accountType": "CHECKING",
+      "initialBalance": 500,
+      "currency": "USD"
+    },
+    "expectedStatus": "201",
+    "expectedBody": {
+      "id": 1,
+      "userId": 1,
+      "accountNumber": "123456789012",
+      "balance": 500.0,
+      "accountType": "CHECKING"
+    },
+    "capture": {
+      "accountId": "$.id"
+    }
+  },
+  {
+    "id": "list-accounts",
+    "method": "GET",
+    "url": "/api/v1/accounts",
+    "headers": {
+      "Accept": "application/json",
+      "Authorization": "Bearer __REPLAY_JWT__"
+    },
+    "body": null,
+    "expectedStatus": "200",
+    "expectedBody": [
+      {
+        "id": 1,
+        "userId": 1,
+        "accountNumber": "123456789012",
+        "balance": 500.0,
+        "accountType": "CHECKING"
+      }
+    ]
+  },
+  {
+    "id": "get-account",
+    "method": "GET",
+    "url": "/api/v1/accounts/${accountId}",
+    "headers": {
+      "Accept": "application/json",
+      "Authorization": "Bearer __REPLAY_JWT__"
+    },
+    "body": null,
+    "expectedStatus": "200"
+  },
+  {
+    "id": "get-balance",
+    "method": "GET",
+    "url": "/api/v1/accounts/${accountId}/balance",
+    "headers": {
+      "Accept": "application/json",
+      "Authorization": "Bearer __REPLAY_JWT__"
+    },
+    "body": null,
+    "expectedStatus": "200"
+  }
+]

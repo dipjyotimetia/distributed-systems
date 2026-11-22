@@ -1,0 +1,41 @@
+[
+  {
+    "id": "health",
+    "method": "GET",
+    "url": "/api/v1/health",
+    "headers": {},
+    "body": null,
+    "expectedStatus": "200",
+    "expectedBody": {
+      "status": "ok",
+      "temporalQueue": "ai-banking"
+    }
+  },
+  {
+    "id": "chat",
+    "method": "POST",
+    "url": "/api/v1/chat",
+    "headers": {
+      "Content-Type": "application/json",
+      "Accept": "application/json"
+    },
+    "body": {
+      "message": "What is my checking balance?",
+      "accountContext": "Account: checking, balance: 1234.56",
+      "locale": "en-US"
+    },
+    "expectedStatus": "200",
+    "expectedBody": {
+      "results": [
+        {
+          "provider": "anthropic",
+          "name": "Anthropic Claude",
+          "model": "claude-sonnet-4-20250514",
+          "message": "Your checking balance is $1,234.56.",
+          "error": null,
+          "durationMs": 1
+        }
+      ]
+    }
+  }
+]
