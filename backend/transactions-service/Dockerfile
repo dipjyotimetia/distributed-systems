@@ -11,6 +11,7 @@ COPY backend/payments-service/build.gradle.kts backend/payments-service/gradle.p
 COPY backend/transactions-service/build.gradle.kts backend/transactions-service/gradle.properties backend/transactions-service/
 COPY backend/transactions-service/src backend/transactions-service/src
 COPY contracts/openapi/transactions.yaml contracts/openapi/transactions.yaml
+COPY contracts/avro/ contracts/avro/
 COPY contracts/proto/fraud/ contracts/proto/fraud/
 COPY contracts/proto/ledger/ contracts/proto/ledger/
 COPY contracts/proto/transactions/ contracts/proto/transactions/

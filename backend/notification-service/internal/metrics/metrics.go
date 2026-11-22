@@ -28,6 +28,12 @@ var (
 		Help: "Total errors encountered while consuming or decoding Kafka messages.",
 	})
 
+	// EventsQuarantined counts poison Kafka records persisted before offset commit.
+	EventsQuarantined = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "notification_events_quarantined_total",
+		Help: "Invalid Kafka records written to the quarantine collection before offset commit.",
+	})
+
 	// BufferEvents reports how many events are currently held in the ring buffer.
 	BufferEvents = promauto.NewGauge(prometheus.GaugeOpts{
 		Name: "notification_buffer_events",

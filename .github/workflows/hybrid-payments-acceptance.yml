@@ -30,6 +30,7 @@ on:
       - 'tests/integration/temporal/verify-financial-restore.sh'
       - 'contracts/openapi/payments.yaml'
       - 'scripts/ci/build-and-load-kind-images.sh'
+      - 'scripts/ci/docker-pull-retry.sh'
 
 concurrency:
   group: hybrid-payments-${{ github.workflow }}-${{ github.ref }}

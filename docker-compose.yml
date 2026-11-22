@@ -42,6 +42,7 @@ services:
         condition: service_healthy
     environment:
       KAFKA_BROKERS: redpanda:9092
+      SCHEMA_REGISTRY_URL: http://redpanda:8081
       MONGO_URI: mongodb://mongodb:27017
       JWT_SECRET: banking-app-super-secret-key-change-this-in-production-256-bit
 
@@ -216,6 +217,8 @@ services:
   redpanda:
     image: docker.redpanda.com/redpandadata/redpanda:v26.2.2
     networks: [banking-network]
+    ports:
+      - "8081:8081"
     command:
       - redpanda
       - start
@@ -223,6 +226,7 @@ services:
       - --smp=1
       - --kafka-addr=0.0.0.0:9092
       - --advertise-kafka-addr=redpanda:9092
+      - --schema-registry-addr=0.0.0.0:8081
     healthcheck:
       test:
         - CMD-SHELL
@@ -230,7 +234,8 @@ services:
           (rpk topic describe transaction-events -X brokers=redpanda:9092 >/dev/null 2>&1 ||
            rpk topic create transaction-events --partitions 1 --replicas 1 -X brokers=redpanda:9092) &&
           (rpk topic describe movement-lifecycle-v1 -X brokers=redpanda:9092 >/dev/null 2>&1 ||
-           rpk topic create movement-lifecycle-v1 --partitions 1 --replicas 1 -X brokers=redpanda:9092)
+           rpk topic create movement-lifecycle-v1 --partitions 1 --replicas 1 -X brokers=redpanda:9092) &&
+          rpk registry mode get -X registry.hosts=127.0.0.1:8081 >/dev/null
       interval: 5s
       timeout: 10s
       retries: 15
@@ -265,6 +270,8 @@ services:
       - FRAUD_SERVICE_PORT=8080
       - FRAUD_FAIL_OPEN=${FRAUD_FAIL_OPEN:-true}
       - KAFKA_BROKERS=redpanda:9092
+      - SCHEMA_REGISTRY_URL=http://redpanda:8081
+      - KAFKA_VALUE_FORMAT=avro
       # OpenTelemetry Configuration
       - OTEL_SERVICE_NAME=transactions-service
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317

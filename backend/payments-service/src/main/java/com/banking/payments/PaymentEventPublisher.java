@@ -5,6 +5,7 @@ import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.apache.kafka.common.serialization.StringSerializer;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -18,6 +19,7 @@ import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
 
 @Component
 @Profile("payment-worker")
@@ -26,13 +28,25 @@ public class PaymentEventPublisher {
     private final String topic;
     private final PaymentTracing tracing;
     private final KafkaProducer<String, byte[]> producer;
+    private final Function<byte[], byte[]> encode;
 
-    public PaymentEventPublisher(JdbcTemplate db, PaymentTracing tracing,
+    @Autowired
+    public PaymentEventPublisher(JdbcTemplate db, PaymentTracing tracing, SchemaRegistryAvroEncoder encoder,
                                  @Value("${PAYMENTS_KAFKA_BROKERS}") String brokers,
                                  @Value("${PAYMENTS_KAFKA_TOPIC:payment-events.v1}") String topic) {
+        this(db, tracing, brokers, topic, encoder::encode);
+    }
+
+    PaymentEventPublisher(JdbcTemplate db, PaymentTracing tracing, String brokers, String topic) {
+        this(db, tracing, brokers, topic, body -> body);
+    }
+
+    PaymentEventPublisher(JdbcTemplate db, PaymentTracing tracing, String brokers, String topic,
+                          Function<byte[], byte[]> encode) {
         this.db = db;
         this.tracing = tracing;
         this.topic = topic;
+        this.encode = encode;
         this.producer = new KafkaProducer<>(Map.of(
                 "bootstrap.servers", brokers,
                 "acks", "all",
@@ -65,7 +79,7 @@ public class PaymentEventPublisher {
         Event event = pending.getFirst();
         var span = tracing.start("payment.kafka.publish", event.paymentId(), event.traceParent());
         try (var scope = span.makeCurrent()) {
-            var record = new ProducerRecord<>(topic, event.paymentId().toString(), event.body());
+            var record = new ProducerRecord<>(topic, event.paymentId().toString(), encode.apply(event.body()));
             String parent = PaymentTracing.currentParent();
             if (parent != null) record.headers().add("traceparent", parent.getBytes(java.nio.charset.StandardCharsets.US_ASCII));
             producer.send(record).get(7, TimeUnit.SECONDS);

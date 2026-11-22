@@ -39,7 +39,30 @@ if ! "${compose[@]}" build "${build_services[@]}"; then
   sleep 5
   "${compose[@]}" build "${build_services[@]}"
 fi
-"${compose[@]}" up -d --wait payments-postgres clearing-postgres clearing-mq disputes-temporal redpanda
+# Pre-pull third-party images with retries; Docker Hub TLS timeouts are common in CI.
+bash scripts/ci/docker-pull-retry.sh \
+  temporalio/temporal:1.10.1 \
+  postgres:19.0-alpine \
+  apache/activemq-artemis:2.44.0-alpine \
+  docker.redpanda.com/redpandadata/redpanda:v26.2.2 \
+  mongo:9.0.8 \
+  redis:8.10.3-alpine \
+  jaegertracing/jaeger:2.23.0
+infra_up() {
+  local attempt=1
+  while (( attempt <= 5 )); do
+    if "${compose[@]}" up -d --wait payments-postgres clearing-postgres clearing-mq disputes-temporal redpanda; then
+      return 0
+    fi
+    echo "infra compose up failed (attempt $attempt); retrying..." >&2
+    "${compose[@]}" down --volumes --remove-orphans || true
+    bash scripts/ci/docker-pull-retry.sh temporalio/temporal:1.10.1 || true
+    sleep $((attempt * 10))
+    attempt=$((attempt + 1))
+  done
+  return 1
+}
+infra_up
 # Choose a future cutoff only after the infrastructure and images are available.
 settlement_minutes="${BANKING_SETTLEMENT_WAIT_MINUTES:-3}"
 read -r BANKING_SETTLEMENT_CUTOFF BANKING_SETTLEMENT_BUSINESS_DATE < <(SETTLEMENT_MINUTES="$settlement_minutes" python3 - <<'PY'
@@ -60,7 +83,8 @@ fixtures="http://$("${compose[@]}" port provider-fixtures 8081)"
 
 (cd frontend && npm run test:e2e:real-backend -- payments.real-backend.spec.ts --workers=1)
 timeout 30 "${compose[@]}" exec -T redpanda rpk topic consume payment-events.v1 \
-  -X brokers=redpanda:9092 -o :end --format '%k\t%v\n' |
+  -X brokers=redpanda:9092 -X registry.hosts=redpanda:8081 --use-schema-registry=value \
+  -o :end --format '%k\t%v\n' |
   python3 tests/integration/verify-payment-event.py "$MICROSVC_PAYMENT_EVIDENCE"
 
 jaeger="http://$("${compose[@]}" port jaeger 16686)"

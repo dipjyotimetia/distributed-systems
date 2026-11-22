@@ -94,6 +94,13 @@ trap 'exit 143' TERM
 
 docker info --format '{{.ServerVersion}}' >/dev/null
 stage=startup
+# Pre-pull Docker Hub images that flake on TLS/auth timeouts in CI.
+bash scripts/ci/docker-pull-retry.sh \
+  temporalio/temporal:1.10.1 \
+  postgres:19.0-alpine \
+  mongo:9.0.8 \
+  redis:8.10.3-alpine \
+  docker.redpanda.com/redpandadata/redpanda:v26.2.2
 # `up --build` builds the full dependency graph. Retry on Maven Central flakes;
 # tear down between attempts so partial creates do not leave missing images.
 compose_up_build() {

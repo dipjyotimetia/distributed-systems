@@ -1,0 +1,15 @@
+{
+  "type": "record",
+  "name": "TransactionEvent",
+  "namespace": "com.banking.events",
+  "doc": "Legacy ledger completion event on topic transaction-events",
+  "fields": [
+    {"name": "transaction_id", "type": "long"},
+    {"name": "account_id", "type": ["null", "long"], "default": null},
+    {"name": "user_id", "type": "long"},
+    {"name": "amount", "type": "double"},
+    {"name": "transaction_type", "type": "string"},
+    {"name": "status", "type": "string"},
+    {"name": "timestamp", "type": "string", "doc": "ISO-8601 instant, historically LocalDateTime + Z"}
+  ]
+}

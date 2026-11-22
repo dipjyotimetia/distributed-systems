@@ -48,7 +48,10 @@ func (a *Activities) VerifyKafka(ctx context.Context, transfer Transfer) (Bounda
 		Event                         transactionEvent
 	}
 	err := probeContainer(ctx, a.BrokerContainer, &record,
-		"rpk", "topic", "consume", "transaction-events", "-X", "brokers=redpanda:9092",
+		"rpk", "topic", "consume", "transaction-events",
+		"-X", "brokers=redpanda:9092",
+		"-X", "registry.hosts=redpanda:8081",
+		"--use-schema-registry=value",
 		"--offset", "start", "--num", "1",
 		"--format", `{"partition":%p,"offset":%o,"start":%[,"end":%],"event":%v}`)
 	if err != nil {

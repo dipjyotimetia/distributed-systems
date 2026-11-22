@@ -23,7 +23,9 @@ Browser banking requests flow through the frontend server. The AI chat proxy use
 Client → Frontend Service → API Gateway → Backend Services
 ```
 
-`contracts/proto/` is the protobuf contract, next to the OpenAPI files in `contracts/openapi/`. KYC is `contracts/proto/kyc/kyc.proto` and cards is `contracts/proto/cards/cards.proto`. `scripts/frontend-proto.sh` writes the checked-in TypeScript under `frontend/src/gen` with Buf 1.75.0 and `protoc-gen-es` 2.16.0. Next.js route handlers import those stubs and call the Go servers with the gRPC protocol. The browser uses the HTTP routes. Those routes forward the incoming `Authorization` header as gRPC metadata.
+`contracts/proto/` is the protobuf contract for gRPC APIs, next to the OpenAPI files in `contracts/openapi/`. KYC is `contracts/proto/kyc/kyc.proto` and cards is `contracts/proto/cards/cards.proto`. `scripts/frontend-proto.sh` writes the checked-in TypeScript under `frontend/src/gen` with Buf 1.75.0 and `protoc-gen-es` 2.16.0. Next.js route handlers import those stubs and call the Go servers with the gRPC protocol. The browser uses the HTTP routes. Those routes forward the incoming `Authorization` header as gRPC metadata.
+
+Kafka event shapes live under [`contracts/avro/`](contracts/avro/README.md) (not protobuf). Producers and notification-service use Confluent wire-format Avro via Redpanda Schema Registry (`SCHEMA_REGISTRY_URL`, default `http://banking-kafka:8081`).
 
 KYC stores the case and starts a Temporal review on the `kyc-review` task queue. Cards calls `fraud-service` over gRPC and reads the account from `accounts-service` over HTTP before it issues a card. `docker-compose.mtls.yml` is the optional mutual TLS overlay for the frontend, KYC, cards, and fraud clients.
 
@@ -36,8 +38,22 @@ The application backend services are `api-gateway`, `user-service`,
 `kyc-service`, `cards-service`, `notification-service`,
 `disputes-service`, `ai-service`, and the optional `payments-service`.
 MongoDB provides infrastructure
-for notification event storage. Kafka carries transaction events and
+for notification event storage. Redpanda carries `transaction-events`,
+`payment-events.v1`, and `movement-lifecycle-v1` (Confluent Avro via Schema
+Registry by default; set `KAFKA_VALUE_FORMAT=json` for UTF-8 JSON). Schemas and
+codegen are documented in [`contracts/avro/README.md`](contracts/avro/README.md).
 PostgreSQL stores identity, account, transaction, dispute, and payment data.
+
+```mermaid
+flowchart LR
+  tx[transactions-service] -->|outbox| te[transaction-events]
+  tx -->|outbox| ml[movement-lifecycle-v1]
+  pay[payments-service] -->|outbox| pe[payment-events.v1]
+  te --> notif[notification-service]
+  pe --> notif
+  ml --> future[external consumers]
+  tx & pay & notif -.-> sr[(Schema Registry)]
+```
 
 Local Compose uses one PostgreSQL database with a schema per service
 (`user_service`, `accounts_service`, `transactions_service`, `payments`,

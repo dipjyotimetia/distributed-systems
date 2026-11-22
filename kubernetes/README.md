@@ -4,7 +4,7 @@ Run these commands from the repository root with the target cluster selected.
 
 | Configuration | Purpose |
 |---|---|
-| `kubernetes/base` | Application, PostgreSQL, Redis, MongoDB, Redpanda and simulation client |
+| `kubernetes/base` | Application, PostgreSQL, Redis, MongoDB, Redpanda (broker + Schema Registry `:8081`) and simulation client |
 | `kubernetes/overlays/local` | Base resources plus a frontend NodePort, using the published images |
 | `kubernetes/observability` | Collector, Jaeger, Prometheus, Grafana and Loki |
 | `kubernetes/overlays/speedscale` | Base and observability resources with six replay responders |
@@ -104,7 +104,9 @@ database URLs. The local overlay initializes both schemas through Flyway.
 Set the cutoff and time zone consistently in `banking-payments-config`.
 Set `PAYMENTS_OPERATOR_IDS` there to grant read-only access to reconciliation
 discrepancies. Provision the `payment-events.v1` Redpanda topic before using
-the worker.
+the worker. App config defaults `SCHEMA_REGISTRY_URL=http://banking-kafka:8081`
+and `KAFKA_VALUE_FORMAT=avro` for Confluent Avro on `transaction-events`,
+`payment-events.v1`, and `movement-lifecycle-v1` ([Avro contracts](../contracts/avro/README.md)).
 
 ```bash
 kubectl apply -k kubernetes/overlays/payments-local
