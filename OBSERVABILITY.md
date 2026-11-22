@@ -23,6 +23,12 @@ flowchart LR
     accounts[accounts-service]
     transactions[transactions-service]
     users[user-service]
+    fraud[fraud-service]
+    kyc[kyc-service]
+    cards[cards-service]
+    disputes[disputes-service]
+    notif[notification-service]
+    ai[ai-service]
   end
   collector[otel-collector]
   jaeger[jaeger]
@@ -32,8 +38,17 @@ flowchart LR
   accounts --> collector
   transactions --> collector
   users --> collector
+  fraud --> collector
+  kyc --> collector
+  cards --> collector
+  disputes --> collector
+  notif --> collector
+  ai --> collector
   collector --> jaeger
 ```
+
+Compose and Kubernetes route every instrumented service through the collector;
+the Java/.NET path above is not a special case.
 
 ### OpenTelemetry trace data processing
 

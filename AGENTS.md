@@ -18,23 +18,16 @@ Internal demo orchestration, customer rehearsals, cloud-account-specific runners
 
 ## Development Workflow
 
-This project follows a phased implementation approach. Each phase must be completed and tested before moving to the next:
+Delivery milestones live in `plan.md`. Phases **1–9 are complete**. Remaining open work is **Phase 10** (production K8s / security hardening) and **Phase 11** (advanced features). The live service inventory is in `README.md` and `architecture.md` — do not treat the historical phase checklists as the feature list.
 
-1. **Phase 1**: Project Setup & Infrastructure
-2. **Phase 2**: Backend Services Development
-3. **Phase 3**: Frontend Development
-4. **Phase 4**: Testing
-5. **Phase 5**: Observability & Monitoring
-6. **Phase 6**: Containerization
-7. **Phase 7**: Kubernetes Deployment
-8. **Phase 8**: Documentation & Maintenance
+Current application backends: `api-gateway`, `user-service`, `accounts-service`, `transactions-service`, `fraud-service`, `kyc-service`, `cards-service`, `disputes-service`, `notification-service`, `ai-service` (+ workers), and optional `payments-service` on overlays.
 
 ## Key Commands Reference
 
-**Start development environment**: `docker-compose up -d`  
-**Build service**: `../../gradlew -p ../.. clean bootJar` (from service directory)
-**Run tests**: `../../gradlew -p ../.. test` (backend) or `npm test` (frontend)
-**Database migrations**: `../../gradlew -p ../.. :accounts-service:flywayMigrate`
+**Start development environment**: `docker compose up -d`  
+**Build service**: `./gradlew :accounts-service:bootJar` (from repository root)
+**Run tests**: `./gradlew test` (backend) or `npm test` (frontend)
+**Database migrations**: `./gradlew :accounts-service:flywayMigrate`
 
 ## Implementation Guidelines
 
@@ -76,4 +69,4 @@ Docs-only or infra-only changes can skip a `gradle.properties` version bump. CI 
 
 ## Current Status
 
-Check `plan.md` for the current implementation phase and specific tasks. Each sub-phase includes both implementation tasks and testing requirements that must be completed.
+Phases 1–9 are complete. Use `plan.md` for remaining Phase 10–11 production work and the “Shipped since Phase 9” inventory. Use `README.md` / `architecture.md` / `docs/architecture/` for the current runtime topology.

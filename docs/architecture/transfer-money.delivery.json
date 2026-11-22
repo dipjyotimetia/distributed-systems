@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "e5334fc3-9dd9-409e-ab37-1366e7ba3e50",
+  "status": "current",
+  "command": "deliver",
+  "type": "sequence",
+  "input": "/Users/dipjyotimetia/Documents/working/ccviews/distributed-systems/docs/architecture/transfer-money.sequence.json",
+  "output": "/Users/dipjyotimetia/Documents/working/ccviews/distributed-systems/docs/architecture/transfer-money.html",
+  "specification": {
+    "sha256": "0964177e3d1a03a9e6203fd0c064099ae11521859eff6ce480ac744dee847f0d",
+    "bytes": 5559
+  },
+  "artifact": {
+    "sha256": "f3d4c552a1dd02ebaf5a115ab1f764eed7adf7108f82a7c83e27ac354e25e4ff",
+    "bytes": 841945
+  }
+}

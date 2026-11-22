@@ -1,6 +1,18 @@
 # Banking Application Implementation Plan
 
-The completed phases record delivery milestones. See the [README](README.md) for current deployment support.
+The completed phases record delivery milestones. See the [README](README.md) for current deployment support and [architecture.md](architecture.md) for the runtime topology.
+
+## Shipped since Phase 9
+
+These capabilities landed after the numbered Phase 9 checklist and are part of the current product:
+
+- **KYC and cards** — Go gRPC services (`:8091` / `:8092`), frontend Buf clients, optional mTLS Compose overlay
+- **Disputes** — intake API, Temporal escalation/investigation, operator HITL, transactions query gRPC
+- **Avro event pipeline** — Confluent Avro via Schema Registry for `transaction-events`, `payment-events.v1`, `movement-lifecycle-v1`
+- **Temporal workers** — disputes, statement exports, KYC review, AI banking agent (payments worker on overlay)
+- **Internal gRPC mesh** — accounts ledger `:9092`, transactions query `:9095`, dispute research proto
+- **Optional payments** — Compose/K8s overlays with Artemis clearing and reconciliation
+- **Speedscale** — optional Kubernetes traffic-replay overlay (OTel no longer depends on Speedscale)
 
 ## Phase 1: Project Setup & Infrastructure ✅ COMPLETED
 - [x] Create monorepo structure with backend services, frontend, and infrastructure directories

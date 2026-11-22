@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "1ab74c01-98a9-4713-8d3c-cb9d3f205eef",
+  "status": "current",
+  "command": "deliver",
+  "type": "dataflow",
+  "input": "/Users/dipjyotimetia/Documents/working/ccviews/distributed-systems/docs/architecture/event-pipeline.dataflow.json",
+  "output": "/Users/dipjyotimetia/Documents/working/ccviews/distributed-systems/docs/architecture/event-pipeline.html",
+  "specification": {
+    "sha256": "bc4af0ede9d16f1956fe247802c960501617f61e70e178fb6038cc1db5118d4b",
+    "bytes": 6324
+  },
+  "artifact": {
+    "sha256": "b1dd28e48195a1ff12eb6157404a5156f368fb2e766f43e3c12bbf1dd7273162",
+    "bytes": 846163
+  }
+}

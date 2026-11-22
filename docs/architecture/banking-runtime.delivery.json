@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "d687d162-20b7-4fd2-b00b-dacec0171dce",
+  "status": "current",
+  "command": "deliver",
+  "type": "architecture",
+  "input": "/Users/dipjyotimetia/Documents/working/ccviews/distributed-systems/docs/architecture/banking-runtime.architecture.json",
+  "output": "/Users/dipjyotimetia/Documents/working/ccviews/distributed-systems/docs/architecture/banking-runtime.html",
+  "specification": {
+    "sha256": "f7873c822ce8375c6d155f38f509babd1a39df8f173addef97b9b9a444588488",
+    "bytes": 6718
+  },
+  "artifact": {
+    "sha256": "af483efa642ce432171ead17a387b66ae53cf770e8e72b29f987f143ff8431f6",
+    "bytes": 849576
+  }
+}

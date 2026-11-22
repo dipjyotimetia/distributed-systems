@@ -1,5 +1,8 @@
 # System Architecture & Traffic Flow
 
+Interactive Archify diagrams for the runtime topology, transfer path, and
+event pipeline are under [`docs/architecture/`](docs/architecture/).
+
 ## Local Development with Colima
 
 The `kubernetes/overlays/local/` overlay uses the same base manifests and namespace (`banking-app`) as the default stack. It does not override container images; services use the published images from the base manifests (e.g. `ghcr.io/dipjyotimetia/distributed-systems/...`).
@@ -10,10 +13,10 @@ To run against images built locally (e.g. `localhost:5000/...`), build and tag i
 # Example: deploy the local overlay (same images as base unless you patch)
 kubectl apply -k kubernetes/overlays/local/
 
-# Optional: local registry for custom tags
+# Optional: local registry for custom tags (tag matches root VERSION)
 docker run -d -p 5000:5000 --name registry registry:2
-docker tag ghcr.io/dipjyotimetia/distributed-systems/frontend:v1.3.4 localhost:5000/frontend:v1.3.4
-docker push localhost:5000/frontend:v1.3.4
+docker tag ghcr.io/dipjyotimetia/distributed-systems/frontend:v1.4.139 localhost:5000/frontend:v1.4.139
+docker push localhost:5000/frontend:v1.4.139
 ```
 
 ## Traffic Flow Design
@@ -27,7 +30,7 @@ Client → Frontend Service → API Gateway → Backend Services
 
 Kafka event shapes live under [`contracts/avro/`](contracts/avro/README.md) (not protobuf). Producers and notification-service use Confluent wire-format Avro via Redpanda Schema Registry (`SCHEMA_REGISTRY_URL`, default `http://banking-kafka:8081`).
 
-KYC stores the case and starts a Temporal review on the `kyc-review` task queue. Cards calls `fraud-service` over gRPC and reads the account from `accounts-service` over HTTP before it issues a card. `docker-compose.mtls.yml` is the optional mutual TLS overlay for the frontend, KYC, cards, and fraud clients.
+KYC stores the case and starts a Temporal review on the `kyc-review` task queue. Cards calls `fraud-service` over gRPC and the accounts ledger over gRPC (`ACCOUNTS_GRPC_ADDRESS`, default `accounts-service:9092`) before it issues a card. `docker-compose.mtls.yml` is the optional mutual TLS overlay for the frontend, KYC, cards, and fraud clients.
 
 ## Application services and infrastructure
 
@@ -68,20 +71,39 @@ unless `FRAUD_FAIL_OPEN=false`. The gateway fault filter stays off unless
 in fixture mode so chat does not call live LLM providers. `payments-service`
 stays on the Artemis and payments Compose overlays.
 
-The disputes API verifies transfer eligibility through the transaction
-read endpoint using the caller's JWT. PostgreSQL stores the case and
-workflow start together. Evidence requests, responses, and resolutions
-update the case and its signal outbox atomically. The investigation workflow
-carries only the case ID and revision, and reloads deadlines and status
-through an activity. The legacy escalation workflow stays registered,
-and both escalation paths guard against changing resolved cases.
+### Internal gRPC and Temporal workers
+
+| Contract | Default address | Callers |
+|---|---|---|
+| Accounts ledger (`contracts/proto/ledger/ledger.proto`) | `accounts-service:9092` | transactions-service, cards-service |
+| Transactions query (`contracts/proto/transactions/query.proto`) | `transactions-service:9095` | disputes-service |
+| Dispute research (`contracts/proto/disputes/research.proto`) | disputes research port | ai-worker / dispute research path |
+| KYC / cards / fraud | `:8091` / `:8092` / h2c `:8080` | frontend (KYC/cards), cards→fraud, transactions→fraud |
+
+Local Compose shares one Temporal development server (SQLite on a named
+volume). Task queues and workers:
+
+| Queue | Worker process |
+|---|---|
+| `disputes-escalation` | `disputes-worker` |
+| `accounts-statement-exports` | `statement-worker` (accounts-service image) |
+| `kyc-review` | `kyc-worker` |
+| `ai-banking` | `ai-worker` |
+| payments queues | `payments-worker` (payments overlay only) |
+
+The disputes API verifies transfer eligibility over transactions query gRPC
+(`TRANSACTIONS_GRPC_ADDRESS`) using the caller's JWT. PostgreSQL stores the
+case and workflow start together. Evidence requests, responses, and
+resolutions update the case and its signal outbox atomically. The
+investigation workflow carries only the case ID and revision, and reloads
+deadlines and status through an activity. The legacy escalation workflow
+stays registered, and both escalation paths guard against changing resolved
+cases.
 
 Accounts-service stores statement jobs and workflow starts together in
 PostgreSQL. A separate Java process runs export workflows on a dedicated task
 queue. Activity results carry the expiry timestamp, while the generated
 JSON stays in PostgreSQL. Downloads check ownership and expiry on each call.
-Local Compose shares one Temporal development server with SQLite on a named
-volume across both workers.
 
 ## Architecture Principles
 
