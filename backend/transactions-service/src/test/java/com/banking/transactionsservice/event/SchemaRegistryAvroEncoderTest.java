@@ -1,7 +1,12 @@
 package com.banking.transactionsservice.event;
 
+import com.banking.events.TransactionEvent;
+import org.apache.avro.io.EncoderFactory;
+import org.apache.avro.specific.SpecificDatumWriter;
+import org.apache.avro.util.ClassSecurityValidator;
 import org.junit.jupiter.api.Test;
 
+import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
@@ -9,6 +14,27 @@ import java.util.Arrays;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SchemaRegistryAvroEncoderTest {
+
+    @Test
+    void trustsGeneratedEventClassesForAvroSerialize() throws Exception {
+        SchemaRegistryAvroEncoder.trustGeneratedEventClasses();
+        assertDoesNotThrow(() -> ClassSecurityValidator.validate(TransactionEvent.class));
+
+        TransactionEvent event = TransactionEvent.newBuilder()
+                .setTransactionId(1L)
+                .setAccountId(2L)
+                .setUserId(3L)
+                .setAmount(1.25)
+                .setTransactionType("DEPOSIT")
+                .setStatus("COMPLETED")
+                .setTimestamp("2026-11-22T00:00:00Z")
+                .build();
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        var encoder = EncoderFactory.get().binaryEncoder(out, null);
+        new SpecificDatumWriter<TransactionEvent>(event.getSchema()).write(event, encoder);
+        encoder.flush();
+        assertTrue(out.size() > 0);
+    }
 
     @Test
     void jsonModePassesThroughUtf8Bytes() throws Exception {
