@@ -22,7 +22,7 @@ The Next.js frontend is the browser's API. For an HTTP service, add a route unde
 
 Compose runs one PostgreSQL database. Each service owns a schema (`user_service`, `accounts_service`, `transactions_service`, `payments`, `disputes`). That shared database is a demo shortcut, not a pattern to copy into production. Put migrations in the service, grant the service user rights on its schema only, and do not query another service's tables.
 
-If a write must be followed by a message or a workflow start, insert an outbox row in the same database transaction. `payments.outbox`, `disputes.workflow_outbox`, and `transactions_service.event_outbox` are the examples. Money movement that a client may retry should store an `Idempotency-Key` and return the original result.
+If a write must be followed by a message or a workflow start, insert an outbox row in the same database transaction. `payments.outbox`, `disputes.workflow_outbox`, and `transactions_service.event_outbox` are the examples. Relays should claim with `FOR UPDATE SKIP LOCKED`, mark published only after the downstream ack, quarantine poison rows so the queue cannot stall, and retain published rows only for a bounded window. Money movement that a client may retry should store an `Idempotency-Key` and return the original result.
 
 ## 4. Local Compose
 

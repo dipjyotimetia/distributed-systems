@@ -65,11 +65,16 @@ schema as private and should not read another service's tables.
 
 Completed ledger movements record an `Idempotency-Key` when the client sends
 one, and write `transaction-events` through `transactions_service.event_outbox`
-in the same database transaction as the ledger row. Fraud screening fails open
-unless `FRAUD_FAIL_OPEN=false`. The gateway fault filter stays off unless
-`FAULT_INJECTION_RATE` is set above zero. Default Compose runs `ai-service`
-in fixture mode so chat does not call live LLM providers. `payments-service`
-stays on the Artemis and payments Compose overlays.
+in the same database transaction as the ledger row. The outbox publisher claims
+rows with `FOR UPDATE SKIP LOCKED`, quarantines poison payloads after repeated
+failures (`failed_at`), and retains published rows only for a configured window.
+`movement-lifecycle-v1` remains for external consumers (dedupe by `eventId`);
+notification-service consumes `transaction-events` and, on the payments overlay,
+`payment-events.v1`. Fraud screening fails open unless `FRAUD_FAIL_OPEN=false`.
+The gateway fault filter stays off unless `FAULT_INJECTION_RATE` is set above
+zero. Default Compose runs `ai-service` in fixture mode so chat does not call
+live LLM providers. `payments-service` stays on the Artemis and payments Compose
+overlays.
 
 ### Internal gRPC and Temporal workers
 
