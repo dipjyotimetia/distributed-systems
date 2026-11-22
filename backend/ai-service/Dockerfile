@@ -1,5 +1,5 @@
 FROM python:3.15.2-slim
-COPY --from=ghcr.io/astral-sh/uv:0.11.9 /uv /uvx /bin/
+COPY --from=ghcr.io/astral-sh/uv:0.13.9 /uv /uvx /bin/
 
 WORKDIR /app
 ENV UV_COMPILE_BYTECODE=1 \
