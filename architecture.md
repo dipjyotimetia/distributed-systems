@@ -40,7 +40,7 @@ The application backend services are `api-gateway`, `user-service`,
 `accounts-service`, `transactions-service`, `fraud-service`,
 `kyc-service`, `cards-service`, `notification-service`,
 `disputes-service`, `ai-service`, `knowledge-service`, and the optional
-`payments-service`. Knowledge-service owns document blobs (MinIO/S3 or local)
+`payments-service`. Knowledge-service owns document blobs (RustFS/S3 or local)
 plus metadata/embeddings for RAG and MCP. MongoDB provides infrastructure
 for notification event storage. Redpanda carries `transaction-events`,
 `payment-events.v1`, and `movement-lifecycle-v1` (Confluent Avro via Schema

@@ -26,7 +26,7 @@ If the gateway exits on an OpenTelemetry `ContainerAttributes` error, see [TROUB
 
 | Environment | Includes |
 |---|---|
-| Default Compose | Identity, accounts, transactions, fraud, KYC, cards, disputes, workers, fixture AI, knowledge vault (MinIO), Postgres, Redis, Redpanda, MongoDB, notifications, OTel/Jaeger/Prometheus/Grafana |
+| Default Compose | Identity, accounts, transactions, fraud, KYC, cards, disputes, workers, fixture AI, knowledge vault (RustFS), Postgres, Redis, Redpanda, MongoDB, notifications, OTel/Jaeger/Prometheus/Grafana |
 | Kubernetes base / local | Core banking + AI + notifications + simulation (no disputes workers by default) |
 | Kubernetes full overlay | Base + disputes/statement/KYC/AI workers + Temporal |
 | Payments overlay | Optional outbound AUD payments (Temporal, Artemis, settlement) |

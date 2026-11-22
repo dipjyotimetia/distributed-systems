@@ -1,4 +1,4 @@
-"""Blob storage: local filesystem (tests/default) or S3-compatible (MinIO)."""
+"""Blob storage: local filesystem (tests/default) or S3-compatible (RustFS/MinIO)."""
 
 from __future__ import annotations
 
@@ -41,8 +41,8 @@ def _s3_client():
     kwargs: dict = {
         "service_name": "s3",
         "region_name": os.environ.get("AWS_REGION", "us-east-1"),
-        "aws_access_key_id": os.environ.get("AWS_ACCESS_KEY_ID", "minioadmin"),
-        "aws_secret_access_key": os.environ.get("AWS_SECRET_ACCESS_KEY", "minioadmin"),
+        "aws_access_key_id": os.environ.get("AWS_ACCESS_KEY_ID", "rustfsadmin"),
+        "aws_secret_access_key": os.environ.get("AWS_SECRET_ACCESS_KEY", "rustfsadmin"),
     }
     if endpoint:
         kwargs["endpoint_url"] = endpoint

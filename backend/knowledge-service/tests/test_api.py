@@ -1,4 +1,4 @@
-"""API tests against in-memory knowledge store (no Postgres/MinIO required)."""
+"""API tests against in-memory knowledge store (no Postgres/object store required)."""
 
 from __future__ import annotations
 
