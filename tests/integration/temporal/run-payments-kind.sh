@@ -126,7 +126,8 @@ jaeger="http://127.0.0.1:$forwarded"
 
 (cd frontend && npm run test:e2e:real-backend -- payments.real-backend.spec.ts --workers=1)
 timeout 30 kubectl -n banking-app exec deployment/banking-kafka -- rpk topic consume payment-events.v1 \
-  -X brokers=banking-kafka:9092 -o :end --format '%k\t%v\n' |
+  -X brokers=banking-kafka:9092 -X registry.hosts=banking-kafka:8081 --use-schema-registry=value \
+  -o :end --format '%k\t%v\n' |
   python3 tests/integration/verify-payment-event.py "$MICROSVC_PAYMENT_EVIDENCE"
 python3 tests/integration/verify-payment-trace.py "$jaeger" "$MICROSVC_PAYMENT_EVIDENCE"
 

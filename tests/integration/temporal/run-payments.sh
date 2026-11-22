@@ -60,7 +60,8 @@ fixtures="http://$("${compose[@]}" port provider-fixtures 8081)"
 
 (cd frontend && npm run test:e2e:real-backend -- payments.real-backend.spec.ts --workers=1)
 timeout 30 "${compose[@]}" exec -T redpanda rpk topic consume payment-events.v1 \
-  -X brokers=redpanda:9092 -o :end --format '%k\t%v\n' |
+  -X brokers=redpanda:9092 -X registry.hosts=redpanda:8081 --use-schema-registry=value \
+  -o :end --format '%k\t%v\n' |
   python3 tests/integration/verify-payment-event.py "$MICROSVC_PAYMENT_EVIDENCE"
 
 jaeger="http://$("${compose[@]}" port jaeger 16686)"

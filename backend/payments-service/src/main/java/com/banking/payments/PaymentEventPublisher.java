@@ -5,6 +5,7 @@ import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.apache.kafka.common.serialization.StringSerializer;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -29,6 +30,7 @@ public class PaymentEventPublisher {
     private final KafkaProducer<String, byte[]> producer;
     private final Function<byte[], byte[]> encode;
 
+    @Autowired
     public PaymentEventPublisher(JdbcTemplate db, PaymentTracing tracing, SchemaRegistryAvroEncoder encoder,
                                  @Value("${PAYMENTS_KAFKA_BROKERS}") String brokers,
                                  @Value("${PAYMENTS_KAFKA_TOPIC:payment-events.v1}") String topic) {
