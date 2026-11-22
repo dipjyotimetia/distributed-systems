@@ -38,7 +38,7 @@ spec:
               memory: 128Mi
       containers:
         - name: temporal
-          image: temporalio/auto-setup:1.29.1
+          image: temporalio/auto-setup:1.29.7
           env:
             - name: DB
               value: postgres12
