@@ -15,6 +15,7 @@
 # Optional env:
 #   PROXYMOCK_DIR             recording dir, relative to backend/user-service (default proxymock/recorded-complete)
 #   PROXYMOCK_REPLAY_FAIL_IF  passed to `proxymock replay --fail-if`
+#   PROXYMOCK_REQUIRED=1      fail (instead of skip) if proxymock is missing or uninitialized
 #
 # Usage:
 #   ./scripts/run-proxymock-validation.sh
@@ -26,6 +27,15 @@ ROOT="$(dirname "$SCRIPT_DIR")"
 SERVICE_DIR="${ROOT}/backend/user-service"
 PROXYMOCK_DIR="${PROXYMOCK_DIR:-proxymock/recorded-complete}"
 
+skip_or_fail() {
+  if [ "${PROXYMOCK_REQUIRED:-}" = "1" ]; then
+    echo "error: $1 (PROXYMOCK_REQUIRED=1)" >&2
+    exit 1
+  fi
+  echo "Skipping proxymock validation: $1."
+  exit 0
+}
+
 # --- 1. install + init proxymock -------------------------------------------------------------
 export PATH="${HOME}/.speedscale:${PATH}"
 if ! command -v proxymock >/dev/null 2>&1; then
@@ -34,17 +44,15 @@ if ! command -v proxymock >/dev/null 2>&1; then
   export PATH="${HOME}/.speedscale:${PATH}"
 fi
 if ! command -v proxymock >/dev/null 2>&1; then
-  echo "error: proxymock not on PATH after install"
-  exit 1
+  skip_or_fail "proxymock is not installed"
 fi
 
 # Skip before a long build when CI has no API key (e.g. fork PRs) or local dev without Speedscale.
 PM_VER_OUT=$(proxymock version 2>&1) || true
 if echo "$PM_VER_OUT" | grep -Fq "not initialized"; then
   if [ -z "${PROXYMOCK_API_KEY:-}" ]; then
-    echo "Skipping proxymock validation: proxymock is not initialized and no API key is set."
     echo "Set GitHub secret PROXYMOCK_API_KEY or run: proxymock init --api-key <key>"
-    exit 0
+    skip_or_fail "proxymock is not initialized and no API key is set"
   fi
   for attempt in 1 2 3; do
     if proxymock init -y --app-url app.speedscale.com --api-key "$PROXYMOCK_API_KEY"; then
@@ -79,7 +87,7 @@ fi
 
 # --- 2. build user-service -------------------------------------------------------------------
 cd "$SERVICE_DIR"
-echo "Building user-service (.NET 8)..."
+echo "Building user-service (.NET 10)..."
 dotnet publish -c Release -o publish
 
 DLL_FILE="publish/user-service-dotnet.dll"

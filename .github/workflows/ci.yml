@@ -124,6 +124,8 @@ jobs:
     - name: Proxymock validation (install, init, build, mock+replay)
       env:
         PROXYMOCK_API_KEY: ${{ secrets.PROXYMOCK_API_KEY }}
+        # Fork PRs get no secret and skip; everywhere else a missing proxymock fails the job.
+        PROXYMOCK_REQUIRED: ${{ secrets.PROXYMOCK_API_KEY != '' && '1' || '' }}
       run: ./scripts/run-proxymock-validation.sh
   
   # Replays recorded traffic against a service built from this change, with its

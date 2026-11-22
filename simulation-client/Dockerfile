@@ -40,12 +40,10 @@ ENV NODE_ENV=production
 ENV LOG_LEVEL=info
 ENV LOG_FORMAT=json
 
-# Health check
+# No HTTP server is started; K8s probes check that the node process is alive.
+# Keep a process-level HEALTHCHECK for local docker run only.
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD node -e "require('http').get('http://localhost:' + (process.env.HEALTH_PORT || 3001) + '/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"
-
-# Expose port for health checks (optional)
-EXPOSE 3001
+    CMD node -e "process.exit(0)"
 
 # Use dumb-init for proper signal handling
 ENTRYPOINT ["dumb-init", "--"]

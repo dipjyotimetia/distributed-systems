@@ -8,7 +8,6 @@ const { AccountsApi, StatementJobsApi, Configuration: AccountsConfiguration } = 
 const { TransactionsApi, Configuration: TransactionsConfiguration } = require('../generated/transactions/src');
 const { DisputesApi, Configuration: DisputesConfiguration } = require('../generated/disputes/src');
 const { PaymentsApi, Configuration: PaymentsConfiguration } = require('../generated/payments/src');
-const { AiApi, Configuration: AiConfiguration } = require('../generated/ai/src');
 const { NotificationsApi, Configuration: NotificationsConfiguration } = require('../generated/notifications/src');
 const { GatewayApi, Configuration: GatewayConfiguration } = require('../generated/gateway/src');
 
@@ -154,7 +153,7 @@ class ApiClient {
   }
 
   async getRecentTransactions(token) {
-    return this.retryRequest(async () => this.contract(TransactionsApi, TransactionsConfiguration, this.baseURL, token).listTransactions());
+    return this.retryRequest(async () => this.contract(TransactionsApi, TransactionsConfiguration, this.baseURL, token).recentTransactions());
   }
 
   async getTransaction(transactionId, token) {
@@ -209,8 +208,19 @@ class ApiClient {
     return this.retryRequest(async () => this.contract(AccountsApi, AccountsConfiguration, this.baseURL, token).exportStatement({ accountId }));
   }
 
+  // TARGET_BASE_URL is the frontend in deployed configs; the Next BFF is
+  // /api/v1/ai/chat (upstream AI service itself uses /api/v1/chat).
   async askAIChat(message, token, locale = 'en-US', accountContext = '') {
-    return this.contract(AiApi, AiConfiguration, this.baseURL, token).chat({ chatRequest: { message, locale, accountContext } });
+    return this.retryRequest(async () => {
+      const headers = injectTraceHeaders({ 'Content-Type': 'application/json' });
+      if (token) headers.Authorization = `Bearer ${token}`;
+      const response = await this.client.post(
+        '/api/v1/ai/chat',
+        { message, locale, accountContext },
+        { headers },
+      );
+      return response.data;
+    });
   }
 
   // Notification service endpoints

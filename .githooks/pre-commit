@@ -39,7 +39,7 @@ for cfg in "$SERVICES_DIR"/*.env; do
   # The harness exits 0 and skips when proxymock is not installed/initialized, so this stays
   # non-blocking for contributors without Speedscale while still gating when present.
   # PROXYMOCK_SKIP_BUILD is cleared so the commit is always tested against a fresh build of
-  # its own sources, never a stale jar left in target/.
+  # its own sources, never a stale jar left in build/libs/.
   if ! env -u PROXYMOCK_SKIP_BUILD "${REPO_ROOT}/scripts/proxymock/replay-service.sh" "$service"; then
     echo ""
     echo "pre-commit: ${service} proxymock replay FAILED. Fix the service or update its"
