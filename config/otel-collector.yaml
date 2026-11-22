@@ -1,6 +1,6 @@
 # Compose OpenTelemetry Collector — traces pipeline mirrors the Kubernetes
 # filter rules in kubernetes/observability/otel-collector.yaml (actuator + Spring
-# Security noise dropped before Jaeger). Metrics/logs/Speedscale pipelines are
+# Security noise dropped before Jaeger). Metrics/logs pipelines beyond traces are
 # omitted here; Compose keeps Prometheus/Grafana separate.
 
 receivers:

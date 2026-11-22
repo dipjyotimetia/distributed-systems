@@ -1,0 +1,41 @@
+[
+  {
+    "_comment": "Account balance: non-negative balance with identity fields.",
+    "match": {"method": "GET", "url": "/api/v1/accounts/{id}/balance", "status": "200"},
+    "assert": [
+      {"field": "$.balance", "type": "number", "required": true, "min": 0},
+      {"field": "$.accountId", "type": "number", "required": true},
+      {"field": "$.accountNumber", "type": "string", "required": true, "pattern": "^[0-9]+$"}
+    ]
+  },
+  {
+    "_comment": "Single account: identity present, balance non-negative, known account type.",
+    "match": {"method": "GET", "url": "/api/v1/accounts/{id}", "status": "200"},
+    "assert": [
+      {"field": "$.id", "type": "number", "required": true},
+      {"field": "$.userId", "type": "number", "required": true},
+      {"field": "$.balance", "type": "number", "required": true, "min": 0},
+      {"field": "$.accountNumber", "type": "string", "required": true, "pattern": "^[0-9]+$"},
+      {"field": "$.accountType", "type": "string", "enum": ["CHECKING", "SAVINGS", "CREDIT", "INVESTMENT"]}
+    ]
+  },
+  {
+    "_comment": "Account list: every element carries identity and a non-negative balance.",
+    "match": {"method": "GET", "url": "/api/v1/accounts", "status": "200"},
+    "assert": [
+      {"field": "$[].id", "type": "number", "required": true},
+      {"field": "$[].userId", "type": "number", "required": true},
+      {"field": "$[].balance", "type": "number", "required": true, "min": 0},
+      {"field": "$[].accountType", "type": "string", "enum": ["CHECKING", "SAVINGS", "CREDIT", "INVESTMENT"]}
+    ]
+  },
+  {
+    "_comment": "Account creation: identified with a non-negative opening balance.",
+    "match": {"method": "POST", "url": "/api/v1/accounts", "status": "201"},
+    "assert": [
+      {"field": "$.id", "type": "number", "required": true},
+      {"field": "$.userId", "type": "number", "required": true},
+      {"field": "$.balance", "type": "number", "required": true, "min": 0}
+    ]
+  }
+]

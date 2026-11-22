@@ -1,0 +1,35 @@
+[
+  {
+    "id": "health",
+    "method": "GET",
+    "url": "/api/v1/health",
+    "headers": {},
+    "body": null,
+    "expectedStatus": "200",
+    "expectedBody": {
+      "status": "ok"
+    }
+  },
+  {
+    "id": "me-unauthorized",
+    "method": "GET",
+    "url": "/api/v1/notifications/me",
+    "headers": {
+      "Accept": "application/json"
+    },
+    "body": null,
+    "expectedStatus": "401"
+  },
+  {
+    "id": "me-empty",
+    "method": "GET",
+    "url": "/api/v1/notifications/me",
+    "headers": {
+      "Accept": "application/json",
+      "Authorization": "Bearer __REPLAY_JWT__"
+    },
+    "body": null,
+    "expectedStatus": "200",
+    "expectedBody": []
+  }
+]

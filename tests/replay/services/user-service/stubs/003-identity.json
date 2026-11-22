@@ -1,0 +1,10 @@
+{
+  "request": {
+    "method": "GET",
+    "urlPathPattern": "/hibp/api/v3/breachedaccount/.*"
+  },
+  "response": {
+    "status": 404,
+    "body": ""
+  }
+}

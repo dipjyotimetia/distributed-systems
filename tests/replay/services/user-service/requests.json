@@ -1,0 +1,60 @@
+[
+  {
+    "id": "health",
+    "method": "GET",
+    "url": "/actuator/health",
+    "headers": {},
+    "body": null,
+    "expectedStatus": "200",
+    "expectedBody": {
+      "status": "UP"
+    }
+  },
+  {
+    "id": "register",
+    "method": "POST",
+    "url": "/api/v1/users/register",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "username": "replay.user.001",
+      "email": "replay.user.001@example.com",
+      "password": "ReplayUser123!"
+    },
+    "expectedStatus": "201",
+    "expectedBody": null
+  },
+  {
+    "id": "login",
+    "method": "POST",
+    "url": "/api/v1/users/login",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "usernameOrEmail": "replay.user.001",
+      "password": "ReplayUser123!"
+    },
+    "expectedStatus": "200",
+    "expectedBody": null
+  },
+  {
+    "id": "check-username",
+    "method": "GET",
+    "url": "/api/v1/users/check-username?username=replay.user.001",
+    "headers": {},
+    "body": null,
+    "expectedStatus": "200",
+    "expectedBody": null
+  },
+  {
+    "id": "check-email",
+    "method": "GET",
+    "url": "/api/v1/users/check-email?email=replay.user.001@example.com",
+    "headers": {},
+    "body": null,
+    "expectedStatus": "200",
+    "expectedBody": null
+  }
+]

@@ -50,6 +50,7 @@ func main() {
 	registerFraudEndpoints(mux, evidence)
 	registerFinancialEndpoints(mux)
 	registerSettlementEndpoints(mux)
+	registerIdentityEndpoints(mux)
 	compliance := &http.Server{Addr: ":8081", Handler: mux, ReadHeaderTimeout: 5 * time.Second}
 	log.Fatal(compliance.ListenAndServe())
 }

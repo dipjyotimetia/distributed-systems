@@ -1,0 +1,13 @@
+{
+  "request": {
+    "method": "GET",
+    "urlPath": "/api/v1/users/profile"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": "{\n  \"success\": true,\n  \"message\": \"Profile retrieved successfully\",\n  \"data\": {\n    \"id\": 242344,\n    \"username\": \"jiho.lim.359\",\n    \"email\": \"jiho.lim.359@northbridge.example\",\n    \"roles\": \"USER\",\n    \"createdAt\": \"2026-07-06T12:14:14.402947\",\n    \"updatedAt\": \"2026-07-06T12:14:14.402947\"\n  }\n}"
+  }
+}

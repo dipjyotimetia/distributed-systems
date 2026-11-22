@@ -11,7 +11,8 @@ on:
       - 'kubernetes/observability/**'
       - 'tests/integration/**'
       - 'scripts/ci/**'
-      - 'scripts/proxymock/**'
+      - 'scripts/replay/**'
+      - 'tests/replay/**'
       - 'Makefile'
   workflow_dispatch:
   schedule:
@@ -69,31 +70,12 @@ jobs:
   scheduled-traffic-replay:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: ./.github/actions/setup-java-gradle
-      - name: Cache proxymock binary
-        uses: actions/cache@v6.1.0
-        with:
-          path: ~/.speedscale
-          key: proxymock-${{ runner.os }}-v1
-          restore-keys: |
-            proxymock-${{ runner.os }}-
-      - name: Run existing gateway replay when authorized
-        env:
-          PROXYMOCK_API_KEY: ${{ secrets.PROXYMOCK_API_KEY }}
-        run: |
-          if [ -z "$PROXYMOCK_API_KEY" ]; then
-            echo 'Traffic replay skipped because PROXYMOCK_API_KEY is unavailable.' >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-          export PATH="${HOME}/.speedscale:${PATH}"
-          if ! command -v proxymock >/dev/null 2>&1; then
-            curl -Lfs https://downloads.speedscale.com/proxymock/install-proxymock | sh
-          fi
-          echo "${HOME}/.speedscale" >> "$GITHUB_PATH"
-          PROXYMOCK_REQUIRED=1 make proxymock-replay
+      - name: Run gateway WireMock replay
+        run: make replay-gate
 
   kubernetes-smoke:
     runs-on: ubuntu-24.04

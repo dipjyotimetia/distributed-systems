@@ -1,0 +1,423 @@
+[
+  {
+    "id": "2026-10-25_14-29-34.377857168Z-a183dc0b8b8f974fbf5dabc0b23fe84afad9ab9fff4b1289641612900ba95f46",
+    "method": "GET",
+    "url": "/api/v1/accounts/589219/balance",
+    "headers": {
+      "Accept": "application/json",
+      "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJoYXJyeS5ldmFucy4zNDYuMTc5MjkzODU0MDQxMDcwNyIsInVzZXJJZCI6Ijg3MjMzMiIsInJvbGVzIjoiVVNFUiIsImV4cCI6MTg5MzQ1NjAwMH0.REDACTED"
+    },
+    "body": null,
+    "expectedStatus": "200",
+    "expectedBody": {
+      "accountId": 589219,
+      "accountNumber": "734982904227",
+      "balance": 698.35
+    }
+  },
+  {
+    "id": "2026-10-25_14-31-34.977568663Z-c6f00acadf75ca6546f9780145a5ce2d67e7844cd65b5b86402bec5885dc9fc2",
+    "method": "GET",
+    "url": "/api/v1/accounts/589224/balance",
+    "headers": {
+      "Accept": "application/json",
+      "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJzb2ZpYS5lc3Bvc2l0by44NzMuMTc5MjkzODY3NDc0MzgwMyIsInVzZXJJZCI6Ijg3MjMzNiIsInJvbGVzIjoiVVNFUiIsImV4cCI6MTg5MzQ1NjAwMH0.REDACTED"
+    },
+    "body": null,
+    "expectedStatus": "200",
+    "expectedBody": {
+      "accountId": 589224,
+      "accountNumber": "204588203353",
+      "balance": 500.0
+    }
+  },
+  {
+    "id": "2026-10-25_14-31-34.978018202Z-958ac630a7ef5e6d9c9a3c56197ab0fcb0c75b57156bfed84493107c6a46de58",
+    "method": "GET",
+    "url": "/api/v1/users/profile",
+    "headers": {
+      "Accept": "application/json",
+      "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJsaWFtLm1pbGxlci4yODQuMTc5MjkzODY4NDQ2MjI3MyIsInVzZXJJZCI6Ijg3MjMzOCIsInJvbGVzIjoiVVNFUiIsImV4cCI6MTg5MzQ1NjAwMH0.REDACTED"
+    },
+    "body": null,
+    "expectedStatus": "200",
+    "expectedBody": {
+      "success": true,
+      "message": "Profile retrieved successfully",
+      "data": {
+        "id": 872338,
+        "username": "liam.miller.284.1792938684462273",
+        "email": "liam.miller.284.1792938684462273@northbridge.example",
+        "roles": "USER",
+        "createdAt": "2026-10-25T14:31:27.348313",
+        "updatedAt": null
+      }
+    }
+  },
+  {
+    "id": "2026-10-25_14-31-37.977462608Z-5319cf4b9927a753ee9f47a8dc7f0e0863746abcebceaeb685713820cfd3b620",
+    "method": "POST",
+    "url": "/api/v1/users/login",
+    "headers": {
+      "Accept": "application/json",
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "usernameOrEmail": "oscar.larsson.655",
+      "password": "SimUser123!"
+    },
+    "expectedStatus": "200",
+    "expectedBody": {
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJvc2Nhci5sYXJzc29uLjY1NSIsInVzZXJJZCI6IjI0MjY0MCIsInJvbGVzIjoiVVNFUiIsImV4cCI6MTc5MzAyNTA5Nn0.REDACTED",
+      "type": "Bearer",
+      "id": 242640,
+      "username": "oscar.larsson.655",
+      "email": "oscar.larsson.655@northbridge.example",
+      "roles": "USER"
+    }
+  },
+  {
+    "id": "2026-10-25_14-31-37.977468403Z-0147c43318efc7364690bfb8e3ce77b88ffc0147d13716a348edcbc5e21c591e",
+    "method": "GET",
+    "url": "/api/v1/users/profile",
+    "headers": {
+      "Accept": "application/json",
+      "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJldGhhbi53aWxsaWFtcy43NDIiLCJ1c2VySWQiOiIyNDI3MjciLCJyb2xlcyI6IlVTRVIiLCJleHAiOjE4OTM0NTYwMDB9.REDACTED"
+    },
+    "body": null,
+    "expectedStatus": "200",
+    "expectedBody": {
+      "success": true,
+      "message": "Profile retrieved successfully",
+      "data": {
+        "id": 242727,
+        "username": "ethan.williams.742",
+        "email": "ethan.williams.742@northbridge.example",
+        "roles": "USER",
+        "createdAt": "2026-07-06T12:14:14.402947",
+        "updatedAt": "2026-07-06T12:14:14.402947"
+      }
+    }
+  },
+  {
+    "id": "2026-10-25_14-31-38.877773772Z-81d974b566f9c5bf75d5b7385e0b32c219a04674260d4871baa3336e7afe7af3",
+    "method": "GET",
+    "url": "/api/v1/accounts",
+    "headers": {
+      "Accept": "application/json",
+      "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJldGhhbi53aWxsaWFtcy41NjIiLCJ1c2VySWQiOiIyNDI1NDciLCJyb2xlcyI6IlVTRVIiLCJleHAiOjE4OTM0NTYwMDB9.REDACTED"
+    },
+    "body": null,
+    "expectedStatus": "200",
+    "expectedBody": [
+      {
+        "id": 227530,
+        "userId": 242547,
+        "accountNumber": "901543638324",
+        "balance": 796559.35,
+        "accountType": "CHECKING",
+        "createdAt": "2026-07-06T15:04:26.589799",
+        "updatedAt": "2026-10-25T13:44:55.398537"
+      }
+    ]
+  },
+  {
+    "id": "2026-10-25_14-31-38.877778906Z-0d925a2a91b58278f20ec5acf99897f5f7fac30af039a861b54dee42e46684ac",
+    "method": "GET",
+    "url": "/api/v1/accounts/227530/balance",
+    "headers": {
+      "Accept": "application/json",
+      "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJldGhhbi53aWxsaWFtcy41NjIiLCJ1c2VySWQiOiIyNDI1NDciLCJyb2xlcyI6IlVTRVIiLCJleHAiOjE4OTM0NTYwMDB9.REDACTED"
+    },
+    "body": null,
+    "expectedStatus": "200",
+    "expectedBody": {
+      "accountId": 227530,
+      "accountNumber": "901543638324",
+      "balance": 796559.35
+    }
+  },
+  {
+    "id": "2026-10-25_14-31-39.177752334Z-cf7a5ebcc30a91a5df1c09d09cafd85d337fe6888468caea8884d89812374c8f",
+    "method": "POST",
+    "url": "/api/v1/transactions/create",
+    "headers": {
+      "Accept": "application/json",
+      "Content-Type": "application/json",
+      "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJzb2ZpYS5lc3Bvc2l0by44NzMuMTc5MjkzODY3NDc0MzgwMyIsInVzZXJJZCI6Ijg3MjMzNiIsInJvbGVzIjoiVVNFUiIsImV4cCI6MTg5MzQ1NjAwMH0.REDACTED"
+    },
+    "body": {
+      "currency": "USD",
+      "type": "DEPOSIT",
+      "amount": 259.24,
+      "accountId": 589224,
+      "description": "Initial deposit for new user"
+    },
+    "expectedStatus": "201",
+    "expectedBody": {
+      "id": 2586077,
+      "userId": 872336,
+      "fromAccountId": null,
+      "toAccountId": 589224,
+      "amount": 259.24,
+      "type": "DEPOSIT",
+      "description": "Initial deposit for new user",
+      "status": "COMPLETED",
+      "createdAt": "2026-10-25T14:31:38.096288",
+      "processedAt": "2026-10-25T14:31:38.09591698"
+    }
+  },
+  {
+    "id": "2026-10-25_14-31-39.177760977Z-615e2cb3830c92cb8532033f82ad87e2d7a9896500c6c328d5fd664089f531cb",
+    "method": "GET",
+    "url": "/api/v1/accounts",
+    "headers": {
+      "Accept": "application/json",
+      "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJsaWFtLm1pbGxlci4yODQuMTc5MjkzODY4NDQ2MjI3MyIsInVzZXJJZCI6Ijg3MjMzOCIsInJvbGVzIjoiVVNFUiIsImV4cCI6MTg5MzQ1NjAwMH0.REDACTED"
+    },
+    "body": null,
+    "expectedStatus": "200",
+    "expectedBody": []
+  },
+  {
+    "id": "2026-10-25_14-31-40.277698974Z-e49048d3e567493102c9c27fd450adbc23ee0c106cd4e92f87cb263fe848f103",
+    "method": "GET",
+    "url": "/api/v1/accounts",
+    "headers": {
+      "Accept": "application/json",
+      "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJldGhhbi53aWxsaWFtcy43NDIiLCJ1c2VySWQiOiIyNDI3MjciLCJyb2xlcyI6IlVTRVIiLCJleHAiOjE4OTM0NTYwMDB9.REDACTED"
+    },
+    "body": null,
+    "expectedStatus": "200",
+    "expectedBody": [
+      {
+        "id": 226722,
+        "userId": 242727,
+        "accountNumber": "142915604482",
+        "balance": 730149.11,
+        "accountType": "CHECKING",
+        "createdAt": "2026-07-06T12:49:22.509846",
+        "updatedAt": "2026-10-25T12:49:25.798805"
+      }
+    ]
+  },
+  {
+    "id": "2026-10-25_14-31-40.277703983Z-119fc11bb1e3acb21adf2f2f03626cb06f73a6e7cc1ef6b9e660d992e81b333a",
+    "method": "GET",
+    "url": "/api/v1/accounts/226722/balance",
+    "headers": {
+      "Accept": "application/json",
+      "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJldGhhbi53aWxsaWFtcy43NDIiLCJ1c2VySWQiOiIyNDI3MjciLCJyb2xlcyI6IlVTRVIiLCJleHAiOjE4OTM0NTYwMDB9.REDACTED"
+    },
+    "body": null,
+    "expectedStatus": "200",
+    "expectedBody": {
+      "accountId": 226722,
+      "accountNumber": "142915604482",
+      "balance": 730149.11
+    }
+  },
+  {
+    "id": "2026-10-25_14-31-40.278724453Z-56461603c402aaeb697902aabdb5c2485a7ed01b751591f859c8a6f6dbf52900",
+    "method": "GET",
+    "url": "/api/v1/accounts/226722",
+    "headers": {
+      "Accept": "application/json",
+      "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJldGhhbi53aWxsaWFtcy43NDIiLCJ1c2VySWQiOiIyNDI3MjciLCJyb2xlcyI6IlVTRVIiLCJleHAiOjE4OTM0NTYwMDB9.REDACTED"
+    },
+    "body": null,
+    "expectedStatus": "200",
+    "expectedBody": {
+      "id": 226722,
+      "userId": 242727,
+      "accountNumber": "142915604482",
+      "balance": 730149.11,
+      "accountType": "CHECKING",
+      "createdAt": "2026-07-06T12:49:22.509846",
+      "updatedAt": "2026-10-25T12:49:25.798805"
+    }
+  },
+  {
+    "id": "2026-10-25_14-31-41.377065028Z-3e9bb06797d7e1b429e119997e5ade400fd2e7e068675a37aa9161b4002b8ce2",
+    "method": "GET",
+    "url": "/api/v1/users/profile",
+    "headers": {
+      "Accept": "application/json",
+      "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJvc2Nhci5sYXJzc29uLjgzNSIsInVzZXJJZCI6IjI0MjgyMCIsInJvbGVzIjoiVVNFUiIsImV4cCI6MTg5MzQ1NjAwMH0.REDACTED"
+    },
+    "body": null,
+    "expectedStatus": "200",
+    "expectedBody": {
+      "success": true,
+      "message": "Profile retrieved successfully",
+      "data": {
+        "id": 242820,
+        "username": "oscar.larsson.835",
+        "email": "oscar.larsson.835@northbridge.example",
+        "roles": "USER",
+        "createdAt": "2026-07-06T12:14:14.402947",
+        "updatedAt": "2026-07-06T12:14:14.402947"
+      }
+    }
+  },
+  {
+    "id": "2026-10-25_14-31-41.377075672Z-f78bce2f2f8bc8cd363519000d2f667568fd8a8061229941d1f66c1b3dff69b0",
+    "method": "GET",
+    "url": "/api/v1/accounts",
+    "headers": {
+      "Accept": "application/json",
+      "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhdmEuY2FtcGJlbGwuNjQ3LjE3OTI5Mzg2NzcwNzc2MDkiLCJ1c2VySWQiOiI4NzIzMzciLCJyb2xlcyI6IlVTRVIiLCJleHAiOjE4OTM0NTYwMDB9.REDACTED"
+    },
+    "body": null,
+    "expectedStatus": "200",
+    "expectedBody": [
+      {
+        "id": 589223,
+        "userId": 872337,
+        "accountNumber": "142192300036",
+        "balance": 735.17,
+        "accountType": "CHECKING",
+        "createdAt": "2026-10-25T14:31:33.247877",
+        "updatedAt": "2026-10-25T14:31:36.697688"
+      }
+    ]
+  },
+  {
+    "id": "2026-10-25_14-31-41.377316275Z-c4f5bbb6dd8c7ad5cd277f733d474c9207b1e628567ba05d34735df07d5e2d57",
+    "method": "GET",
+    "url": "/api/v1/accounts/589223/balance",
+    "headers": {
+      "Accept": "application/json",
+      "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhdmEuY2FtcGJlbGwuNjQ3LjE3OTI5Mzg2NzcwNzc2MDkiLCJ1c2VySWQiOiI4NzIzMzciLCJyb2xlcyI6IlVTRVIiLCJleHAiOjE4OTM0NTYwMDB9.REDACTED"
+    },
+    "body": null,
+    "expectedStatus": "200",
+    "expectedBody": {
+      "accountId": 589223,
+      "accountNumber": "142192300036",
+      "balance": 735.17
+    }
+  },
+  {
+    "id": "2026-10-25_14-31-41.377319657Z-85ba523afe4a3c357466470b1fe8fbeb4e5270a42a21fa742a182ab850d07558",
+    "method": "GET",
+    "url": "/api/v1/accounts/589223",
+    "headers": {
+      "Accept": "application/json",
+      "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhdmEuY2FtcGJlbGwuNjQ3LjE3OTI5Mzg2NzcwNzc2MDkiLCJ1c2VySWQiOiI4NzIzMzciLCJyb2xlcyI6IlVTRVIiLCJleHAiOjE4OTM0NTYwMDB9.REDACTED"
+    },
+    "body": null,
+    "expectedStatus": "200",
+    "expectedBody": {
+      "id": 589223,
+      "userId": 872337,
+      "accountNumber": "142192300036",
+      "balance": 735.17,
+      "accountType": "CHECKING",
+      "createdAt": "2026-10-25T14:31:33.247877",
+      "updatedAt": "2026-10-25T14:31:36.697688"
+    }
+  },
+  {
+    "id": "2026-10-25_14-31-42.477117602Z-6cec9a0757a29a6d5379137a8a298cf774ac4260bfc15812c1b3d1432eeffcf0",
+    "method": "GET",
+    "url": "/api/v1/accounts",
+    "headers": {
+      "Accept": "application/json",
+      "Authorization": "Bearer invalid.expired.token"
+    },
+    "body": null,
+    "expectedStatus": "401",
+    "expectedBody": null
+  },
+  {
+    "id": "2026-10-25_14-31-42.477354748Z-20b5d6e185b069287b2eab89386b1f6c55c6418f0cdef663b046a8121bd51feb",
+    "method": "GET",
+    "url": "/api/v1/accounts",
+    "headers": {
+      "Accept": "application/json",
+      "Authorization": "Bearer invalid.expired.token"
+    },
+    "body": null,
+    "expectedStatus": "401",
+    "expectedBody": null
+  },
+  {
+    "id": "2026-10-25_14-31-43.87744685Z-5a4f5c6ff1d16c6107e7e727ae4c9f38ae3aa767bf20b7374860e97ccbb05be3",
+    "method": "POST",
+    "url": "/api/v1/accounts",
+    "headers": {
+      "Accept": "application/json",
+      "Content-Type": "application/json",
+      "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJsaWFtLm1pbGxlci4yODQuMTc5MjkzODY4NDQ2MjI3MyIsInVzZXJJZCI6Ijg3MjMzOCIsInJvbGVzIjoiVVNFUiIsImV4cCI6MTg5MzQ1NjAwMH0.REDACTED"
+    },
+    "body": {
+      "accountType": "CHECKING",
+      "initialBalance": 500
+    },
+    "expectedStatus": "201",
+    "expectedBody": {
+      "id": 589225,
+      "userId": 872338,
+      "accountNumber": "719966737223",
+      "balance": 500,
+      "accountType": "CHECKING",
+      "createdAt": "2026-10-25T14:31:42.83263",
+      "updatedAt": "2026-10-25T14:31:42.832639"
+    }
+  },
+  {
+    "id": "2026-10-25_14-31-43.877452335Z-93ea6152c67aa56034d98ee2dfe490c2a41e5a56b307f00cc6931807de690a6e",
+    "method": "GET",
+    "url": "/api/v1/accounts",
+    "headers": {
+      "Accept": "application/json",
+      "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJsaWFtLm1pbGxlci4yODQuMTc5MjkzODY4NDQ2MjI3MyIsInVzZXJJZCI6Ijg3MjMzOCIsInJvbGVzIjoiVVNFUiIsImV4cCI6MTg5MzQ1NjAwMH0.REDACTED"
+    },
+    "body": null,
+    "expectedStatus": "200",
+    "expectedBody": [
+      {
+        "id": 589225,
+        "userId": 872338,
+        "accountNumber": "719966737223",
+        "balance": 500.0,
+        "accountType": "CHECKING",
+        "createdAt": "2026-10-25T14:31:42.83263",
+        "updatedAt": "2026-10-25T14:31:42.832639"
+      }
+    ]
+  },
+  {
+    "id": "2026-10-25_14-31-43.877807344Z-7a9726bbdce604002e11207b18b950652957542cd4e112b551799313665db0ef",
+    "method": "GET",
+    "url": "/api/v1/accounts/589225/balance",
+    "headers": {
+      "Accept": "application/json",
+      "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJsaWFtLm1pbGxlci4yODQuMTc5MjkzODY4NDQ2MjI3MyIsInVzZXJJZCI6Ijg3MjMzOCIsInJvbGVzIjoiVVNFUiIsImV4cCI6MTg5MzQ1NjAwMH0.REDACTED"
+    },
+    "body": null,
+    "expectedStatus": "200",
+    "expectedBody": {
+      "accountId": 589225,
+      "accountNumber": "719966737223",
+      "balance": 500.0
+    }
+  },
+  {
+    "id": "2026-10-25_14-31-43.878022386Z-a66f2c92b428a71dd2217c6b05af492b81d9c66b2a7409c0f710df2a347b0f5f",
+    "method": "GET",
+    "url": "/api/v1/accounts/228459/balance",
+    "headers": {
+      "Accept": "application/json",
+      "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJvc2Nhci5sYXJzc29uLjgzNSIsInVzZXJJZCI6IjI0MjgyMCIsInJvbGVzIjoiVVNFUiIsImV4cCI6MTg5MzQ1NjAwMH0.REDACTED"
+    },
+    "body": null,
+    "expectedStatus": "200",
+    "expectedBody": {
+      "accountId": 228459,
+      "accountNumber": "785780390143",
+      "balance": 732340.22
+    }
+  }
+]

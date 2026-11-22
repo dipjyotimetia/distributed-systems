@@ -55,7 +55,7 @@ the Java/.NET path above is not a special case.
 How trace data moves from code to storage:
 
 1. **SDK** — Auto-instrumentation and manual spans run in-process; `tracecontext` propagates IDs across HTTP calls; the sampler decides whether to record; spans are batched (for example `BatchSpanProcessor` with queue and export intervals in Spring config) and exported over **OTLP** (gRPC on `:4317` for Java services, HTTP/protobuf on `:4318` for the frontend where configured).
-2. **Collector** — Compose uses [`config/otel-collector.yaml`](config/otel-collector.yaml); Kubernetes uses [`kubernetes/observability/otel-collector.yaml`](kubernetes/observability/otel-collector.yaml). Both traces pipelines are `otlp → filter → otlp` (to Jaeger). Compose adds a `batch` processor; Kubernetes also runs logs/metrics/Speedscale pipelines that Compose does not.
+2. **Collector** — Compose uses [`config/otel-collector.yaml`](config/otel-collector.yaml); Kubernetes uses [`kubernetes/observability/otel-collector.yaml`](kubernetes/observability/otel-collector.yaml). Both traces pipelines are `otlp → filter → otlp` (to Jaeger). Compose adds a `batch` processor; Kubernetes also exports logs to Loki.
 3. **Jaeger** — receives filtered OTLP from the collector (`jaeger:4317` on the Compose/K8s network). Host OTLP ports `:4317` / `:4318` are published on the collector in Compose.
 
 ```mermaid

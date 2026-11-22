@@ -1,0 +1,13 @@
+{
+  "request": {
+    "method": "GET",
+    "urlPath": "/api/v1/accounts/589223"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": "{\n  \"id\": 589223,\n  \"userId\": 872337,\n  \"accountNumber\": \"142192300036\",\n  \"balance\": 500.00,\n  \"accountType\": \"CHECKING\",\n  \"createdAt\": \"2026-10-25T14:31:33.247877\",\n  \"updatedAt\": \"2026-10-25T14:31:33.247888\"\n}"
+  }
+}

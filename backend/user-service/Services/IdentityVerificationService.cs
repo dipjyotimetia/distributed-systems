@@ -10,6 +10,9 @@ public class IdentityVerificationService
     private readonly string _socureApiKey;
     private readonly string _jumioApiToken;
     private readonly string _hibpApiKey;
+    private readonly string _socureBaseUrl;
+    private readonly string _jumioBaseUrl;
+    private readonly string _hibpBaseUrl;
 
     public IdentityVerificationService(
         HttpClient httpClient,
@@ -21,6 +24,9 @@ public class IdentityVerificationService
         _socureApiKey = configuration["SOCURE_API_KEY"] ?? "mock-socure-key";
         _jumioApiToken = configuration["JUMIO_API_TOKEN"] ?? "mock-jumio-token";
         _hibpApiKey = configuration["HIBP_API_KEY"] ?? "mock-hibp-key";
+        _socureBaseUrl = (configuration["SOCURE_BASE_URL"] ?? "https://sandbox.socure.com").TrimEnd('/');
+        _jumioBaseUrl = (configuration["JUMIO_BASE_URL"] ?? "https://netverify.com").TrimEnd('/');
+        _hibpBaseUrl = (configuration["HIBP_BASE_URL"] ?? "https://haveibeenpwned.com").TrimEnd('/');
     }
 
     public void VerifyIdentityAsync(string email, long userId)
@@ -52,7 +58,7 @@ public class IdentityVerificationService
         {
             _logger.LogInformation("Calling Socure ID+ for email: {Email}", email);
 
-            using var request = new HttpRequestMessage(HttpMethod.Post, "https://sandbox.socure.com/api/3.0/EmailAuthScore");
+            using var request = new HttpRequestMessage(HttpMethod.Post, $"{_socureBaseUrl}/api/3.0/EmailAuthScore");
             request.Headers.Add("Authorization", $"SocureApiKey {_socureApiKey}");
             request.Content = new StringContent(
                 JsonSerializer.Serialize(new { modules = new[] { "emailrisk" }, email }),
@@ -74,7 +80,7 @@ public class IdentityVerificationService
         {
             _logger.LogInformation("Calling Jumio for user: {UserId}", userId);
 
-            using var request = new HttpRequestMessage(HttpMethod.Post, "https://netverify.com/api/v4/initiate");
+            using var request = new HttpRequestMessage(HttpMethod.Post, $"{_jumioBaseUrl}/api/v4/initiate");
             request.Headers.Add("Authorization", $"Bearer {_jumioApiToken}");
             request.Content = new StringContent(
                 JsonSerializer.Serialize(new { customerInternalReference = $"apex-user-{userId}", userReference = email }),
@@ -97,7 +103,7 @@ public class IdentityVerificationService
             _logger.LogInformation("Calling HIBP for email: {Email}", email);
 
             using var request = new HttpRequestMessage(HttpMethod.Get,
-                $"https://haveibeenpwned.com/api/v3/breachedaccount/{email}");
+                $"{_hibpBaseUrl}/api/v3/breachedaccount/{email}");
             request.Headers.Add("hibp-api-key", _hibpApiKey);
             request.Headers.Add("user-agent", "ApexBanking/1.0");
 

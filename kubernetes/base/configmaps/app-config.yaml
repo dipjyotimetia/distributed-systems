@@ -23,11 +23,11 @@ data:
   SCHEMA_REGISTRY_URL: "http://banking-kafka:8081"
   KAFKA_VALUE_FORMAT: "avro"
 
-  # Third-party endpoints — real hosts; Speedscale responder mocks intercept them.
+  # Third-party endpoints — real hosts by default. The provider-isolation overlay
+  # redirects these (and per-service URL envs) to provider-fixtures.
   # SLACK_WEBHOOK_URL here is a dead, non-secret fallback (no token path); the
   # notification service gets the live hooks.slack.com webhook URL from the
-  # banking-thirdparty-keys secret. The responder /etc/hosts redirect is driven by
-  # the recorded snapshot's hosts, not by this value.
+  # banking-thirdparty-keys secret unless an isolation overlay overrides it.
   SLACK_WEBHOOK_URL: "https://hooks.slack.com/services/SET-VIA-SECRET"
   MOODYS_API_URL: "https://api.ratings.moodys.com/research/v1/ratings?identifier=test"
 

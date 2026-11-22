@@ -1,0 +1,13 @@
+{
+  "request": {
+    "method": "GET",
+    "urlPath": "/api/v1/accounts/226722/balance"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": "{\n  \"accountId\": 226722,\n  \"accountNumber\": \"142915604482\",\n  \"balance\": 730149.11\n}"
+  }
+}

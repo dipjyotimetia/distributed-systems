@@ -99,31 +99,26 @@ validate-e2e: test-e2e
 
 test-all: test-backend test-frontend test-e2e
 
-# Same as CI job proxymock-validation (requires initialized proxymock or PROXYMOCK_API_KEY; port 5432 must be free on host).
-.PHONY: proxymock-validation
-proxymock-validation:
-	./scripts/run-proxymock-validation.sh
+# Offline WireMock replay gates. No vendor API key required.
+# SERVICE= selects the matrix leg (default: api-gateway). Examples:
+#   make replay-gate
+#   make replay-gate SERVICE=accounts-service
+.PHONY: replay-validation
+replay-validation:
+	./scripts/replay/replay-service.sh user-service
 
-# Run proxymock validation in Docker when host port 5432 is in use (set PROXYMOCK_API_KEY if proxymock is not initialized).
-.PHONY: proxymock-validation-docker
-proxymock-validation-docker:
-	./scripts/run-proxymock-validation-docker.sh
+.PHONY: replay-gate
+replay-gate:
+	./scripts/replay/replay-service.sh $(or $(SERVICE),api-gateway)
 
-# Externalized proxymock replay integration tests for a backend service, driven by its
-# checked-in golden snapshot (backend/<service>/proxymock/recorded-golden). Add new
-# services via scripts/proxymock/services/<service>.env.
-.PHONY: proxymock-replay
-proxymock-replay:
-	./scripts/proxymock/replay-service.sh api-gateway
-
-# Enable the tracked pre-commit hook (runs the api-gateway replay when the gateway changes).
+# Enable the tracked pre-commit hook (runs offline replay for changed services with suites).
 .PHONY: install-git-hooks
 install-git-hooks:
 	git config core.hooksPath .githooks
 	@echo "Git hooks enabled (core.hooksPath=.githooks)."
 
 # Kubernetes targets - Consolidated
-.PHONY: k8s-deploy observability-deploy speedscale-deploy k8s-cleanup k8s-status
+.PHONY: k8s-deploy observability-deploy provider-isolation-deploy k8s-cleanup k8s-status
 k8s-deploy:
 	@echo "Deploying banking application to Kubernetes..."
 	kubectl apply -k $(KUSTOMIZE_DIR)/
@@ -132,13 +127,13 @@ observability-deploy:
 	@echo "Deploying observability stack..."
 	kubectl apply -k kubernetes/observability/
 
-speedscale-deploy:
-	@echo "Deploying with Speedscale overlay..."
-	kubectl apply -k kubernetes/overlays/speedscale/
+provider-isolation-deploy:
+	@echo "Deploying with provider-isolation overlay (provider-fixtures mocks)..."
+	kubectl apply -k kubernetes/overlays/provider-isolation/
 
 k8s-cleanup:
 	@echo "Cleaning up all Kubernetes resources..."
-	kubectl delete -k kubernetes/overlays/speedscale/ || true
+	kubectl delete -k kubernetes/overlays/provider-isolation/ || true
 	kubectl delete -k kubernetes/observability/ || true
 	kubectl delete -k $(KUSTOMIZE_DIR)/ || true
 
@@ -262,13 +257,13 @@ help:
 	@echo "  test-e2e-k8s       - Run E2E tests against Kubernetes deployment"
 	@echo "  validate-e2e       - Validate E2E tests (alias for test-e2e)"
 	@echo "  test-all           - Run all tests (backend, frontend, e2e)"
-	@echo "  proxymock-validation - user-service proxymock mock+replay (matches CI; needs free :5432)"
-	@echo "  proxymock-validation-docker - same test in Docker if host :5432 is busy"
+	@echo "  replay-validation  - user-service WireMock + Postgres replay gate"
+	@echo "  replay-gate        - WireMock offline replay (SERVICE=api-gateway|user-service|accounts-service|transactions-service|notification-service|ai-service)"
 	@echo ""
 	@echo "Kubernetes:"
 	@echo "  k8s-deploy         - Deploy banking application to Kubernetes"
 	@echo "  observability-deploy - Deploy observability stack (Grafana, Prometheus, Jaeger)"
-	@echo "  speedscale-deploy  - Deploy with Speedscale overlay"
+	@echo "  provider-isolation-deploy - Deploy with provider-fixtures third-party mocks"
 	@echo "  k8s-cleanup        - Clean up all Kubernetes resources"
 	@echo "  k8s-status         - Check deployment status"
 	@echo ""

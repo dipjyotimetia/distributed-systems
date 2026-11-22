@@ -18,8 +18,7 @@ assert_nodeport_absent() {
   echo "PASS: $overlay excludes banking-frontend-nodeport"
 }
 
-assert_nodeport_absent speedscale
-assert_nodeport_absent speedscale-sidecar
+assert_nodeport_absent provider-isolation
 assert_nodeport_absent replay
 
 local_manifest=$(render_overlay local)

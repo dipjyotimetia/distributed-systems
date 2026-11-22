@@ -79,4 +79,4 @@ schema; `ddl-auto=validate`.
 Unit: fraud reject, fail-open, insufficient balance, same-account transfer, rollback on
 credit failure. Integration: happy paths persist the record and emit the event; fraud
 reject moves no money. Contract: fraud gRPC shape, accounts REST, Kafka payload. Isolation
-via proxymock is covered by the service-integration-tests spec.
+via offline WireMock replay is covered by the service-integration-tests spec.

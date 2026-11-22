@@ -179,9 +179,9 @@ gateway.
 
 ## CI Replay Validation
 
-Run `make proxymock-validation` from the repository root to reproduce the user-service CI check. If port 5432 is occupied, use `make proxymock-validation-docker`. The validation scripts print the initialization requirements and preserve failure logs for inspection.
+Run `make replay-gate SERVICE=<service>` from the repository root to reproduce a CI `replay-gate` matrix leg (Docker for WireMock; Postgres on `:5432` for Java/.NET DB services; notification-service also starts Mongo + Redpanda). `make replay-validation` is a thin alias for `user-service`. Failure logs are written under `backend/<service>/replay-results/`.
 
-The checked-in user-service recordings are CI fixtures. Use a separate working directory for optional traffic captures and internal demos.
+Checked-in suites live under `tests/replay/services/` for `api-gateway`, `user-service`, `accounts-service`, `transactions-service`, `notification-service`, and `ai-service`. Use a separate working directory for optional traffic captures and internal demos.
 
 ## Performance Issues
 

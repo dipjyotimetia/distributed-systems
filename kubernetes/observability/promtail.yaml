@@ -24,7 +24,7 @@ data:
 
       stage.drop {
         source     = "container"
-        expression = "simulation-client|speedscale-.*|wait-for-.*|istio-.*"
+        expression = "simulation-client|provider-fixtures|wait-for-.*|istio-.*"
       }
 
       stage.match {

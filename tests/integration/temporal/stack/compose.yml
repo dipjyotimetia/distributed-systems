@@ -13,6 +13,12 @@ services:
     ports: !reset []
     environment:
       OTEL_SDK_DISABLED: "true"
+      SOCURE_BASE_URL: http://provider-fixtures:8081/socure
+      JUMIO_BASE_URL: http://provider-fixtures:8081/jumio
+      HIBP_BASE_URL: http://provider-fixtures:8081/hibp
+    depends_on:
+      provider-fixtures:
+        condition: service_started
   accounts-service:
     tmpfs: ["/tmp:size=64m"]
     container_name: !reset null
