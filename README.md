@@ -23,9 +23,9 @@ exits with an OpenTelemetry `ContainerAttributes` error, apply the
 
 | Environment | Features and dependencies |
 |---|---|
-| Default Compose | Identity, accounts, transactions, fraud, disputes, statement workers, fixture-backed AI chat, PostgreSQL, Redis, Redpanda, MongoDB, notifications, Jaeger, Prometheus, Grafana |
-| Kubernetes base and local overlay | Identity, accounts, transactions, fraud, AI, notifications, simulation, PostgreSQL, Redis, Redpanda and MongoDB |
-| Kubernetes full overlay | Base services plus disputes, the statement worker, and PostgreSQL-backed Temporal |
+| Default Compose | Identity, accounts, transactions, fraud, KYC, cards, disputes, statement/KYC/AI workers, fixture-backed AI chat, PostgreSQL, Redis, Redpanda, MongoDB, notifications, otel-collector, Jaeger, Prometheus, Grafana |
+| Kubernetes base and local overlay | Identity, accounts, transactions, fraud, KYC, cards, AI, notifications, api-gateway, frontend, simulation, PostgreSQL, Redis, Redpanda, MongoDB |
+| Kubernetes full overlay | Base services plus disputes (+ worker), statement worker, kyc-worker, ai-worker, and PostgreSQL-backed Temporal |
 | Temporal integration stack | Isolated banking journeys with scenario-specific workers and provider fixtures |
 
 Use the [Kubernetes deployment guide](kubernetes/README.md) for cluster setup and
@@ -33,28 +33,28 @@ Use the [Kubernetes deployment guide](kubernetes/README.md) for cluster setup an
 
 ## Architecture
 
-Ten application backend services across four languages, a Next.js frontend, and a load-generating simulation client.
+Ten application backend services across four languages (plus optional `payments-service` on Compose/K8s overlays), a Next.js frontend, and a load-generating simulation client (Kubernetes). Interactive Archify diagrams live under [`docs/architecture/`](docs/architecture/).
 
 | Service | Language | Purpose |
 |---|---|---|
 | `api-gateway` | Java (Spring Cloud Gateway) | Edge router, JWT auth, and edge resilience controls |
 | `user-service` | .NET (ASP.NET Core) | Authentication, profile management |
-| `accounts-service` | Java (Spring Boot) | Account + balance management, Plaid integration |
-| `transactions-service` | Java (Spring Boot) | Transaction processing, Stripe / PayPal / ComplyAdvantage integrations |
+| `accounts-service` | Java (Spring Boot) | Account + balance management, Plaid integration, ledger gRPC on `:9092` |
+| `transactions-service` | Java (Spring Boot) | Transaction processing, Stripe / PayPal / ComplyAdvantage; query gRPC on `:9095` |
 | `ai-service` / `ai-worker` | Python (FastAPI + Temporal) | Multi-provider chat fan-out plus durable banking agent (`ai-banking` queue): LiteLLM activities, hard-rule guardrails, read-only tools, claim-check history, and multi-agent dispute research drafts |
 | `fraud-service` | Go (gRPC h2c on :8080) | Fraud risk scoring with Sift / MaxMind / Stripe Radar |
 | `kyc-service` | Go (gRPC on :8091) | Customer identity review, with a Temporal worker |
-| `cards-service` | Go (gRPC on :8092) | Virtual cards; calls fraud over gRPC and accounts over HTTP |
-| `disputes-service` | Go | Transfer dispute intake, operator review, and Temporal escalation |
+| `cards-service` | Go (gRPC on :8092) | Virtual cards; calls fraud and accounts ledger over gRPC |
+| `disputes-service` | Go | Transfer dispute intake, operator review, and Temporal escalation; eligibility via transactions query gRPC |
 | `notification-service` | Go | Slack / SendGrid / Twilio fan-out for transaction events from Kafka |
 | `frontend` | Next.js 16 / React 19 | Server-side proxy + UI |
-| `simulation-client` | Node.js | Drives realistic user-session traffic with burst and negative-path patterns |
+| `simulation-client` | Node.js | Drives realistic user-session traffic with burst and negative-path patterns (Kubernetes) |
 
-**Storage / messaging:** PostgreSQL (per-service schemas), MongoDB, and Redpanda (Kafka-compatible broker with Schema Registry on `:8081`). Event payloads default to Confluent Avro; see [`contracts/avro/`](contracts/avro/README.md).
+**Storage / messaging:** PostgreSQL (per-service schemas), MongoDB, and Redpanda (Kafka-compatible broker). Schema Registry listens on container port `:8081` (in Compose that host port collides with user-service — prefer in-network `http://redpanda:8081`). Event payloads default to Confluent Avro; see [`contracts/avro/`](contracts/avro/README.md).
 
-**Observability:** Compose sends traces directly to Jaeger. Kubernetes routes telemetry through the collector and includes Loki for logs.
+**Observability:** Compose and Kubernetes both export OTLP through the OpenTelemetry Collector to Jaeger. Kubernetes also includes Loki for logs.
 
-How **OpenTelemetry trace data** is processed in-process (SDK) and after export (OTLP -> collector on Kubernetes, or direct to Jaeger in Docker Compose) is documented with Mermaid diagrams in [OBSERVABILITY.md - OpenTelemetry trace data processing](./OBSERVABILITY.md#opentelemetry-trace-data-processing).
+How **OpenTelemetry trace data** is processed in-process (SDK) and after export (OTLP → collector → Jaeger) is documented with Mermaid diagrams in [OBSERVABILITY.md - OpenTelemetry trace data processing](./OBSERVABILITY.md#opentelemetry-trace-data-processing).
 
 ```mermaid
 flowchart LR
@@ -98,7 +98,7 @@ flowchart LR
   kyc --> temporal
   kycworker --> temporal
   cards -->|gRPC| fraud
-  cards -->|HTTP| accounts
+  cards -->|gRPC ledger| accounts
 
   subgraph mtls["optional mTLS overlay"]
     frontend
@@ -113,7 +113,7 @@ flowchart LR
   gateway --> transactions
   frontend --> ai
   gateway --> disputes
-  disputes --> transactions
+  disputes -->|gRPC query| transactions
   disputes --> postgres
   gateway -.-> outboundPayments[payments-service<br/>optional overlay]
   outboundPayments -.-> artemis[(Artemis)]
@@ -124,6 +124,7 @@ flowchart LR
   worker --> temporal
 
   accounts --> postgres
+  transactions -->|gRPC ledger| accounts
   transactions --> postgres
   users --> postgres
   accounts --> plaid
@@ -339,8 +340,9 @@ These fixtures and validation scripts support application tests. Keep optional r
 
 Run `make version` to read the global release version from `VERSION`.
 `make version-bump BUMP_TYPE=patch` updates that file. Java services version
-their POMs independently. On merges to `master`, CI synchronizes the
-frontend and simulation package versions and Kubernetes image tags. See
+themselves via `backend/<service>/gradle.properties` (`serviceVersion`). On
+merges to `master`, CI synchronizes the frontend and simulation package
+versions and Kubernetes image tags. See
 [the version bump policy](AGENTS.md#version-bump-policy).
 
 ## Documentation
@@ -348,8 +350,9 @@ frontend and simulation package versions and Kubernetes image tags. See
 - **[AGENTS.md](./AGENTS.md)** — Guidance for AI assistants and automated agents
 - **[TROUBLESHOOTING.md](./TROUBLESHOOTING.md)** — Comprehensive debugging guide
 - **[OBSERVABILITY.md](./OBSERVABILITY.md)** — Monitoring, tracing, and metrics setup
-- **[plan.md](./plan.md)** — Detailed implementation phases and testing criteria
+- **[plan.md](./plan.md)** — Delivery milestones and remaining production work
 - **[architecture.md](./architecture.md)** — System architecture and design decisions
+- **[docs/architecture/](./docs/architecture/)** — Interactive Archify architecture diagrams
 - **[docs/add-a-service.md](./docs/add-a-service.md)** — How to add a service to the playground
 
 ## Local Health Checks
@@ -359,10 +362,16 @@ status and these HTTP checks for published endpoints:
 
 ```bash
 curl -fsS http://localhost:3000/api/v1/healthz
-curl -fsS http://localhost:8080/actuator/health
-curl -fsS http://localhost:8081/actuator/health
-curl -fsS http://localhost:8082/actuator/health
-curl -fsS http://localhost:8083/actuator/health
+curl -fsS http://localhost:8080/actuator/health   # api-gateway
+curl -fsS http://localhost:8082/actuator/health   # accounts-service
+curl -fsS http://localhost:8083/actuator/health   # transactions-service
 ```
 
-Fraud exposes its application RPCs over gRPC on host port 8086.
+Compose maps both user-service (`8081:8080`) and Redpanda Schema Registry
+(`8081:8081`) to host port `8081`, so host curls to `:8081` are unreliable.
+Check user-service with `docker compose exec user-service curl -fsS http://localhost:8080/actuator/health`
+(or the .NET health path the image exposes) and Schema Registry on the
+Compose network at `http://redpanda:8081`.
+
+Fraud exposes its application RPCs over gRPC on host port 8086. KYC and cards
+use host ports 8091 and 8092.

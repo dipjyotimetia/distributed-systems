@@ -1,0 +1,270 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "Banking Event Pipeline",
+    "output": "docs/architecture/event-pipeline.html",
+    "quality_profile": "showcase",
+    "locale": "en",
+    "repository": {
+      "url": "git@github.com:dipjyotimetia/distributed-systems.git",
+      "revision": "30c1ede9668edf36869addd46afb35016e0c424a",
+      "link_mode": "local-only"
+    }
+  },
+  "stages": [
+    { "label": "Produce" },
+    { "label": "Wire" },
+    { "label": "Broker" },
+    { "label": "Consume" },
+    { "label": "Notify" }
+  ],
+  "nodes": [
+    {
+      "id": "tx",
+      "type": "backend",
+      "label": "Transactions",
+      "sublabel": "event_outbox",
+      "stage": 0,
+      "row": 1,
+      "tag": "Java",
+      "sources": [
+        {
+          "path": "backend/transactions-service/src/main/java/com/banking/transactionsservice/event/TransactionEventOutbox.java",
+          "line": 47,
+          "end_line": 59,
+          "label": "outbox rows"
+        }
+      ]
+    },
+    {
+      "id": "pay",
+      "type": "backend",
+      "label": "Payments",
+      "sublabel": "optional overlay",
+      "stage": 0,
+      "row": 3,
+      "tag": "overlay"
+    },
+    {
+      "id": "encoder",
+      "type": "backend",
+      "label": "Avro Encoder",
+      "sublabel": "Confluent wire",
+      "stage": 1,
+      "row": 1,
+      "tag": "default",
+      "sources": [
+        {
+          "path": "backend/transactions-service/src/main/java/com/banking/transactionsservice/event/SchemaRegistryAvroEncoder.java",
+          "line": 41,
+          "end_line": 41,
+          "label": "KAFKA_VALUE_FORMAT"
+        }
+      ]
+    },
+    {
+      "id": "sr",
+      "type": "database",
+      "label": "Schema Registry",
+      "sublabel": "redpanda :8081",
+      "stage": 1,
+      "row": 3,
+      "tag": "register",
+      "sources": [
+        {
+          "path": "docker-compose.yml",
+          "line": 279,
+          "end_line": 280,
+          "label": "SCHEMA_REGISTRY"
+        }
+      ]
+    },
+    {
+      "id": "te",
+      "type": "messagebus",
+      "label": "tx-events",
+      "sublabel": "transaction-events",
+      "stage": 2,
+      "row": 0,
+      "tag": "Avro"
+    },
+    {
+      "id": "pe",
+      "type": "messagebus",
+      "label": "pay-events",
+      "sublabel": "payment-events.v1",
+      "stage": 2,
+      "row": 2,
+      "tag": "Avro"
+    },
+    {
+      "id": "ml",
+      "type": "messagebus",
+      "label": "lifecycle",
+      "sublabel": "movement-lifecycle-v1",
+      "stage": 2,
+      "row": 4,
+      "tag": "Avro"
+    },
+    {
+      "id": "notif",
+      "type": "backend",
+      "label": "Notifications",
+      "sublabel": "franz-go consumer",
+      "stage": 3,
+      "row": 1,
+      "tag": "Go",
+      "sources": [
+        {
+          "path": "backend/notification-service/cmd/server/main.go",
+          "line": 22,
+          "end_line": 24,
+          "label": "topic + mongo"
+        }
+      ]
+    },
+    {
+      "id": "mongo",
+      "type": "database",
+      "label": "MongoDB",
+      "sublabel": "dedupe store",
+      "stage": 3,
+      "row": 3,
+      "sources": [
+        {
+          "path": "docker-compose.yml",
+          "line": 23,
+          "end_line": 27,
+          "label": "mongodb"
+        }
+      ]
+    },
+    {
+      "id": "slack",
+      "type": "external",
+      "label": "Messaging",
+      "sublabel": "Slack / SendGrid / Twilio",
+      "stage": 4,
+      "row": 1
+    },
+    {
+      "id": "future",
+      "type": "external",
+      "label": "Future consumers",
+      "sublabel": "lifecycle topic",
+      "stage": 4,
+      "row": 4
+    }
+  ],
+  "flows": [
+    {
+      "id": "tx-encode",
+      "from": "tx",
+      "to": "encoder",
+      "label": "outbox payload",
+      "classification": "ledger events",
+      "variant": "emphasis"
+    },
+    {
+      "id": "pay-encode",
+      "from": "pay",
+      "to": "encoder",
+      "label": "payment outbox",
+      "classification": "overlay events",
+      "variant": "dashed"
+    },
+    {
+      "id": "encode-sr",
+      "from": "encoder",
+      "to": "sr",
+      "label": "register schema",
+      "classification": "schema id",
+      "variant": "security"
+    },
+    {
+      "id": "encode-te",
+      "from": "encoder",
+      "to": "te",
+      "label": "publish Avro",
+      "classification": "transaction-events",
+      "variant": "emphasis"
+    },
+    {
+      "id": "encode-pe",
+      "from": "encoder",
+      "to": "pe",
+      "label": "publish Avro",
+      "classification": "payment-events.v1",
+      "variant": "dashed"
+    },
+    {
+      "id": "encode-ml",
+      "from": "encoder",
+      "to": "ml",
+      "label": "publish Avro",
+      "classification": "movement-lifecycle-v1",
+      "variant": "default"
+    },
+    {
+      "id": "te-notif",
+      "from": "te",
+      "to": "notif",
+      "label": "consume",
+      "classification": "transaction events",
+      "variant": "emphasis"
+    },
+    {
+      "id": "pe-notif",
+      "from": "pe",
+      "to": "notif",
+      "label": "consume",
+      "classification": "payment events",
+      "variant": "dashed"
+    },
+    {
+      "id": "notif-mongo",
+      "from": "notif",
+      "to": "mongo",
+      "label": "dedupe write",
+      "classification": "event store",
+      "variant": "default"
+    },
+    {
+      "id": "notif-msg",
+      "from": "notif",
+      "to": "slack",
+      "label": "fan-out",
+      "classification": "provider APIs",
+      "variant": "emphasis"
+    },
+    {
+      "id": "ml-future",
+      "from": "ml",
+      "to": "future",
+      "label": "external consume",
+      "classification": "lifecycle",
+      "variant": "dashed"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Primary path",
+      "items": [
+        "transactions-service inserts event_outbox rows in the same DB transaction as the ledger write",
+        "Default wire format is Confluent Avro via SCHEMA_REGISTRY_URL; KAFKA_VALUE_FORMAT=json remains an opt-out",
+        "notification-service consumes transaction-events and payment-events.v1, then fans out to providers"
+      ]
+    },
+    {
+      "dot": "orange",
+      "title": "Topics",
+      "items": [
+        "transaction-events — ledger completion notifications",
+        "payment-events.v1 — optional payments overlay",
+        "movement-lifecycle-v1 — reserved for external / future consumers"
+      ]
+    }
+  ]
+}

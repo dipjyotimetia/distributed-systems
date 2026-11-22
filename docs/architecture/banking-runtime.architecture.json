@@ -1,0 +1,283 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Banking Runtime Architecture",
+    "output": "docs/architecture/banking-runtime.html",
+    "quality_profile": "showcase",
+    "locale": "en",
+    "repository": {
+      "url": "git@github.com:dipjyotimetia/distributed-systems.git",
+      "revision": "30c1ede9668edf36869addd46afb35016e0c424a",
+      "link_mode": "local-only"
+    }
+  },
+  "components": [
+    {
+      "id": "browser",
+      "type": "external",
+      "label": "Browser",
+      "sublabel": "customer UI",
+      "pos": [40, 240],
+      "size": [120, 60]
+    },
+    {
+      "id": "frontend",
+      "type": "frontend",
+      "label": "Frontend",
+      "sublabel": "Next.js :3000",
+      "pos": [210, 240],
+      "size": [130, 60],
+      "sources": [
+        {
+          "path": "docker-compose.yml",
+          "line": 505,
+          "end_line": 511,
+          "label": "gateway + gRPC"
+        }
+      ]
+    },
+    {
+      "id": "gateway",
+      "type": "security",
+      "label": "API Gateway",
+      "sublabel": "Spring Cloud :8080",
+      "pos": [400, 240],
+      "size": [140, 60],
+      "tag": "JWT",
+      "sources": [
+        {
+          "path": "backend/api-gateway/src/main/resources/application.yml",
+          "line": 56,
+          "end_line": 66,
+          "label": "service URLs"
+        }
+      ]
+    },
+    {
+      "id": "transactions",
+      "type": "backend",
+      "label": "Transactions",
+      "sublabel": "Java :8083 / :9095",
+      "pos": [600, 240],
+      "size": [140, 60],
+      "sources": [
+        {
+          "path": "docker-compose.yml",
+          "line": 272,
+          "end_line": 280,
+          "label": "ledger + Avro"
+        }
+      ]
+    },
+    {
+      "id": "accounts",
+      "type": "backend",
+      "label": "Accounts",
+      "sublabel": "ledger gRPC :9092",
+      "pos": [820, 240],
+      "size": [140, 60],
+      "sources": [
+        {
+          "path": "backend/transactions-service/src/main/resources/application.yml",
+          "line": 12,
+          "end_line": 12,
+          "label": "ACCOUNTS_GRPC"
+        }
+      ]
+    },
+    {
+      "id": "postgres",
+      "type": "database",
+      "label": "PostgreSQL",
+      "sublabel": "per-service schemas",
+      "pos": [1020, 240],
+      "size": [130, 60],
+      "sources": [
+        {
+          "path": "docker-compose.yml",
+          "line": 3,
+          "end_line": 16,
+          "label": "postgres service"
+        }
+      ]
+    },
+    {
+      "id": "fraud",
+      "type": "backend",
+      "label": "Fraud",
+      "sublabel": "Go gRPC h2c",
+      "pos": [600, 80],
+      "size": [130, 60],
+      "sources": [
+        {
+          "path": "docker-compose.yml",
+          "line": 275,
+          "end_line": 276,
+          "label": "fraud host/port"
+        }
+      ]
+    },
+    {
+      "id": "redpanda",
+      "type": "messagebus",
+      "label": "Redpanda",
+      "sublabel": "Kafka + Schema Registry",
+      "pos": [600, 400],
+      "size": [150, 60],
+      "sources": [
+        {
+          "path": "docker-compose.yml",
+          "line": 278,
+          "end_line": 280,
+          "label": "brokers + Avro"
+        }
+      ]
+    },
+    {
+      "id": "notification",
+      "type": "backend",
+      "label": "Notifications",
+      "sublabel": "Go Kafka consumer",
+      "pos": [820, 400],
+      "size": [140, 60],
+      "sources": [
+        {
+          "path": "backend/notification-service/cmd/server/main.go",
+          "line": 22,
+          "end_line": 24,
+          "label": "topic + mongo"
+        }
+      ]
+    },
+    {
+      "id": "otel",
+      "type": "cloud",
+      "label": "OTel Collector",
+      "sublabel": "OTLP → Jaeger",
+      "pos": [400, 80],
+      "size": [140, 60],
+      "sources": [
+        {
+          "path": "docker-compose.yml",
+          "line": 535,
+          "end_line": 551,
+          "label": "collector service"
+        }
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Docker Compose banking stack",
+      "wraps": [
+        "frontend",
+        "gateway",
+        "transactions",
+        "accounts",
+        "postgres",
+        "fraud",
+        "redpanda",
+        "notification",
+        "otel"
+      ],
+      "pad": 18
+    }
+  ],
+  "connections": [
+    {
+      "id": "browser-frontend",
+      "from": "browser",
+      "to": "frontend",
+      "label": "HTTPS",
+      "variant": "emphasis"
+    },
+    {
+      "id": "frontend-gateway",
+      "from": "frontend",
+      "to": "gateway",
+      "label": "HTTP proxy"
+    },
+    {
+      "id": "gateway-tx",
+      "from": "gateway",
+      "to": "transactions",
+      "label": "route",
+      "variant": "emphasis"
+    },
+    {
+      "id": "tx-fraud",
+      "from": "transactions",
+      "to": "fraud",
+      "label": "gRPC risk",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "id": "tx-accounts",
+      "from": "transactions",
+      "to": "accounts",
+      "label": "ledger gRPC",
+      "variant": "emphasis"
+    },
+    {
+      "id": "accounts-pg",
+      "from": "accounts",
+      "to": "postgres",
+      "label": "SQL"
+    },
+    {
+      "id": "tx-kafka",
+      "from": "transactions",
+      "to": "redpanda",
+      "label": "Avro outbox",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "kafka-notif",
+      "from": "redpanda",
+      "to": "notification",
+      "label": "consume"
+    },
+    {
+      "id": "gateway-otel",
+      "from": "gateway",
+      "to": "otel",
+      "label": "OTLP",
+      "variant": "dashed",
+      "fromSide": "top",
+      "toSide": "bottom"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Primary journey",
+      "items": [
+        "Browser traffic enters Next.js, which proxies JWT banking calls through the API gateway",
+        "Transfers hit transactions-service, which screens fraud over gRPC and posts ledger updates on accounts :9092",
+        "Completions write Confluent Avro outbox rows that Redpanda delivers to notification-service"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Also in the stack",
+      "items": [
+        "user-service (.NET) issues identity JWTs behind the gateway",
+        "KYC :8091 and cards :8092 are frontend gRPC edges; cards also dials accounts ledger and fraud",
+        "disputes, statement, KYC, and AI Temporal workers share the Compose Temporal server; payments stay on overlays"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Observability",
+      "items": [
+        "Compose and Kubernetes both export OTLP through otel-collector before Jaeger",
+        "Host port 8081 is contended by user-service and Schema Registry; prefer in-network redpanda:8081"
+      ]
+    }
+  ]
+}

@@ -7,12 +7,17 @@ This guide helps you debug common issues in the Banking Microservices Applicatio
 ### Health Checks
 Check if all services are running:
 ```bash
-# All services
+# Published host ports (default Compose)
 curl http://localhost:8080/actuator/health  # API Gateway
-curl http://localhost:8081/actuator/health  # User Service
 curl http://localhost:8082/actuator/health  # Accounts Service
 curl http://localhost:8083/actuator/health  # Transactions Service
-curl http://localhost:3000/api/v1/healthz       # Frontend
+curl http://localhost:3000/api/v1/healthz   # Frontend
+
+# Host port 8081 is mapped by both user-service (8081:8080) and Redpanda
+# Schema Registry (8081:8081). Prefer in-container or Compose-network checks:
+docker compose exec user-service curl -fsS http://localhost:8080/actuator/health
+# Schema Registry: http://redpanda:8081 on banking-network
+# KYC gRPC :8091, cards gRPC :8092, fraud gRPC :8086
 ```
 
 ### Database Connection
@@ -52,8 +57,8 @@ docker compose logs -f user-service
 lsof -i :8080  # Replace with actual port
 kill -9 <PID> # Kill the process using the port
 
-# Or restart with different ports
-export USER_SERVICE_PORT=8091
+# Or free the conflicting host port / remap in docker-compose.yml.
+# Do not reuse 8091 for user-service — KYC owns host port 8091.
 docker compose up user-service
 ```
 
@@ -74,7 +79,8 @@ docker compose up user-service
 - **Network issues**:
   ```bash
   docker network ls
-  docker network inspect microsvc_default
+  docker network inspect distributed-systems_banking-network
+  # Project prefix may vary; confirm with: docker compose ps
   ```
 
 ### 3. JWT Authentication Problems
@@ -88,8 +94,9 @@ docker compose up user-service
 # Verify JWT configuration
 grep -r "jwt" backend/*/src/main/resources/application.yml
 
-# Check if user-service is running (it generates tokens)
-curl http://localhost:8081/actuator/health
+# Check if user-service is running (it generates tokens).
+# Avoid host :8081 (Schema Registry clash); use Compose exec:
+docker compose exec user-service curl -fsS http://localhost:8080/actuator/health
 ```
 
 ### 4. Frontend API Connection Issues
@@ -226,7 +233,8 @@ docker compose exec accounts-service curl http://transactions-service:8080/actua
    # Terminal 2: Accounts Service  
    export DB_HOST=localhost
    export DB_PORT=5432
-   export USER_SERVICE_URL=http://localhost:8081
+   # Prefer Compose network DNS; host :8081 collides with Schema Registry
+   export USER_SERVICE_URL=http://user-service:8080
    ./gradlew :accounts-service:bootRun
    ```
 

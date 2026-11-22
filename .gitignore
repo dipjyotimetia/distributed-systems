@@ -135,3 +135,8 @@ thoughts/
 .gradle/
 **/build/
 !gradle/wrapper/gradle-wrapper.jar
+
+# Archify authoring scratch (curated diagrams live under docs/architecture/)
+.archify/
+**/.archify-delivery-lock.json
+**/*.delivery-pending.json

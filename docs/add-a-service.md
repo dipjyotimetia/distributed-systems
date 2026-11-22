@@ -26,7 +26,7 @@ If a write must be followed by a message or a workflow start, insert an outbox r
 
 ## 4. Local Compose
 
-Add a service to `docker-compose.yml` on `banking-network` with a healthcheck. Point OpenTelemetry at Jaeger (`4317` for gRPC, `4318` for HTTP). Set `OTEL_SERVICE_NAME`. Add a Prometheus scrape in `config/prometheus.yml`.
+Add a service to `docker-compose.yml` on `banking-network` with a healthcheck. Point OpenTelemetry at the Compose collector (`otel-collector:4317` for gRPC, `otel-collector:4318` for HTTP). Set `OTEL_SERVICE_NAME`. Add a Prometheus scrape in `config/prometheus.yml`.
 
 Default Compose should start without live third-party credentials. `ai-service` uses `AI_PROVIDER_MODE=fixture` for that reason. Optional brokers and workers stay in an overlay, the way Artemis and `payments-service` do.
 

@@ -1,0 +1,223 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Transfer Money Sequence",
+    "output": "docs/architecture/transfer-money.html",
+    "quality_profile": "showcase",
+    "locale": "en",
+    "repository": {
+      "url": "git@github.com:dipjyotimetia/distributed-systems.git",
+      "revision": "30c1ede9668edf36869addd46afb35016e0c424a",
+      "link_mode": "local-only"
+    }
+  },
+  "participants": [
+    {
+      "id": "browser",
+      "type": "external",
+      "label": "Browser",
+      "sublabel": "customer"
+    },
+    {
+      "id": "frontend",
+      "type": "frontend",
+      "label": "Frontend",
+      "sublabel": "Next.js proxy",
+      "sources": [
+        {
+          "path": "frontend/src/app/api/v1/transactions/transfer/route.ts",
+          "line": 9,
+          "end_line": 29,
+          "label": "POST transfer"
+        }
+      ]
+    },
+    {
+      "id": "gateway",
+      "type": "security",
+      "label": "Gateway",
+      "sublabel": "JWT route",
+      "sources": [
+        {
+          "path": "backend/api-gateway/src/main/resources/application.yml",
+          "line": 65,
+          "end_line": 66,
+          "label": "tx URL"
+        }
+      ]
+    },
+    {
+      "id": "tx",
+      "type": "backend",
+      "label": "Transactions",
+      "sublabel": "transfer + outbox",
+      "sources": [
+        {
+          "path": "backend/transactions-service/src/main/java/com/banking/transactionsservice/service/TransactionService.java",
+          "line": 282,
+          "end_line": 297,
+          "label": "transfer + fraud"
+        }
+      ]
+    },
+    {
+      "id": "fraud",
+      "type": "backend",
+      "label": "Fraud",
+      "sublabel": "gRPC score"
+    },
+    {
+      "id": "accounts",
+      "type": "backend",
+      "label": "Accounts",
+      "sublabel": "ledger :9092",
+      "sources": [
+        {
+          "path": "backend/transactions-service/src/main/resources/application.yml",
+          "line": 12,
+          "end_line": 12,
+          "label": "ledger target"
+        }
+      ]
+    },
+    {
+      "id": "kafka",
+      "type": "messagebus",
+      "label": "Redpanda",
+      "sublabel": "Avro topic",
+      "sources": [
+        {
+          "path": "backend/transactions-service/src/main/java/com/banking/transactionsservice/event/TransactionEventOutbox.java",
+          "line": 47,
+          "end_line": 51,
+          "label": "outbox insert"
+        }
+      ]
+    }
+  ],
+  "segments": [
+    { "from": 140, "to": 250, "label": "Ingress" },
+    { "from": 260, "to": 400, "label": "Risk + ledger" },
+    { "from": 410, "to": 520, "label": "Async notify" }
+  ],
+  "messages": [
+    {
+      "id": "submit",
+      "from": "browser",
+      "to": "frontend",
+      "y": 160,
+      "label": "POST /api/v1/transactions/transfer",
+      "variant": "emphasis",
+      "note": "Authorization + Idempotency-Key forwarded"
+    },
+    {
+      "id": "proxy",
+      "from": "frontend",
+      "to": "gateway",
+      "y": 230,
+      "label": "proxy to gateway"
+    },
+    {
+      "id": "route",
+      "from": "gateway",
+      "to": "tx",
+      "y": 265,
+      "label": "route to transactions",
+      "variant": "emphasis"
+    },
+    {
+      "id": "fraud-check",
+      "from": "tx",
+      "to": "fraud",
+      "y": 300,
+      "label": "gRPC fraud check",
+      "variant": "security"
+    },
+    {
+      "id": "fraud-ok",
+      "from": "fraud",
+      "to": "tx",
+      "y": 335,
+      "label": "approved",
+      "variant": "return"
+    },
+    {
+      "id": "ledger",
+      "from": "tx",
+      "to": "accounts",
+      "y": 370,
+      "label": "ledger gRPC post",
+      "variant": "emphasis"
+    },
+    {
+      "id": "ledger-ok",
+      "from": "accounts",
+      "to": "tx",
+      "y": 405,
+      "label": "posted",
+      "variant": "return"
+    },
+    {
+      "id": "outbox",
+      "from": "tx",
+      "to": "kafka",
+      "y": 440,
+      "label": "enqueue Avro outbox",
+      "variant": "dashed",
+      "note": "Same DB transaction as the ledger row"
+    },
+    {
+      "id": "resp",
+      "from": "tx",
+      "to": "gateway",
+      "y": 490,
+      "label": "200 transfer result",
+      "variant": "return"
+    },
+    {
+      "id": "resp2",
+      "from": "gateway",
+      "to": "frontend",
+      "y": 515,
+      "label": "forward",
+      "variant": "return"
+    },
+    {
+      "id": "resp3",
+      "from": "frontend",
+      "to": "browser",
+      "y": 540,
+      "label": "render",
+      "variant": "return"
+    }
+  ],
+  "activations": [
+    { "participant": "frontend", "from": 155, "to": 545, "type": "frontend" },
+    { "participant": "gateway", "from": 225, "to": 520, "type": "security" },
+    { "participant": "tx", "from": 260, "to": 500, "type": "backend" },
+    { "participant": "fraud", "from": 295, "to": 340, "type": "backend" },
+    { "participant": "accounts", "from": 365, "to": 410, "type": "backend" },
+    { "participant": "kafka", "from": 435, "to": 470, "type": "messagebus" }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Happy path",
+      "items": [
+        "Frontend never calls transactions directly; API_GATEWAY_URL is the edge",
+        "Fraud screening runs before ledger post; fail-open is configurable",
+        "Outbox publish is async relative to the HTTP response path"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Guards",
+      "items": [
+        "JWT is validated at the gateway for protected banking routes",
+        "Idempotency-Key lets clients safely retry transfers",
+        "Ledger writes go through accounts gRPC, not a shared SQL table"
+      ]
+    }
+  ]
+}
