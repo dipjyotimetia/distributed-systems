@@ -23,6 +23,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
@@ -111,7 +112,10 @@ func run(ctx context.Context, mode string) error {
 		if _, err := db.ExecContext(startup, "SELECT 1 FROM disputes.cases, disputes.workflow_outbox, disputes.signal_outbox LIMIT 0"); err != nil {
 			return fmt.Errorf("check dispute schema: %w", err)
 		}
-		conn, err := grpc.NewClient(transactionsAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		conn, err := grpc.NewClient(transactionsAddress,
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+			grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
+		)
 		if err != nil {
 			return err
 		}
@@ -146,7 +150,7 @@ func serveResearch(ctx context.Context, api httpapi.API) error {
 	if err != nil {
 		return err
 	}
-	server := grpc.NewServer()
+	server := grpc.NewServer(grpc.StatsHandler(otelgrpc.NewServerHandler()))
 	researchv1.RegisterDisputeResearchServer(server, httpapi.ResearchServer{API: api})
 	go func() {
 		<-ctx.Done()

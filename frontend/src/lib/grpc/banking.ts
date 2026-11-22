@@ -1,4 +1,5 @@
 import fs from 'fs';
+import { context, propagation } from '@opentelemetry/api';
 import { createClient, type CallOptions } from '@connectrpc/connect';
 import { createGrpcTransport } from '@connectrpc/connect-node';
 import {
@@ -51,7 +52,10 @@ function transport(address: string, serverName: string) {
 }
 
 function callOptions(authorization: string | null): CallOptions {
-  return authorization ? { headers: { authorization } } : {};
+  const headers: Record<string, string> = {};
+  if (authorization) headers.authorization = authorization;
+  propagation.inject(context.active(), headers);
+  return Object.keys(headers).length ? { headers } : {};
 }
 
 function responseJson(schema: DescMessage, message: MessageShape<DescMessage>) {

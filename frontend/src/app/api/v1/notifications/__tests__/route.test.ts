@@ -10,25 +10,45 @@ beforeEach(() => {
   global.fetch = mockFetch;
   mockFetch.mockReset();
 });
-afterAll(() => { global.fetch = originalFetch; });
+afterAll(() => {
+  global.fetch = originalFetch;
+});
 
 test('requires a session and forwards it to the customer inbox', async () => {
-  expect((await GET(new NextRequest('http://localhost/api/v1/notifications'))).status).toBe(401);
-  mockFetch.mockResolvedValueOnce(new Response('[]', { status: 200, headers: { 'content-type': 'application/json' } }));
-  const result = await GET(new NextRequest('http://localhost/api/v1/notifications', {
-    headers: { authorization: 'Bearer session' },
-  }));
+  expect(
+    (await GET(new NextRequest('http://localhost/api/v1/notifications')))
+      .status,
+  ).toBe(401);
+  mockFetch.mockResolvedValueOnce(
+    new Response('[]', {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    }),
+  );
+  const result = await GET(
+    new NextRequest('http://localhost/api/v1/notifications', {
+      headers: { authorization: 'Bearer session' },
+    }),
+  );
   expect(result.status).toBe(200);
   expect(await result.json()).toEqual([]);
-  expect(mockFetch).toHaveBeenCalledWith('http://notification-service:8080/api/v1/notifications/me', expect.objectContaining({
-    headers: { authorization: 'Bearer session' },
-  }));
+  expect(mockFetch).toHaveBeenCalledWith(
+    'http://notification-service:8080/api/v1/notifications/me',
+    expect.objectContaining({
+      headers: expect.objectContaining({
+        authorization: 'Bearer session',
+        traceparent: expect.stringMatching(/^00-[a-f0-9]{32}-[a-f0-9]{16}-01$/),
+      }),
+    }),
+  );
 });
 
 test('reports an unreachable notification service', async () => {
   mockFetch.mockRejectedValueOnce(new Error('offline'));
-  const result = await GET(new NextRequest('http://localhost/api/v1/notifications', {
-    headers: { authorization: 'Bearer session' },
-  }));
+  const result = await GET(
+    new NextRequest('http://localhost/api/v1/notifications', {
+      headers: { authorization: 'Bearer session' },
+    }),
+  );
   expect(result.status).toBe(502);
 });

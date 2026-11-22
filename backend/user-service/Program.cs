@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using Prometheus;
 using System.Text.RegularExpressions;
 using UserServiceDotnet.Data;
@@ -25,6 +27,21 @@ builder.Services.AddControllers()
         options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
         options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
     });
+
+if (!string.Equals(Environment.GetEnvironmentVariable("OTEL_SDK_DISABLED"), "true", StringComparison.OrdinalIgnoreCase))
+{
+    var serviceName = Environment.GetEnvironmentVariable("OTEL_SERVICE_NAME") ?? "user-service";
+    builder.Services.AddOpenTelemetry()
+        .ConfigureResource(resource => resource.AddService(serviceName: serviceName,
+            serviceNamespace: Environment.GetEnvironmentVariable("OTEL_RESOURCE_ATTRIBUTES")
+                ?.Split(',').Select(part => part.Split('=', 2))
+                .FirstOrDefault(parts => parts.Length == 2 && parts[0].Trim() == "service.namespace")?[1].Trim()
+                ?? "banking-app"))
+        .WithTracing(tracing => tracing
+            .AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation()
+            .AddOtlpExporter());
+}
 
 var app = builder.Build();
 

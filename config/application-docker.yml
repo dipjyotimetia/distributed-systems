@@ -70,7 +70,7 @@ otel:
   exporter:
     otlp:
       protocol: grpc
-      endpoint: http://jaeger:4317
+      endpoint: http://otel-collector:4317
   traces:
     exporter: otlp
     propagators: tracecontext

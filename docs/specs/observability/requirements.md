@@ -18,10 +18,13 @@ otel-collector, Jaeger, Prometheus, Grafana and Loki.
    frontend → gateway → backend → database is one connected trace.
 
 ### 2. Export topology
-1. Docker Compose: services export OTLP directly to Jaeger all-in-one (no collector).
+1. Docker Compose: services export OTLP to `otel-collector`
+   ([`config/otel-collector.yaml`](../../../config/otel-collector.yaml)), which
+   filters then forwards to Jaeger.
 2. Kubernetes: services export to `otel-collector`, whose traces pipeline is
    `otlp → filter → otlp` (to Jaeger). The filter SHALL drop health-check and
-   actuator/security noise spans and keep business spans.
+   actuator/security noise spans and keep business spans. Compose uses the same
+   filter rules for local parity.
 
 ### 3. Configuration
 1. Spring Boot services use gRPC OTLP on `4317`; the frontend uses HTTP/protobuf on `4318`.

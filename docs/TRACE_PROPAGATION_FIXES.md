@@ -21,7 +21,7 @@ The OpenTelemetry traces were not working properly for cross-application tracing
 ### 3. Backend Services Missing Trace Propagation
 - **Problem**: RestTemplate configurations not using RestTemplateBuilder for automatic trace propagation
 - **Impact**: Service-to-service calls didn't carry trace context
-- **Location**: `backend/*/src/main/java/com/banking/*/config/RestTemplateConfig.java`
+- **Location**: Java services such as `transactions-service` RestTemplate config (user-service is .NET and uses the OpenTelemetry ASP.NET Core instrumentation instead)
 
 ### 4. Inconsistent OpenTelemetry Endpoints
 - **Problem**: Frontend using different OTLP endpoint than backend services

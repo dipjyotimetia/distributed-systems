@@ -4,15 +4,20 @@ import com.banking.accountsservice.service.StatementExportService;
 import com.banking.accountsservice.statements.generated.v1.StatementJob;
 import com.banking.accountsservice.statements.persistence.StatementJobStore;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.opentelemetry.api.GlobalOpenTelemetry;
 import io.opentelemetry.api.trace.Tracer;
+import io.opentelemetry.opentracingshim.OpenTracingShim;
 import io.temporal.api.enums.v1.WorkflowIdReusePolicy;
 import io.temporal.api.workflowservice.v1.GetSystemInfoRequest;
 import io.temporal.client.WorkflowClient;
 import io.temporal.client.WorkflowExecutionAlreadyStarted;
 import io.temporal.client.WorkflowOptions;
+import io.temporal.opentracing.OpenTracingOptions;
+import io.temporal.opentracing.OpenTracingWorkerInterceptor;
 import io.temporal.serviceclient.WorkflowServiceStubs;
 import io.temporal.serviceclient.WorkflowServiceStubsOptions;
 import io.temporal.worker.WorkerFactory;
+import io.temporal.worker.WorkerFactoryOptions;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import java.util.UUID;
@@ -62,7 +67,12 @@ public class StatementWorker implements HealthIndicator {
         service = stubs;
         try {
             client = WorkflowClient.newInstance(service);
-            factory = WorkerFactory.newInstance(client);
+            var tracing = OpenTracingOptions.newBuilder()
+                    .setTracer(OpenTracingShim.createTracerShim(GlobalOpenTelemetry.get()))
+                    .build();
+            factory = WorkerFactory.newInstance(client, WorkerFactoryOptions.newBuilder()
+                    .setWorkerInterceptors(new OpenTracingWorkerInterceptor(tracing))
+                    .build());
             var worker = factory.newWorker(StatementExportWorkflow.QUEUE);
             worker.registerWorkflowImplementationTypes(StatementExportWorkflow.Implementation.class);
             worker.registerActivitiesImplementations(activities);

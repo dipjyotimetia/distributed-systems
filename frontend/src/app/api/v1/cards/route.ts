@@ -8,5 +8,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
-  return grpcResponse(call('cards', 'IssueCard', authorization(request), { accountId: body.accountId }));
+  return grpcResponse(
+    call('cards', 'IssueCard', authorization(request), {
+      accountId: body.accountId,
+    }),
+  );
 }

@@ -1,14 +1,36 @@
 # Trace filtering
 
-The [Kubernetes collector](../kubernetes/observability/otel-collector.yaml)
-drops spans whose name or HTTP URL attributes match Actuator, and drops the
-Spring Security spans listed in its filter. Compose exports to Jaeger
-directly, so the Kubernetes collector rules do not apply there.
+Compose and Kubernetes both drop noisy spans in the OpenTelemetry Collector
+before exporting to Jaeger. The filter rules are kept in sync:
+
+- Compose: [`config/otel-collector.yaml`](../config/otel-collector.yaml)
+- Kubernetes: [`kubernetes/observability/otel-collector.yaml`](../kubernetes/observability/otel-collector.yaml)
+
+Both drop spans whose name or HTTP URL attributes match Actuator, and drop the
+Spring Security spans listed in the filter (`security filterchain before/after`,
+`authorize exchange`, `secured request`).
+
+Compose’s traces pipeline is `otlp → filter → batch → otlp` (to `jaeger:4317`).
+Kubernetes uses the same filter on traces and additionally runs logs/metrics
+pipelines that are not part of local Compose.
 
 ## Verify traces
 
-With the Kubernetes app and observability stack running, forward the
-frontend and Jaeger services in separate terminals:
+### Docker Compose
+
+```bash
+docker compose up -d jaeger otel-collector
+# exercise the app, then:
+curl -s http://localhost:16686/api/v3/services
+```
+
+Confirm application services appear and that Actuator / Spring Security spans
+covered by the filter are absent from recent traces.
+
+### Kubernetes
+
+With the app and observability stack running, forward the frontend and Jaeger
+services in separate terminals:
 
 ```bash
 kubectl port-forward -n banking-app svc/banking-frontend 3000:80

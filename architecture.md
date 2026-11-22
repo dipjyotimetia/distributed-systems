@@ -99,10 +99,13 @@ volume across both workers.
 
 ## Observability
 
-Compose sends traces directly to Jaeger. Kubernetes exports through the
-collector, which filters spans before sending traces to Jaeger. The frontend
-uses OTLP over HTTP/protobuf. Java services use OTLP over gRPC in the supplied
-deployment configurations. See [OTel trace data processing](OBSERVABILITY.md#opentelemetry-trace-data-processing)
+Compose and Kubernetes both export through the OpenTelemetry Collector, which
+filters actuator and Spring Security noise before Jaeger. Compose uses
+[`config/otel-collector.yaml`](config/otel-collector.yaml); Kubernetes uses
+[`kubernetes/observability/otel-collector.yaml`](kubernetes/observability/otel-collector.yaml).
+The frontend uses OTLP over HTTP/protobuf. Java services use OTLP over gRPC in
+the supplied deployment configurations. See
+[OTel trace data processing](OBSERVABILITY.md#opentelemetry-trace-data-processing)
 for the pipeline and signal-specific configuration.
 
 ## Versioning and repository workflow

@@ -121,8 +121,8 @@ const config = {
     // OpenTelemetry settings
     otel: {
       serviceName: process.env.OTEL_SERVICE_NAME || 'simulation-client',
-      endpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://jaeger:4317',
-      protocol: process.env.OTEL_EXPORTER_OTLP_PROTOCOL || 'grpc'
+      endpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://jaeger:4318/v1/traces',
+      protocol: process.env.OTEL_EXPORTER_OTLP_PROTOCOL || 'http/protobuf'
     },
     
     // Logging settings

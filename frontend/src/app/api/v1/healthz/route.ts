@@ -1,10 +1,10 @@
 export async function GET() {
   return Response.json(
-    { 
+    {
       status: 'UP',
       timestamp: new Date().toISOString(),
-      service: 'frontend'
+      service: 'frontend',
     },
-    { status: 200 }
+    { status: 200 },
   );
 }

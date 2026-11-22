@@ -1,12 +1,17 @@
 package com.banking.payments;
 
+import io.opentelemetry.api.GlobalOpenTelemetry;
+import io.opentelemetry.opentracingshim.OpenTracingShim;
 import io.temporal.api.enums.v1.WorkflowIdReusePolicy;
 import io.temporal.client.WorkflowClient;
 import io.temporal.client.WorkflowExecutionAlreadyStarted;
 import io.temporal.client.WorkflowOptions;
+import io.temporal.opentracing.OpenTracingOptions;
+import io.temporal.opentracing.OpenTracingWorkerInterceptor;
 import io.temporal.serviceclient.WorkflowServiceStubs;
 import io.temporal.serviceclient.WorkflowServiceStubsOptions;
 import io.temporal.worker.WorkerFactory;
+import io.temporal.worker.WorkerFactoryOptions;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
@@ -35,7 +40,12 @@ public class PaymentWorker {
         connection = WorkflowServiceStubs.newServiceStubs(WorkflowServiceStubsOptions.newBuilder()
                 .setTarget(address).setRpcTimeout(Duration.ofSeconds(5)).build());
         temporal = WorkflowClient.newInstance(connection);
-        factory = WorkerFactory.newInstance(temporal);
+        var tracing = OpenTracingOptions.newBuilder()
+                .setTracer(OpenTracingShim.createTracerShim(GlobalOpenTelemetry.get()))
+                .build();
+        factory = WorkerFactory.newInstance(temporal, WorkerFactoryOptions.newBuilder()
+                .setWorkerInterceptors(new OpenTracingWorkerInterceptor(tracing))
+                .build());
         var worker = factory.newWorker(PaymentWorkflow.QUEUE);
         worker.registerWorkflowImplementationTypes(PaymentWorkflow.Implementation.class);
         worker.registerActivitiesImplementations(steps);

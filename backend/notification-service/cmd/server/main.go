@@ -12,7 +12,9 @@ import (
 
 	"github.com/dipjyotimetia/distributed-systems/backend/notification-service/internal/api"
 	"github.com/dipjyotimetia/distributed-systems/backend/notification-service/internal/consumer"
+	otelsetup "github.com/dipjyotimetia/distributed-systems/backend/notification-service/internal/otel"
 	"github.com/dipjyotimetia/distributed-systems/backend/notification-service/internal/store"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 func main() {
@@ -28,6 +30,12 @@ func main() {
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer cancel()
+
+	shutdown, err := otelsetup.Init(ctx, "notification-service")
+	if err != nil {
+		log.Fatalf("otel init: %v", err)
+	}
+	defer func() { _ = shutdown(context.Background()) }()
 
 	mongoStore, err := store.NewMongoStore(ctx, mongoURI, "notifications", "events")
 	if err != nil {
@@ -66,9 +74,12 @@ func main() {
 		}
 	}(c)
 
+	handler := api.NewHandler(mongoStore, []byte(os.Getenv("JWT_SECRET")))
 	srv := &http.Server{
-		Addr:    ":" + port,
-		Handler: api.NewHandler(mongoStore, []byte(os.Getenv("JWT_SECRET"))),
+		Addr: ":" + port,
+		Handler: otelhttp.NewHandler(handler, "notification.http", otelhttp.WithFilter(func(r *http.Request) bool {
+			return r.URL.Path != "/metrics" && r.URL.Path != "/api/v1/notifications/health"
+		})),
 	}
 
 	go func() {

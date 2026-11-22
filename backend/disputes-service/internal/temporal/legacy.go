@@ -17,6 +17,8 @@ import (
 	"go.temporal.io/api/serviceerror"
 	"go.temporal.io/sdk/activity"
 	"go.temporal.io/sdk/client"
+	"go.temporal.io/sdk/contrib/opentelemetry"
+	"go.temporal.io/sdk/interceptor"
 	"go.temporal.io/sdk/worker"
 	"go.temporal.io/sdk/workflow"
 )
@@ -103,7 +105,13 @@ func Run(ctx context.Context, db *sql.DB, s *postgres.Store, serve func(context.
 		return err
 	}
 	defer temporal.Close()
-	w := worker.New(temporal, TaskQueue, worker.Options{})
+	tracing, err := opentelemetry.NewTracingInterceptor(opentelemetry.TracerOptions{})
+	if err != nil {
+		return err
+	}
+	w := worker.New(temporal, TaskQueue, worker.Options{
+		Interceptors: []interceptor.WorkerInterceptor{tracing},
+	})
 	w.RegisterWorkflowWithOptions(escalateDispute, workflow.RegisterOptions{Name: "escalateDispute"})
 	w.RegisterWorkflowWithOptions(investigateDispute, workflow.RegisterOptions{Name: investigationWorkflow})
 	w.RegisterActivityWithOptions(func(ctx context.Context, input *disputesv1.CaseRevision) (*disputesv1.InvestigationState, error) {

@@ -25,6 +25,8 @@ dependencyManagement {
 
 dependencies {
     implementation("io.temporal:temporal-sdk:1.41.1")
+    implementation("io.temporal:temporal-opentracing:1.41.1")
+    implementation("io.opentelemetry:opentelemetry-opentracing-shim:1.68.0")
     testImplementation("io.temporal:temporal-testing:1.41.1")
     implementation("com.google.protobuf:protobuf-java:4.36.2")
     implementation("io.grpc:grpc-netty:1.85.1")
@@ -49,6 +51,7 @@ dependencies {
     implementation("io.opentelemetry.instrumentation:opentelemetry-spring-boot-starter:2.34.0")
     implementation("io.opentelemetry:opentelemetry-exporter-otlp:1.68.0")
     implementation("io.opentelemetry.instrumentation:opentelemetry-jdbc:2.34.0-alpha")
+    implementation("io.opentelemetry.instrumentation:opentelemetry-grpc-1.6:2.34.0-alpha")
     implementation("io.micrometer:micrometer-registry-prometheus")
     developmentOnly("org.springframework.boot:spring-boot-devtools")
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")

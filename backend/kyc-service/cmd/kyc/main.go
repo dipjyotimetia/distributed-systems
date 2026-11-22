@@ -12,17 +12,26 @@ import (
 
 	"github.com/dipjyotimetia/distributed-systems/backend/kyc-service/gen/kyc/v1"
 	"github.com/dipjyotimetia/distributed-systems/backend/kyc-service/internal/mtls"
+	otelsetup "github.com/dipjyotimetia/distributed-systems/backend/kyc-service/internal/otel"
 	"github.com/dipjyotimetia/distributed-systems/backend/kyc-service/internal/rpc"
 	"github.com/dipjyotimetia/distributed-systems/backend/kyc-service/internal/store"
 	"github.com/dipjyotimetia/distributed-systems/backend/kyc-service/internal/workflow"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	sdk "go.temporal.io/sdk/client"
+	"go.temporal.io/sdk/contrib/opentelemetry"
+	"go.temporal.io/sdk/interceptor"
 	"go.temporal.io/sdk/worker"
 	"google.golang.org/grpc"
 )
 
 func main() {
 	ctx := context.Background()
+	shutdown, err := otelsetup.Init(ctx, "kyc-service")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer func() { _ = shutdown(context.Background()) }()
 	cases, err := store.Open(env("DATABASE_URL", "postgres://postgres:password@postgres:5432/banking_app?sslmode=disable"))
 	if err != nil {
 		log.Fatal(err)
@@ -53,7 +62,7 @@ func runAPI(cases *store.Store) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	var options []grpc.ServerOption
+	options := []grpc.ServerOption{grpc.StatsHandler(otelgrpc.NewServerHandler())}
 	if option != nil {
 		options = append(options, option)
 	}
@@ -80,7 +89,13 @@ func runWorker(cases *store.Store) {
 		log.Fatal(err)
 	}
 	defer client.Close()
-	work := worker.New(client, "kyc-review", worker.Options{})
+	tracing, err := opentelemetry.NewTracingInterceptor(opentelemetry.TracerOptions{})
+	if err != nil {
+		log.Fatal(err)
+	}
+	work := worker.New(client, "kyc-review", worker.Options{
+		Interceptors: []interceptor.WorkerInterceptor{tracing},
+	})
 	work.RegisterWorkflow(workflow.Review)
 	work.RegisterActivity(&workflow.Activities{Store: cases})
 	go claim(cases, client)

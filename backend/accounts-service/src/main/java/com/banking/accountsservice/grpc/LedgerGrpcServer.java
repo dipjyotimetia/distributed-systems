@@ -8,6 +8,8 @@ import io.grpc.ServerBuilder;
 import io.grpc.ServerCall;
 import io.grpc.ServerCallHandler;
 import io.grpc.ServerInterceptor;
+import io.opentelemetry.api.GlobalOpenTelemetry;
+import io.opentelemetry.instrumentation.grpc.v1_6.GrpcTelemetry;
 import jakarta.annotation.PreDestroy;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -24,7 +26,9 @@ public class LedgerGrpcServer {
     private final Server server;
 
     public LedgerGrpcServer(LedgerGrpcService service, @Value("${ledger.grpc.port:9092}") int port) throws IOException {
+        GrpcTelemetry grpcTelemetry = GrpcTelemetry.create(GlobalOpenTelemetry.get());
         this.server = ServerBuilder.forPort(port)
+                .intercept(grpcTelemetry.newServerInterceptor())
                 .intercept(new HeaderInterceptor())
                 .addService(service)
                 .build()

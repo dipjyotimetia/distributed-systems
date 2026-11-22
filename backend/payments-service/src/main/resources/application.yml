@@ -22,7 +22,8 @@ otel:
   logs:
     exporter: none
   traces:
-    exporter: ${PAYMENTS_TRACES_EXPORTER:none}
+    # Default on when OTEL endpoint is configured; override with PAYMENTS_TRACES_EXPORTER=none to disable.
+    exporter: ${PAYMENTS_TRACES_EXPORTER:otlp}
 management:
   endpoints:
     web:

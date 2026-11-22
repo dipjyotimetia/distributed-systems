@@ -11,16 +11,23 @@ import (
 	ledgerv1 "github.com/dipjyotimetia/distributed-systems/backend/cards-service/gen/ledger/v1"
 	"github.com/dipjyotimetia/distributed-systems/backend/cards-service/internal/ledger"
 	"github.com/dipjyotimetia/distributed-systems/backend/cards-service/internal/mtls"
+	otelsetup "github.com/dipjyotimetia/distributed-systems/backend/cards-service/internal/otel"
 	"github.com/dipjyotimetia/distributed-systems/backend/cards-service/internal/service"
 	"github.com/dipjyotimetia/distributed-systems/backend/cards-service/internal/store"
 	fraudv1 "github.com/dipjyotimetia/distributed-systems/backend/fraud-service/gen/fraud/v1"
 	kycv1 "github.com/dipjyotimetia/distributed-systems/backend/kyc-service/gen/kyc/v1"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 )
 
 func main() {
 	ctx := context.Background()
+	shutdown, err := otelsetup.Init(ctx, "cards-service")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer func() { _ = shutdown(context.Background()) }()
 	db, err := store.Open(env("DATABASE_URL", "postgres://postgres:password@postgres:5432/banking_app?sslmode=disable"))
 	if err != nil {
 		log.Fatal(err)
@@ -48,7 +55,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	var options []grpc.ServerOption
+	options := []grpc.ServerOption{grpc.StatsHandler(otelgrpc.NewServerHandler())}
 	if option != nil {
 		options = append(options, option)
 	}
@@ -79,7 +86,7 @@ func dial(address, serverName string) (*grpc.ClientConn, error) {
 	if err != nil {
 		return nil, err
 	}
-	return grpc.NewClient(address, option)
+	return grpc.NewClient(address, option, grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
 }
 
 func env(key, fallback string) string {
