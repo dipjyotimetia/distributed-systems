@@ -9,6 +9,7 @@ import org.apache.avro.Schema;
 import org.apache.avro.io.EncoderFactory;
 import org.apache.avro.specific.SpecificDatumWriter;
 import org.apache.avro.specific.SpecificRecord;
+import org.apache.avro.util.ClassSecurityValidator;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -30,11 +31,47 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Component
 public class SchemaRegistryAvroEncoder {
+    private static final String TRUSTED_EVENT_PACKAGE = "com.banking.events";
+    private static final String SERIALIZABLE_PACKAGES_PROP = "org.apache.avro.SERIALIZABLE_PACKAGES";
+
+    static {
+        trustGeneratedEventClasses();
+    }
+
     private final boolean enabled;
     private final String registryUrl;
     private final ObjectMapper json = new ObjectMapper();
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).build();
     private final Map<String, Integer> schemaIds = new ConcurrentHashMap<>();
+
+    /**
+     * Avro 1.12.2+ refuses to load SpecificRecord classes unless their package is trusted.
+     * Trust our generated contracts package via system property and the ClassSecurityValidator API.
+     */
+    static void trustGeneratedEventClasses() {
+        String existing = System.getProperty(SERIALIZABLE_PACKAGES_PROP, "");
+        if (existing.isBlank()) {
+            System.setProperty(SERIALIZABLE_PACKAGES_PROP, TRUSTED_EVENT_PACKAGE);
+        } else if (!csvContainsPackage(existing, TRUSTED_EVENT_PACKAGE)) {
+            System.setProperty(SERIALIZABLE_PACKAGES_PROP, existing + "," + TRUSTED_EVENT_PACKAGE);
+        }
+        ClassSecurityValidator.setGlobal(ClassSecurityValidator.composite(
+                ClassSecurityValidator.getGlobal(),
+                type -> {
+                    String name = type.getName();
+                    return name.equals(TRUSTED_EVENT_PACKAGE) || name.startsWith(TRUSTED_EVENT_PACKAGE + ".");
+                }));
+    }
+
+    private static boolean csvContainsPackage(String csv, String pkg) {
+        for (String entry : csv.split(",")) {
+            String trimmed = entry.trim();
+            if (trimmed.equals("*") || trimmed.equals(pkg)) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     public SchemaRegistryAvroEncoder(
             @Value("${SCHEMA_REGISTRY_URL:http://banking-kafka:8081}") String registryUrl,

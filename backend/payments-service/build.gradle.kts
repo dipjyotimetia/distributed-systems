@@ -36,7 +36,7 @@ dependencies {
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.13.0")
     implementation("org.apache.activemq:artemis-jakarta-client:2.44.0")
     implementation("org.apache.kafka:kafka-clients")
-    implementation("org.apache.avro:avro:1.12.1")
+    implementation("org.apache.avro:avro:1.12.2")
     implementation("io.temporal:temporal-sdk:1.41.1")
     implementation("io.temporal:temporal-opentracing:1.41.1")
     implementation("io.opentelemetry:opentelemetry-opentracing-shim:1.68.0")
@@ -46,10 +46,10 @@ dependencies {
     implementation("io.grpc:grpc-stub:1.85.1")
     implementation("com.google.protobuf:protobuf-java:4.36.2")
     testImplementation("org.mockito:mockito-core")
-    implementation("software.amazon.awssdk:s3:2.59.4")
+    implementation("software.amazon.awssdk:s3:2.59.7")
     implementation("io.micrometer:micrometer-registry-prometheus")
     implementation("io.opentelemetry.instrumentation:opentelemetry-spring-boot-starter:2.34.0")
-    avroTools("org.apache.avro:avro-tools:1.12.1") { isTransitive = false }
+    avroTools("org.apache.avro:avro-tools:1.12.2") { isTransitive = false }
 }
 
 openApiGenerate {

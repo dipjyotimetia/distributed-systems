@@ -107,6 +107,9 @@ discrepancies. Provision the `payment-events.v1` Redpanda topic before using
 the worker. App config defaults `SCHEMA_REGISTRY_URL=http://banking-kafka:8081`
 and `KAFKA_VALUE_FORMAT=avro` for Confluent Avro on `transaction-events`,
 `payment-events.v1`, and `movement-lifecycle-v1` ([Avro contracts](../contracts/avro/README.md)).
+Optional outbox knobs: `TRANSACTIONS_OUTBOX_MAX_ATTEMPTS`,
+`TRANSACTIONS_OUTBOX_RETENTION_DAYS`, `PAYMENTS_OUTBOX_RETENTION_DAYS` (see
+[money-movement recovery](../docs/money-movement-recovery.md)).
 
 ```bash
 kubectl apply -k kubernetes/overlays/payments-local

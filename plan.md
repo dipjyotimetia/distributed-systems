@@ -9,6 +9,7 @@ These capabilities landed after the numbered Phase 9 checklist and are part of t
 - **KYC and cards** — Go gRPC services (`:8091` / `:8092`), frontend Buf clients, optional mTLS Compose overlay
 - **Disputes** — intake API, Temporal escalation/investigation, operator HITL, transactions query gRPC
 - **Avro event pipeline** — Confluent Avro via Schema Registry for `transaction-events`, `payment-events.v1`, `movement-lifecycle-v1`
+- **Financial outbox hardening** — `SKIP LOCKED` claim, poison-row quarantine (`failed_at`), published-row retention for transactions and payments Kafka relays
 - **Temporal workers** — disputes, statement exports, KYC review, AI banking agent (payments worker on overlay)
 - **Internal gRPC mesh** — accounts ledger `:9092`, transactions query `:9095`, dispute research proto
 - **Optional payments** — Compose/K8s overlays with Artemis clearing and reconciliation

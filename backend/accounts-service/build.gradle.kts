@@ -16,7 +16,7 @@ dependencyManagement {
     imports {
         mavenBom("io.opentelemetry:opentelemetry-bom:1.68.0")
         mavenBom("io.grpc:grpc-bom:1.85.1")
-        mavenBom("software.amazon.awssdk:bom:2.59.4")
+        mavenBom("software.amazon.awssdk:bom:2.59.7")
     }
     dependencies {
         dependency("com.google.guava:guava:33.8.0-android")

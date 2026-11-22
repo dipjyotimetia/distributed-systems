@@ -253,6 +253,7 @@
       "title": "Primary path",
       "items": [
         "transactions-service inserts event_outbox rows in the same DB transaction as the ledger write",
+        "Relay claims with SKIP LOCKED, quarantines poison rows after max attempts, retains published rows for a bounded window",
         "Default wire format is Confluent Avro via SCHEMA_REGISTRY_URL; KAFKA_VALUE_FORMAT=json remains an opt-out",
         "notification-service consumes transaction-events and payment-events.v1, then fans out to providers"
       ]

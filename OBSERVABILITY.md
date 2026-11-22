@@ -578,12 +578,16 @@ payment signals under the `hybrid-payments` scrape job. Artemis queue counts can
 | --- | --- |
 | Age of the oldest nonterminal payment | `payments_oldest_pending_seconds` |
 | Age of the oldest unpublished outbox record | `payments_outbox_oldest_seconds{destination="workflow|mq|kafka"}`, with one series per destination |
-| Age of the oldest unpublished transaction event | `transactions_outbox_oldest_seconds` on the Banking App dashboard |
+| Age of the oldest unpublished transaction event | `transactions_outbox_oldest_seconds` (ready rows only; excludes quarantined `failed_at`) on the Banking App dashboard |
+| Quarantined transaction outbox rows | `transactions_outbox_quarantined_total` when encode/publish exhausts `TRANSACTIONS_OUTBOX_MAX_ATTEMPTS` |
 | Reconciliation discrepancies retained for review | `payments_reconciliation_discrepancies` |
 
 Use the backout queue depth to see messages awaiting operator inspection.
 A nonzero outbox age during an outage identifies the destination still
-awaiting acknowledgement.
+awaiting acknowledgement. A rising quarantine counter means poison or
+permanently failing payloads are being skipped so later events can publish;
+inspect `transactions_service.event_outbox` rows with `failed_at` set (they are
+deleted after the same retention window as published rows).
 
 The payments API saves the W3C trace context alongside the payment.
 Temporal activities, MQ publications, clearing replies, and Kafka

@@ -1,12 +1,41 @@
 package com.banking.payments;
 
+import com.banking.events.PaymentEvent;
+import org.apache.avro.io.EncoderFactory;
+import org.apache.avro.specific.SpecificDatumWriter;
+import org.apache.avro.util.ClassSecurityValidator;
 import org.junit.jupiter.api.Test;
 
+import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class SchemaRegistryAvroEncoderTest {
+
+    @Test
+    void trustsGeneratedEventClassesForAvroSerialize() throws Exception {
+        SchemaRegistryAvroEncoder.trustGeneratedEventClasses();
+        assertDoesNotThrow(() -> ClassSecurityValidator.validate(PaymentEvent.class));
+
+        PaymentEvent event = PaymentEvent.newBuilder()
+                .setVersion(1)
+                .setEventId("e1")
+                .setPaymentId("p1")
+                .setCustomerId(9L)
+                .setAmountMinor(100L)
+                .setCurrency("AUD")
+                .setStatus("CLEARED")
+                .setClearingReference(null)
+                .setSettlementBusinessDate(null)
+                .setOccurredAt("2026-11-22T00:00:00Z")
+                .build();
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        var encoder = EncoderFactory.get().binaryEncoder(out, null);
+        new SpecificDatumWriter<>(PaymentEvent.getClassSchema()).write(event, encoder);
+        encoder.flush();
+        assertTrue(out.size() > 0);
+    }
 
     @Test
     void jsonModeLeavesBodyUnchanged() throws Exception {
