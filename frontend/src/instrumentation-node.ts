@@ -50,8 +50,12 @@ export async function registerNode() {
 
     const { NodeTracerProvider } =
       await import('@opentelemetry/sdk-trace-node');
-    const { ConsoleSpanExporter, BatchSpanProcessor, SimpleSpanProcessor } =
-      await import('@opentelemetry/sdk-trace-base');
+    const {
+      ConsoleSpanExporter,
+      BatchSpanProcessor,
+      SimpleSpanProcessor,
+    } = await import('@opentelemetry/sdk-trace-base');
+    type SpanProcessor = import('@opentelemetry/sdk-trace-base').SpanProcessor;
     const { OTLPTraceExporter } =
       await import('@opentelemetry/exporter-trace-otlp-http');
     const { resourceFromAttributes } = await import('@opentelemetry/resources');
@@ -69,7 +73,9 @@ export async function registerNode() {
         process.env.OTEL_EXPORTER_OTLP_ENDPOINT ||
         'http://localhost:4318/v1/traces',
     });
-    const spanProcessors = [new BatchSpanProcessor(otlpExporter)];
+    const spanProcessors: SpanProcessor[] = [
+      new BatchSpanProcessor(otlpExporter),
+    ];
     if (isDebugMode) {
       spanProcessors.push(new SimpleSpanProcessor(new ConsoleSpanExporter()));
     }

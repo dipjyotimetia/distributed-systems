@@ -28,7 +28,7 @@ public class LedgerGrpcServer {
     public LedgerGrpcServer(LedgerGrpcService service, @Value("${ledger.grpc.port:9092}") int port) throws IOException {
         GrpcTelemetry grpcTelemetry = GrpcTelemetry.create(GlobalOpenTelemetry.get());
         this.server = ServerBuilder.forPort(port)
-                .intercept(grpcTelemetry.newServerInterceptor())
+                .intercept(grpcTelemetry.createServerInterceptor())
                 .intercept(new HeaderInterceptor())
                 .addService(service)
                 .build()
