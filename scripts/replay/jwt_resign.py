@@ -23,21 +23,23 @@ def resign(token: str, key: str) -> str:
     parts = token.split(".")
     if len(parts) != 3:
         return token
-    header_b64, payload_b64, _sig = parts
-    if _sig == "REDACTED" or True:
-        # Always re-sign suite tokens with the test key so gateway accepts them.
-        try:
-            pad = "=" * (-len(payload_b64) % 4)
-            payload = json.loads(base64.urlsafe_b64decode(payload_b64 + pad))
-        except Exception:
-            return token
-        now = int(time.time())
-        payload["iat"] = now
-        payload["exp"] = now + 3600
-        signing_input = f"{header_b64}.{_b64url_json(payload)}".encode()
-        sig = hmac.new(key.encode(), signing_input, hashlib.sha256).digest()
-        return f"{header_b64}.{_b64url_json(payload)}.{_b64url(sig)}"
-    return token
+    header_b64, payload_b64, sig = parts
+    # Only rewrite suite placeholders. Leave intentionally invalid tokens alone
+    # (e.g. "invalid.expired.token") so 401 cases stay negative tests.
+    if sig != "REDACTED":
+        return token
+    try:
+        pad = "=" * (-len(payload_b64) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(payload_b64 + pad))
+    except Exception:
+        return token
+    now = int(time.time())
+    payload["iat"] = now
+    payload["exp"] = now + 3600
+    signing_input = f"{header_b64}.{_b64url_json(payload)}".encode()
+    new_sig = hmac.new(key.encode(), signing_input, hashlib.sha256).digest()
+    return f"{header_b64}.{_b64url_json(payload)}.{_b64url(new_sig)}"
+
 
 
 def main():

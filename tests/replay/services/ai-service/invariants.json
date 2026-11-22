@@ -1,0 +1,13 @@
+[
+  {
+    "_comment": "Live chat fans out to all five LLM providers; each result is identified and either succeeds or reports an error.",
+    "match": {"method": "POST", "url": "/api/v1/chat", "status": "200"},
+    "assert": [
+      {"field": "$.results", "type": "array", "required": true, "min_length": 5, "max_length": 5},
+      {"field": "$.results[].provider", "type": "string", "required": true, "enum": ["anthropic", "openai", "gemini", "xai", "openrouter"]},
+      {"field": "$.results[].name", "type": "string", "required": true, "non_empty": true},
+      {"field": "$.results[].model", "type": "string", "required": true, "non_empty": true},
+      {"field": "$.results[].durationMs", "type": "number", "required": true, "min": 0}
+    ]
+  }
+]

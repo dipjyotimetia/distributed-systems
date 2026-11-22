@@ -47,6 +47,7 @@ HEALTH_PATHS=("/actuator/health")
 NEEDS_POSTGRES=0
 NEEDS_MONGO=0
 NEEDS_KAFKA=0
+POSTGRES_RESET=0
 POSTGRES_SCHEMAS=()
 JWT_RESIGN=0
 MINT_JWT=0
@@ -63,6 +64,22 @@ source "$CONFIG"
 SERVICE_DIR="${PROJECT_ROOT}/${SERVICE_DIR_REL}"
 RESULTS_DIR="${SERVICE_DIR}/replay-results/replay-$(date +%Y-%m-%d_%H-%M-%S)"
 mkdir -p "$RESULTS_DIR"
+
+wait_ready() {
+  # wait_ready <label> <attempts> <command...>
+  local label="$1"
+  local attempts="$2"
+  shift 2
+  local i
+  for i in $(seq 1 "$attempts"); do
+    if "$@" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 1
+  done
+  echo "error: ${label} did not become ready after ${attempts}s" >&2
+  return 1
+}
 
 if command -v nc >/dev/null 2>&1; then
   if nc -z 127.0.0.1 "$WIREMOCK_PORT" 2>/dev/null; then
@@ -95,8 +112,13 @@ trap cleanup EXIT
 if [ "$NEEDS_POSTGRES" = "1" ]; then
   export PGPASSWORD
   for schema in "${POSTGRES_SCHEMAS[@]+"${POSTGRES_SCHEMAS[@]}"}"; do
-    psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" -v ON_ERROR_STOP=1 -c \
-      "CREATE SCHEMA IF NOT EXISTS ${schema};" >/dev/null
+    if [ "$POSTGRES_RESET" = "1" ]; then
+      psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" -v ON_ERROR_STOP=1 -c \
+        "DROP SCHEMA IF EXISTS ${schema} CASCADE; CREATE SCHEMA ${schema};" >/dev/null
+    else
+      psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" -v ON_ERROR_STOP=1 -c \
+        "CREATE SCHEMA IF NOT EXISTS ${schema};" >/dev/null
+    fi
   done
 fi
 
@@ -104,12 +126,7 @@ if [ "$NEEDS_MONGO" = "1" ]; then
   MONGO_CID="replay-mongo-${SERVICE}-$$"
   echo "Starting MongoDB on :${MONGO_PORT}..."
   docker run --rm -d --name "$MONGO_CID" -p "127.0.0.1:${MONGO_PORT}:27017" mongo:7 >/dev/null
-  for _ in $(seq 1 30); do
-    if docker exec "$MONGO_CID" mongosh --quiet --eval 'db.runCommand({ ping: 1 })' >/dev/null 2>&1; then
-      break
-    fi
-    sleep 1
-  done
+  wait_ready "MongoDB" 30 docker exec "$MONGO_CID" mongosh --quiet --eval 'db.runCommand({ ping: 1 })'
 fi
 
 if [ "$NEEDS_KAFKA" = "1" ]; then
@@ -125,12 +142,7 @@ if [ "$NEEDS_KAFKA" = "1" ]; then
       --advertise-kafka-addr=127.0.0.1:${KAFKA_PORT} \
       --schema-registry-addr=0.0.0.0:8081 \
       >/dev/null
-  for _ in $(seq 1 40); do
-    if docker exec "$KAFKA_CID" rpk cluster health >/dev/null 2>&1; then
-      break
-    fi
-    sleep 1
-  done
+  wait_ready "Redpanda" 40 docker exec "$KAFKA_CID" rpk cluster health
 fi
 
 echo "Starting WireMock on :${WIREMOCK_PORT}..."
@@ -144,12 +156,7 @@ docker run --rm -d --name "$WM_CID" \
   -v "${STUBS_MOUNT}:/home/wiremock/mappings:ro" \
   wiremock/wiremock:3.13.1 --disable-banner >/dev/null
 
-for _ in $(seq 1 30); do
-  if curl -fsS "http://127.0.0.1:${WIREMOCK_PORT}/__admin/mappings" >/dev/null 2>&1; then
-    break
-  fi
-  sleep 1
-done
+wait_ready "WireMock" 30 curl -fsS "http://127.0.0.1:${WIREMOCK_PORT}/__admin/mappings"
 
 # Re-source so APP_ENV expands with companion ports now known.
 # shellcheck source=/dev/null

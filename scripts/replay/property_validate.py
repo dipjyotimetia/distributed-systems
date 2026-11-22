@@ -77,6 +77,10 @@ def _check(assert_rule, present, value, path, errors):
     if assert_rule.get("non_empty"):
         if value in ("", [], {}, None):
             errors.append(f"{path}: expected non-empty")
+    if "min_length" in assert_rule and hasattr(value, "__len__") and len(value) < assert_rule["min_length"]:
+        errors.append(f"{path}: length {len(value)} < min_length {assert_rule['min_length']}")
+    if "max_length" in assert_rule and hasattr(value, "__len__") and len(value) > assert_rule["max_length"]:
+        errors.append(f"{path}: length {len(value)} > max_length {assert_rule['max_length']}")
 
 
 def main():

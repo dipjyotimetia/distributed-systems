@@ -34,6 +34,38 @@
           "message": "Your checking balance is $1,234.56.",
           "error": null,
           "durationMs": 1
+        },
+        {
+          "provider": "openai",
+          "name": "OpenAI GPT-4o Mini",
+          "model": "gpt-4o-mini",
+          "message": "Your checking balance is $1,234.56.",
+          "error": null,
+          "durationMs": 1
+        },
+        {
+          "provider": "gemini",
+          "name": "Google Gemini",
+          "model": "gemini-2.0-flash",
+          "message": "Your checking balance is $1,234.56.",
+          "error": null,
+          "durationMs": 1
+        },
+        {
+          "provider": "xai",
+          "name": "xAI Grok",
+          "model": "grok-3-mini",
+          "message": "Your checking balance is $1,234.56.",
+          "error": null,
+          "durationMs": 1
+        },
+        {
+          "provider": "openrouter",
+          "name": "OpenRouter Mistral",
+          "model": "mistralai/mistral-small-3.2-24b-instruct",
+          "message": "Your checking balance is $1,234.56.",
+          "error": null,
+          "durationMs": 1
         }
       ]
     }

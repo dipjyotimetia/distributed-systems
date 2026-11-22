@@ -5,7 +5,8 @@
 # For each service that has both:
 #   tests/replay/services/<service>/requests.json
 #   scripts/replay/services/<service>.env
-# if the commit touches that service's backend tree, run the offline WireMock replay gate.
+# if the commit touches that service's backend tree, replay suite, or replay
+# config, run the offline WireMock replay gate.
 #
 # Skip for a single commit with:  SKIP_REPLAY=1 git commit ...
 
@@ -30,8 +31,8 @@ for suite in "$SUITE_ROOT"/*/requests.json; do
   if [ ! -f "${CONFIG_ROOT}/${service}.env" ]; then
     continue
   fi
-  rel="backend/${service}"
-  if ! printf '%s\n' "$CHANGED" | grep -qE "^${rel}/"; then
+  if ! printf '%s\n' "$CHANGED" | grep -qE \
+    "^(backend/${service}/|tests/replay/services/${service}/|scripts/replay/services/${service}\\.env$)"; then
     continue
   fi
 
