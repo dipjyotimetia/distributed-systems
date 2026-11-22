@@ -34,7 +34,7 @@ dependencies {
     implementation("io.jsonwebtoken:jjwt-api:0.13.0")
     runtimeOnly("io.jsonwebtoken:jjwt-impl:0.13.0")
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.13.0")
-    implementation("org.apache.activemq:artemis-jakarta-client:2.44.0")
+    implementation("org.apache.activemq:artemis-jakarta-client:2.57.0")
     implementation("org.apache.kafka:kafka-clients")
     implementation("org.apache.avro:avro:1.12.2")
     implementation("io.temporal:temporal-sdk:1.41.1")
