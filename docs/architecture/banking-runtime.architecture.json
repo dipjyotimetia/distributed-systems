@@ -259,7 +259,7 @@
       "items": [
         "Browser traffic enters Next.js, which proxies JWT banking calls through the API gateway",
         "Transfers hit transactions-service, which screens fraud over gRPC and posts ledger updates on accounts :9092",
-        "Completions write Confluent Avro outbox rows that Redpanda delivers to notification-service"
+        "Completions write Confluent Avro outbox rows (SKIP LOCKED relay, poison quarantine) that Redpanda delivers to notification-service"
       ]
     },
     {

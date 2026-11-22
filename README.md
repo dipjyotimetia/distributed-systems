@@ -178,6 +178,15 @@ flowchart TB
   notif -.->|decode| sr
 ```
 
+Producers write outbox rows in the same database transaction as the domain write, then a
+scheduled relay publishes with broker ack before marking `published_at`. Transactions-service
+claims with `FOR UPDATE SKIP LOCKED`, quarantines poison rows after
+`TRANSACTIONS_OUTBOX_MAX_ATTEMPTS`, and deletes published rows after
+`TRANSACTIONS_OUTBOX_RETENTION_DAYS` (payments-worker uses `PAYMENTS_OUTBOX_RETENTION_DAYS`).
+`movement-lifecycle-v1` has no in-repo consumer yet—external consumers should dedupe by
+`eventId`. See [`contracts/avro/`](contracts/avro/README.md) and
+[`docs/money-movement-recovery.md`](docs/money-movement-recovery.md).
+
 ## Provider Isolation (zero third-party egress)
 
 The `provider-isolation` overlay deploys first-party [`provider-fixtures`](tests/integration/temporal/cmd/provider-fixtures) and redirects outbound third-party URLs for six workloads to that in-cluster mock (fail-closed 404 on unknown paths):

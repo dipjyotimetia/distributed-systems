@@ -44,8 +44,12 @@ flowchart LR
 - `PaymentComplianceService` — JDK `HttpClient`, 5s timeouts: Stripe
   `POST /v1/payment_intents`, PayPal `POST /v2/checkout/orders`, ComplyAdvantage
   `POST ${payment.comply.base-url}/searches` (parses `total_matches`, `risk_level`).
-- `TransactionEventOutbox` — writes outbox rows in the ledger transaction, then publishes to
-  Kafka (`${KAFKA_BROKERS}`) topics `transaction-events` and `movement-lifecycle-v1`.
+- `TransactionEventOutbox` — writes outbox rows in the ledger transaction, then a scheduled
+  relay publishes to Kafka (`${KAFKA_BROKERS}`) topics `transaction-events` and
+  `movement-lifecycle-v1`. The relay claims unpublished rows with `FOR UPDATE SKIP LOCKED`,
+  waits for the broker ack, then sets `published_at`. After `TRANSACTIONS_OUTBOX_MAX_ATTEMPTS`
+  (default 5) a row is quarantined (`failed_at`, `last_error`) so later events keep flowing;
+  published rows older than `TRANSACTIONS_OUTBOX_RETENTION_DAYS` (default 14) are deleted.
   Payloads default to Confluent Avro via `SchemaRegistryAvroEncoder`
   (`SCHEMA_REGISTRY_URL`, `KAFKA_VALUE_FORMAT=avro`); set `KAFKA_VALUE_FORMAT=json` for UTF-8 JSON.
   Schemas: [`contracts/avro/`](../../../contracts/avro/README.md).
@@ -65,7 +69,8 @@ schema; `ddl-auto=validate`.
 | Fraud service | Fail open |
 | Accounts service | Transaction fails, saved `FAILED` |
 | Transfer credit | Best-effort debit rollback, saved `FAILED` |
-| Kafka, payment fan-out | Logged only |
+| Kafka | Ledger commit succeeds; event stays in `event_outbox` until ack (or quarantine) |
+| Payment fan-out | Logged only |
 | Transfer compliance | Blocks the transfer |
 
 ## Known limitations (intentional trade-offs)
