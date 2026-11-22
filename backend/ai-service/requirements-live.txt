@@ -1,2 +1,2 @@
 # Optional extras for AI_PROVIDER_MODE=live (not required for fixture Compose/CI).
-litellm>=1.74.0
+litellm>=1.110.1
