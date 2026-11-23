@@ -122,6 +122,12 @@ services:
       GEMINI_API_KEY: synthetic-key
       XAI_API_KEY: synthetic-key
       OPENROUTER_API_KEY: synthetic-key
+  rustfs:
+    container_name: !reset null
+    ports: !reset []
+  knowledge-service:
+    container_name: !reset null
+    ports: !reset []
   frontend:
     networks:
       banking-network: {}
