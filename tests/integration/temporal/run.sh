@@ -115,6 +115,7 @@ compose_up_build() {
       return 0
     fi
     echo "compose up --build failed (attempt $attempt); retrying..." >&2
+    "${compose[@]}" logs --tail 40 knowledge-service knowledge-schema rustfs || true
     "${compose[@]}" down --volumes --remove-orphans || true
     if (( attempt == 5 )); then
       return 1

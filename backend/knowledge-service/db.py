@@ -18,8 +18,8 @@ DATABASE_URL = os.environ.get(
     "postgres://knowledge_service_user:knowledge_service_pass@localhost:5432/banking_app?sslmode=disable",
 )
 
+# The database bootstrap provisions the schema. The service role creates its tables.
 SCHEMA_SQL = """
-CREATE SCHEMA IF NOT EXISTS knowledge_service;
 SET search_path TO knowledge_service;
 
 CREATE TABLE IF NOT EXISTS documents (
