@@ -30,6 +30,8 @@ from temporal.models import ToolCall, ToolResult
 ACCOUNTS_URL = os.environ.get("ACCOUNTS_SERVICE_URL", "http://accounts-service:8080").rstrip("/")
 TRANSACTIONS_URL = os.environ.get("TRANSACTIONS_SERVICE_URL", "http://transactions-service:8080").rstrip("/")
 DISPUTES_URL = os.environ.get("DISPUTES_SERVICE_URL", "http://disputes-service:8080").rstrip("/")
+KNOWLEDGE_URL = os.environ.get("KNOWLEDGE_SERVICE_URL", "http://knowledge-service:8080").rstrip("/")
+KNOWLEDGE_INTERNAL_TOKEN = os.environ.get("KNOWLEDGE_INTERNAL_TOKEN", "local-knowledge-internal")
 KYC_HTTP_URL = os.environ.get("KYC_STATUS_URL", "").rstrip("/")  # optional HTTP facade
 FRONTEND_KYC_URL = os.environ.get("KYC_PROXY_URL", "").rstrip("/")
 
@@ -147,6 +149,62 @@ async def get_dispute_status(case_id: int, auth_token: str = "") -> ToolResult:
     return ToolResult(name="get_dispute_status", call_id="", content=loaded)
 
 
+@activity.defn(name="searchKnowledge")
+async def search_knowledge(
+    query: str,
+    auth_token: str = "",
+    doc_type: str | None = None,
+    limit: int = 5,
+) -> ToolResult:
+    if os.environ.get("AI_PROVIDER_MODE", "live") == "fixture" and not os.environ.get("AI_TOOLS_LIVE"):
+        return ToolResult(
+            name="search_knowledge",
+            call_id="",
+            content=json.dumps(
+                {
+                    "query": query,
+                    "hits": [
+                        {
+                            "documentId": "00000000-0000-4000-8000-000000000001",
+                            "title": "Dispute Timeframe",
+                            "docType": "POLICY",
+                            "score": 0.91,
+                            "excerpt": "Customers may file a transfer dispute within 60 calendar days of settlement.",
+                            "citations": ["Dispute Timeframe#chunk-0"],
+                        }
+                    ],
+                    "source": "fixture",
+                }
+            ),
+        )
+    loaded = await asyncio.to_thread(_knowledge_search, query, auth_token, doc_type, limit)
+    if isinstance(loaded, str) and loaded.startswith("ERROR:"):
+        return ToolResult(name="search_knowledge", call_id="", content="", error=loaded)
+    return ToolResult(name="search_knowledge", call_id="", content=loaded)
+
+
+@activity.defn(name="getDocumentExcerpt")
+async def get_document_excerpt(document_id: str, auth_token: str = "", max_chars: int = 1200) -> ToolResult:
+    if os.environ.get("AI_PROVIDER_MODE", "live") == "fixture" and not os.environ.get("AI_TOOLS_LIVE"):
+        return ToolResult(
+            name="get_document_excerpt",
+            call_id="",
+            content=json.dumps(
+                {
+                    "documentId": document_id,
+                    "title": "Dispute Timeframe",
+                    "excerpt": "Customers may file a transfer dispute within 60 calendar days of the settlement date.",
+                    "citations": ["Dispute Timeframe"],
+                    "source": "fixture",
+                }
+            ),
+        )
+    loaded = await asyncio.to_thread(_knowledge_excerpt, document_id, auth_token, max_chars)
+    if isinstance(loaded, str) and loaded.startswith("ERROR:"):
+        return ToolResult(name="get_document_excerpt", call_id="", content="", error=loaded)
+    return ToolResult(name="get_document_excerpt", call_id="", content=loaded)
+
+
 @activity.defn(name="executeTool")
 async def execute_tool(payload: dict[str, Any]) -> ToolResult:
     """Dispatch a single allow-listed tool call."""
@@ -170,6 +228,19 @@ async def execute_tool(payload: dict[str, Any]) -> ToolResult:
         result = await get_kyc_status(auth_token)
     elif name == "get_dispute_status":
         result = await get_dispute_status(int(args.get("case_id") or 0), auth_token)
+    elif name == "search_knowledge":
+        result = await search_knowledge(
+            query=str(args.get("query") or ""),
+            auth_token=auth_token,
+            doc_type=str(args["doc_type"]) if args.get("doc_type") is not None else None,
+            limit=int(args.get("limit") or 5),
+        )
+    elif name == "get_document_excerpt":
+        result = await get_document_excerpt(
+            document_id=str(args.get("document_id") or ""),
+            auth_token=auth_token,
+            max_chars=int(args.get("max_chars") or 1200),
+        )
     else:
         return ToolResult(name=name, call_id=call.call_id, content="", error=f"unknown tool {name}")
     result.call_id = call.call_id
@@ -270,3 +341,45 @@ def _research_draft(case_id: int, token: str, draft: dict[str, Any]) -> dict[str
         timeout=10,
     )
     return json.loads(reply.json)
+
+
+def _knowledge_headers(token: str) -> dict[str, str]:
+    headers = {"Accept": "application/json", "Content-Type": "application/json"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    else:
+        headers["X-Internal-Token"] = KNOWLEDGE_INTERNAL_TOKEN
+    return headers
+
+
+def _knowledge_search(query: str, token: str, doc_type: str | None, limit: int) -> str:
+    payload: dict[str, Any] = {"query": query, "limit": max(1, min(limit, 20))}
+    if doc_type:
+        payload["docType"] = doc_type
+    try:
+        with httpx.Client(timeout=10.0) as client:
+            resp = client.post(
+                f"{KNOWLEDGE_URL}/api/v1/knowledge/search",
+                headers=_knowledge_headers(token),
+                json=payload,
+            )
+            if resp.status_code >= 400:
+                return f"ERROR: knowledge-service returned {resp.status_code}"
+            return resp.text
+    except httpx.HTTPError as exc:
+        return f"ERROR: knowledge-service unreachable ({exc})"
+
+
+def _knowledge_excerpt(document_id: str, token: str, max_chars: int) -> str:
+    try:
+        with httpx.Client(timeout=10.0) as client:
+            resp = client.get(
+                f"{KNOWLEDGE_URL}/api/v1/knowledge/documents/{document_id}/excerpt",
+                headers=_knowledge_headers(token),
+                params={"maxChars": max_chars},
+            )
+            if resp.status_code >= 400:
+                return f"ERROR: knowledge-service returned {resp.status_code}"
+            return resp.text
+    except httpx.HTTPError as exc:
+        return f"ERROR: knowledge-service unreachable ({exc})"

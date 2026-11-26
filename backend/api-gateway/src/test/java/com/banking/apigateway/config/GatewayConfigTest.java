@@ -33,6 +33,7 @@ class GatewayConfigTest {
         ReflectionTestUtils.setField(config, "accountsServiceUrl", "http://accounts:8080");
         ReflectionTestUtils.setField(config, "transactionsServiceUrl", "http://transactions:8080");
         ReflectionTestUtils.setField(config, "disputesServiceUrl", "http://disputes:8080");
+        ReflectionTestUtils.setField(config, "knowledgeServiceUrl", "http://knowledge:8080");
         ReflectionTestUtils.setField(config, "paymentsServiceUrl", "http://payments:8080");
 
         try (StaticApplicationContext context = new StaticApplicationContext()) {
@@ -50,6 +51,13 @@ class GatewayConfigTest {
                 assertTrue(matches(route, path));
             }
             assertFalse(matches(route, "/api/v1/transactions/1"));
+            Route knowledge = config.routes(new RouteLocatorBuilder(context)).getRoutes()
+                    .filter(candidate -> candidate.getId().equals("knowledge-service"))
+                    .blockFirst();
+            assertNotNull(knowledge);
+            assertEquals("http://knowledge:8080", knowledge.getUri().toString());
+            assertTrue(matches(knowledge, "/api/v1/knowledge/documents"));
+            assertTrue(matches(knowledge, "/api/v1/knowledge/search"));
         }
     }
 
@@ -61,6 +69,7 @@ class GatewayConfigTest {
         ReflectionTestUtils.setField(config, "accountsServiceUrl", "http://accounts:8080");
         ReflectionTestUtils.setField(config, "transactionsServiceUrl", "http://transactions:8080");
         ReflectionTestUtils.setField(config, "disputesServiceUrl", "http://disputes:8080");
+        ReflectionTestUtils.setField(config, "knowledgeServiceUrl", "http://knowledge:8080");
         ReflectionTestUtils.setField(config, "paymentsServiceUrl", "http://payments:8080");
         List<Route> routes;
         try (StaticApplicationContext context = new StaticApplicationContext()) {
@@ -76,7 +85,7 @@ class GatewayConfigTest {
         }
         assertNotNull(specs);
         Yaml yaml = new Yaml();
-        for (String name : List.of("users.yaml", "accounts.yaml", "transactions.yaml", "disputes.yaml", "payments.yaml")) {
+        for (String name : List.of("users.yaml", "accounts.yaml", "transactions.yaml", "disputes.yaml", "payments.yaml", "knowledge.yaml")) {
             Map<String, Object> document = yaml.load(Files.readString(specs.resolve("contracts/openapi").resolve(name)));
             @SuppressWarnings("unchecked")
             Map<String, Object> paths = (Map<String, Object>) document.get("paths");

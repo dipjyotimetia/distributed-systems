@@ -20,13 +20,13 @@ Internal demo orchestration, customer rehearsals, cloud-account-specific runners
 
 Delivery milestones live in `plan.md`. Phases **1–9 are complete**. Remaining open work is **Phase 10** (production K8s / security hardening) and **Phase 11** (advanced features). The live service inventory is in `README.md` and `architecture.md` — do not treat the historical phase checklists as the feature list.
 
-Current application backends: `api-gateway`, `user-service`, `accounts-service`, `transactions-service`, `fraud-service`, `kyc-service`, `cards-service`, `disputes-service`, `notification-service`, `ai-service` (+ workers), and optional `payments-service` on overlays.
+Current application backends: `api-gateway`, `user-service`, `accounts-service`, `transactions-service`, `fraud-service`, `kyc-service`, `cards-service`, `disputes-service`, `notification-service`, `ai-service` (+ workers), `knowledge-service` (document vault + RAG/MCP), and optional `payments-service` on overlays.
 
 ## Key Commands Reference
 
 **Start development environment**: `docker compose up -d`  
 **Build service**: `./gradlew :accounts-service:bootJar` (from repository root)
-**Run tests**: `./gradlew test` (backend) or `npm test` (frontend)
+**Run tests**: `./gradlew test` (backend), `uv sync && uv run pytest` (Python services), or `npm test` (frontend)
 **Database migrations**: `./gradlew :accounts-service:flywayMigrate`
 
 ## Implementation Guidelines

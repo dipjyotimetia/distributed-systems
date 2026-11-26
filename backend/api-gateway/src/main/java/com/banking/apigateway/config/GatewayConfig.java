@@ -34,6 +34,9 @@ public class GatewayConfig {
     @Value("${services.disputes-service.url}")
     private String disputesServiceUrl;
 
+    @Value("${services.knowledge-service.url}")
+    private String knowledgeServiceUrl;
+
     @Value("${services.payments-service.url:}")
     private String paymentsServiceUrl;
 
@@ -99,7 +102,16 @@ public class GatewayConfig {
                             }
                             return f;
                         })
-                        .uri(disputesServiceUrl));
+                        .uri(disputesServiceUrl))
+                .route("knowledge-service", r -> r.path("/api/v1/knowledge/**")
+                        .filters(f -> {
+                            f.filter(authFilter);
+                            if (rateLimiterEnabled) {
+                                f.requestRateLimiter(c -> c.setRateLimiter(redisRateLimiter()).setKeyResolver(userKeyResolver()));
+                            }
+                            return f;
+                        })
+                        .uri(knowledgeServiceUrl));
         if (paymentsServiceUrl != null && !paymentsServiceUrl.isBlank()) {
             routes.route("payments-service", r -> r.path("/api/v1/payments", "/api/v1/payments/**", "/api/v1/operations/payments/**")
                     .filters(f -> {

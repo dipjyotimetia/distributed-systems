@@ -22,10 +22,12 @@ from temporal.tools import (
     execute_tool,
     get_balance,
     get_dispute_status,
+    get_document_excerpt,
     get_kyc_status,
     list_transactions,
     load_dispute_context,
     save_dispute_ai_draft,
+    search_knowledge,
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -74,6 +76,8 @@ async def run_worker() -> None:
             list_transactions,
             get_kyc_status,
             get_dispute_status,
+            search_knowledge,
+            get_document_excerpt,
             load_dispute_context,
             save_dispute_ai_draft,
             claim_check_put,

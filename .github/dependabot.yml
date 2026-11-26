@@ -99,9 +99,31 @@ updates:
         exclude-patterns:
           - "OpenTelemetry*"
 
-  # --- Python (ai-service) ---
-  - package-ecosystem: pip
+  # --- Python / uv (ai-service) ---
+  - package-ecosystem: uv
     directory: /backend/ai-service
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Australia/Sydney
+    open-pull-requests-limit: 5
+    labels: [dependencies, python]
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      opentelemetry-python:
+        patterns:
+          - "opentelemetry-*"
+      other-python:
+        patterns: ["*"]
+        exclude-patterns:
+          - "opentelemetry-*"
+
+  # --- Python / uv (knowledge-service) ---
+  - package-ecosystem: uv
+    directory: /backend/knowledge-service
     schedule:
       interval: weekly
       day: monday
@@ -283,6 +305,7 @@ updates:
     directories:
       - /backend/accounts-service
       - /backend/ai-service
+      - /backend/knowledge-service
       - /backend/api-gateway
       - /backend/cards-service
       - /backend/disputes-service

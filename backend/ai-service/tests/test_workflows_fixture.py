@@ -12,7 +12,7 @@ from temporal.guardrails import guardrail_check
 from temporal.llm import llm_complete
 from temporal.models import AgentInput, DisputeResearchInput
 from temporal.research_workflow import DisputeResearchWorkflow
-from temporal.tools import execute_tool, load_dispute_context, save_dispute_ai_draft
+from temporal.tools import execute_tool, load_dispute_context, save_dispute_ai_draft, search_knowledge
 from temporal.claim_check import claim_check_get, claim_check_put
 
 
@@ -97,6 +97,8 @@ async def test_dispute_research_workflow_saves_structured_draft():
             activities=[
                 llm_complete,
                 guardrail_check,
+                execute_tool,
+                search_knowledge,
                 load_dispute_context,
                 save_dispute_ai_draft,
                 claim_check_put,

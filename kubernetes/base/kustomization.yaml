@@ -11,6 +11,7 @@ resources:
   # Database
   - database/postgres-configmap.yaml
   - database/postgres-pvc.yaml
+  - database/knowledge-blobs-pvc.yaml
   - database/postgres-deployment.yaml
   - database/postgres-service.yaml
   - database/redis-deployment.yaml
@@ -24,6 +25,7 @@ resources:
   - configmaps/simulation-client-configmap.yaml
   - configmaps/simulation-client-secret.yaml
   - configmaps/ai-secret.yaml
+  - configmaps/knowledge-secret.yaml
   
   # Kafka
   - kafka/kafka-deployment.yaml
@@ -38,6 +40,7 @@ resources:
   - deployments/cards-service-deployment.yaml
   - deployments/notification-service-deployment.yaml
   - deployments/ai-service-deployment.yaml
+  - deployments/knowledge-service-deployment.yaml
   - deployments/api-gateway-deployment.yaml
   - deployments/frontend-deployment.yaml
   - deployments/simulation-client-deployment.yaml
@@ -52,6 +55,7 @@ resources:
   - services/cards-service-service.yaml
   - services/notification-service-service.yaml
   - services/ai-service-service.yaml
+  - services/knowledge-service-service.yaml
   - services/api-gateway-service.yaml
   - services/frontend-service.yaml
 

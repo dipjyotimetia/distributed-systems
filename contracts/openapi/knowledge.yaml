@@ -1,0 +1,327 @@
+openapi: 3.0.3
+info:
+  title: Knowledge Service
+  description: Document vault and retrieval for banking evidence, KYC packs, and policy corpus (RAG/MCP foundation).
+  version: v1
+servers:
+  - url: http://localhost:8093
+    description: Local development server
+paths:
+  /api/v1/knowledge/health:
+    get:
+      tags: [knowledge]
+      operationId: health
+      summary: Liveness probe (also available at /api/v1/health for container probes)
+      responses:
+        '200':
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+  /api/v1/knowledge/documents:
+    get:
+      tags: [knowledge]
+      operationId: listDocuments
+      summary: List documents visible to the caller
+      parameters:
+        - $ref: '#/components/parameters/Authorization'
+        - name: docType
+          in: query
+          schema:
+            $ref: '#/components/schemas/DocType'
+        - name: caseId
+          in: query
+          schema:
+            type: string
+        - name: accountId
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Document metadata page
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentPage'
+        '401':
+          description: Missing or invalid JWT
+    post:
+      tags: [knowledge]
+      operationId: uploadDocument
+      summary: Upload a document owned by the caller (or bank policy with internal token)
+      parameters:
+        - $ref: '#/components/parameters/Authorization'
+        - name: X-Internal-Token
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, docType, title]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                title:
+                  type: string
+                docType:
+                  $ref: '#/components/schemas/DocType'
+                caseId:
+                  type: string
+                accountId:
+                  type: string
+                visibility:
+                  $ref: '#/components/schemas/Visibility'
+                  default: OWNER
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+        '400':
+          description: Invalid upload
+        '401':
+          description: Unauthorized
+  /api/v1/knowledge/documents/{documentId}:
+    get:
+      tags: [knowledge]
+      operationId: getDocument
+      summary: Get document metadata
+      parameters:
+        - $ref: '#/components/parameters/Authorization'
+        - $ref: '#/components/parameters/DocumentId'
+      responses:
+        '200':
+          description: Document metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+        '401':
+          description: Unauthorized
+        '404':
+          description: Not found
+  /api/v1/knowledge/documents/{documentId}/content:
+    get:
+      tags: [knowledge]
+      operationId: downloadDocument
+      summary: Download document bytes
+      parameters:
+        - $ref: '#/components/parameters/Authorization'
+        - $ref: '#/components/parameters/DocumentId'
+      responses:
+        '200':
+          description: Binary content
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '401':
+          description: Unauthorized
+        '404':
+          description: Not found
+  /api/v1/knowledge/documents/{documentId}/excerpt:
+    get:
+      tags: [knowledge]
+      operationId: getDocumentExcerpt
+      summary: Return a text excerpt for RAG / agent citation
+      parameters:
+        - $ref: '#/components/parameters/Authorization'
+        - $ref: '#/components/parameters/DocumentId'
+        - name: maxChars
+          in: query
+          schema:
+            type: integer
+            minimum: 64
+            maximum: 8000
+            default: 1200
+      responses:
+        '200':
+          description: Excerpt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentExcerpt'
+        '401':
+          description: Unauthorized
+        '404':
+          description: Not found
+  /api/v1/knowledge/search:
+    post:
+      tags: [knowledge]
+      operationId: searchKnowledge
+      summary: Semantic / lexical retrieval over owned and bank-visible documents
+      parameters:
+        - $ref: '#/components/parameters/Authorization'
+        - name: X-Internal-Token
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SearchRequest'
+      responses:
+        '200':
+          description: Ranked hits with excerpts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResponse'
+        '401':
+          description: Unauthorized
+components:
+  parameters:
+    Authorization:
+      name: Authorization
+      in: header
+      required: false
+      schema:
+        type: string
+      description: Bearer JWT
+    DocumentId:
+      name: documentId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  schemas:
+    Health:
+      type: object
+      required: [status, service]
+      properties:
+        status:
+          type: string
+        service:
+          type: string
+        storage:
+          type: string
+        documents:
+          type: integer
+    DocType:
+      type: string
+      enum: [POLICY, KYC_EVIDENCE, DISPUTE_EVIDENCE, STATEMENT, OTHER]
+    Visibility:
+      type: string
+      enum: [OWNER, BANK, PUBLIC_BANK]
+    Document:
+      type: object
+      required: [id, title, docType, visibility, contentType, sizeBytes, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        docType:
+          $ref: '#/components/schemas/DocType'
+        visibility:
+          $ref: '#/components/schemas/Visibility'
+        contentType:
+          type: string
+        sizeBytes:
+          type: integer
+        ownerUserId:
+          type: integer
+          nullable: true
+        caseId:
+          type: string
+          nullable: true
+        accountId:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+    DocumentPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Document'
+    DocumentExcerpt:
+      type: object
+      required: [documentId, title, excerpt, contentType]
+      properties:
+        documentId:
+          type: string
+          format: uuid
+        title:
+          type: string
+        excerpt:
+          type: string
+        contentType:
+          type: string
+        citations:
+          type: array
+          items:
+            type: string
+    SearchRequest:
+      type: object
+      required: [query]
+      properties:
+        query:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        docType:
+          $ref: '#/components/schemas/DocType'
+        caseId:
+          type: string
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 20
+          default: 5
+    SearchHit:
+      type: object
+      required: [documentId, title, docType, score, excerpt]
+      properties:
+        documentId:
+          type: string
+          format: uuid
+        title:
+          type: string
+        docType:
+          $ref: '#/components/schemas/DocType'
+        score:
+          type: number
+        excerpt:
+          type: string
+        citations:
+          type: array
+          items:
+            type: string
+    SearchResponse:
+      type: object
+      required: [query, hits]
+      properties:
+        query:
+          type: string
+        hits:
+          type: array
+          items:
+            $ref: '#/components/schemas/SearchHit'

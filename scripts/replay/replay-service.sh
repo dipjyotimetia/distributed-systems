@@ -192,7 +192,7 @@ case "$RUNTIME" in
     env "${APP_ENV[@]}" "./${ARTIFACT}" >"${RESULTS_DIR}/app.log" 2>&1 &
     ;;
   python)
-    env "${APP_ENV[@]}" python3 -m uvicorn "${PYTHON_MODULE}" --host 127.0.0.1 --port "$APP_PORT" \
+    env "${APP_ENV[@]}" uv run uvicorn "${PYTHON_MODULE}" --host 127.0.0.1 --port "$APP_PORT" \
       >"${RESULTS_DIR}/app.log" 2>&1 &
     ;;
   *)

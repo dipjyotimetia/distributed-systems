@@ -49,6 +49,9 @@ cards rows are Next.js HTTP adapters over the Buf clients generated from
 | POST `/api/v1/cards/authorize` | Authorize a purchase once for an idempotency key | Service | The same cards test covers replay and `DECLINE` |
 | GET and POST `/api/v1/operations/disputes/[[...casePath]]` | List disputes, request evidence, and resolve cases for allowlisted operators | Playwright and integration | `disputes.real-backend.spec.ts` and the disputes scenario |
 | GET and POST `/api/v1/accounts/[id]/statement-jobs/[[...jobPath]]` | Queue an export, inspect job state, and download it before expiry | Integration | Statement jobs and worker recovery in the [integration guide](../tests/integration/README.md#disputes-and-statement-worker-recovery) |
+| GET and POST `/api/v1/knowledge/[[...path]]` | List/upload documents, search seeded policies, download content/excerpts for RAG | Service unit | `backend/knowledge-service/tests/test_api.py` covers seed/search/upload ACL; official MCP SDK server in `test_mcp.py` (`mcp` / `MCPServer`) |
+| POST `/api/v1/ai/chat` (`mode=agent` + knowledge tools) | Agent may call `search_knowledge` / `get_document_excerpt` | Unit | Fixture heuristic in `temporal/llm.py`; allow-list in `temporal/guardrails.py` |
+| Dispute research policy path | Research workflow retrieves policy corpus before drafting | Unit | `test_dispute_research_workflow_saves_structured_draft` registers `execute_tool` / `search_knowledge` |
 
 ## Shared deployment checks
 

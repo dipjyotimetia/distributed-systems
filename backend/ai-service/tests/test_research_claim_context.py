@@ -10,7 +10,7 @@ from temporal.guardrails import guardrail_check
 from temporal.llm import llm_complete
 from temporal.models import DisputeResearchInput, LlmRequest, LlmResponse
 from temporal.research_workflow import DisputeResearchWorkflow
-from temporal.tools import save_dispute_ai_draft
+from temporal.tools import execute_tool, save_dispute_ai_draft
 
 
 @pytest.mark.asyncio
@@ -43,6 +43,7 @@ async def test_research_uses_real_context_when_claim_check_triggers(monkeypatch,
             activities=[
                 capturing_llm,
                 guardrail_check,
+                execute_tool,
                 large_context,
                 save_dispute_ai_draft,
                 claim_check_put,

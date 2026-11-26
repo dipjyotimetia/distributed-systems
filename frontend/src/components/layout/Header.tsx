@@ -13,6 +13,7 @@ const links = [
   { href: '/transactions', label: 'Transactions' },
   { href: '/payments', label: 'Payments' },
   { href: '/disputes', label: 'Disputes' },
+  { href: '/knowledge', label: 'Knowledge' },
   { href: '/notifications', label: 'Notifications' },
   { href: '/ai-assistant', label: 'AI Assistant' },
   { href: '/profile', label: 'Profile' },

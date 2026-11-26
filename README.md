@@ -26,7 +26,7 @@ If the gateway exits on an OpenTelemetry `ContainerAttributes` error, see [TROUB
 
 | Environment | Includes |
 |---|---|
-| Default Compose | Identity, accounts, transactions, fraud, KYC, cards, disputes, workers, fixture AI, Postgres, Redis, Redpanda, MongoDB, notifications, OTel/Jaeger/Prometheus/Grafana |
+| Default Compose | Identity, accounts, transactions, fraud, KYC, cards, disputes, workers, fixture AI, knowledge vault (RustFS), Postgres, Redis, Redpanda, MongoDB, notifications, OTel/Jaeger/Prometheus/Grafana |
 | Kubernetes base / local | Core banking + AI + notifications + simulation (no disputes workers by default) |
 | Kubernetes full overlay | Base + disputes/statement/KYC/AI workers + Temporal |
 | Payments overlay | Optional outbound AUD payments (Temporal, Artemis, settlement) |
@@ -50,6 +50,7 @@ Interactive diagrams: [`docs/architecture/`](docs/architecture/). Design notes: 
 | `disputes-service` | Go | Dispute intake and Temporal escalation |
 | `notification-service` | Go | Kafka → Slack / SendGrid / Twilio |
 | `ai-service` / `ai-worker` | Python | Chat + Temporal banking agent |
+| `knowledge-service` | Python | Document vault + retrieval (RAG/MCP) |
 | `payments-service` | Java (overlay) | Outbound payments |
 | `frontend` | Next.js 16 | UI and server proxy |
 | `simulation-client` | Node.js | Load generation (Kubernetes) |
@@ -110,7 +111,8 @@ Journey coverage matrix: [docs/banking-journey-coverage.md](docs/banking-journey
 ```bash
 ./gradlew test                          # Java
 cd backend/fraud-service && go test ./...
-cd backend/ai-service && pytest
+cd backend/ai-service && uv sync && uv run pytest
+cd backend/knowledge-service && uv sync && uv run pytest
 cd frontend && npm test && npm run test:e2e
 make test-integration-temporal          # isolated Compose journeys
 make test-integration-temporal-ui       # Temporal UI hold

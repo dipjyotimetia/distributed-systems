@@ -16,6 +16,7 @@ data:
   USER_SERVICE_URL: "http://banking-user:80"
   ACCOUNTS_SERVICE_URL: "http://banking-accounts:80"
   TRANSACTIONS_SERVICE_URL: "http://banking-transactions:80"
+  KNOWLEDGE_SERVICE_URL: "http://banking-knowledge:80"
   FRAUD_SERVICE_HOST: "banking-fraud"
   FRAUD_SERVICE_PORT: "8080"
   NOTIFICATION_SERVICE_URL: "http://banking-notification:80"
@@ -37,6 +38,30 @@ data:
   OTEL_TRACES_EXPORTER: "otlp"
   OTEL_METRICS_EXPORTER: "otlp"
   OTEL_LOGS_EXPORTER: "otlp"
+  OTEL_TRACES_SAMPLER: "always_on"
+  OTEL_PROPAGATORS: "tracecontext"
+  OTEL_RESOURCE_ATTRIBUTES: "service.namespace=banking-app,deployment.environment=decoy"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: banking-knowledge-config
+  namespace: banking-app
+  labels:
+    app.kubernetes.io/name: banking-app
+    app.kubernetes.io/component: config
+    app.kubernetes.io/service: knowledge-service
+data:
+  KNOWLEDGE_STORE: "postgres"
+  STORAGE_BACKEND: "local"
+  LOCAL_BLOB_ROOT: "/data/knowledge-blobs"
+  DATABASE_URL: "postgres://knowledge_service_user:knowledge_service_pass@banking-postgres:5432/banking_app?sslmode=disable"
+  OTEL_SERVICE_NAME: "knowledge-service"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector.observability:4318"
+  OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf"
+  OTEL_TRACES_EXPORTER: "otlp"
+  OTEL_METRICS_EXPORTER: "none"
+  OTEL_LOGS_EXPORTER: "none"
   OTEL_TRACES_SAMPLER: "always_on"
   OTEL_PROPAGATORS: "tracecontext"
   OTEL_RESOURCE_ATTRIBUTES: "service.namespace=banking-app,deployment.environment=decoy"
@@ -167,6 +192,7 @@ data:
   # name here makes every /api/* call fail with ENOTFOUND -> HTTP 500.
   API_GATEWAY_URL: "http://banking-gateway:80"
   BACKEND_API_URL: "http://banking-gateway:80"
+  KNOWLEDGE_SERVICE_URL: "http://banking-knowledge:80"
   
   # OpenTelemetry configuration
   OTEL_SERVICE_NAME: "frontend"
@@ -205,3 +231,5 @@ data:
   OTEL_TRACES_SAMPLER: "always_on"
   OTEL_PROPAGATORS: "tracecontext"
   OTEL_RESOURCE_ATTRIBUTES: "service.namespace=banking-app,deployment.environment=decoy"
+  KNOWLEDGE_SERVICE_URL: "http://banking-knowledge:80"
+  KNOWLEDGE_INTERNAL_TOKEN: "local-knowledge-internal"

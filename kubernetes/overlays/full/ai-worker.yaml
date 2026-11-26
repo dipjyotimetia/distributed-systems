@@ -43,6 +43,10 @@ spec:
               value: http://banking-accounts
             - name: TRANSACTIONS_SERVICE_URL
               value: http://banking-transactions
+            - name: KNOWLEDGE_SERVICE_URL
+              value: http://banking-knowledge
+            - name: KNOWLEDGE_INTERNAL_TOKEN
+              value: local-knowledge-internal
             - name: CLAIM_CHECK_DIR
               value: /tmp/ai-claim-check
             - name: OTEL_SERVICE_NAME
