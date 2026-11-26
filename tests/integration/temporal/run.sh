@@ -3,12 +3,49 @@ set -euo pipefail
 
 cd "$(dirname "$0")/../../.."
 suite=tests/integration/temporal
+pull_infrastructure_images() {
+  # Retry registry access before starting the stack.
+  bash scripts/ci/docker-pull-retry.sh \
+    temporalio/temporal:1.10.1 \
+    postgres:19.0-alpine \
+    mongo:9.0.8 \
+    redis:8.10.3-alpine \
+    docker.redpanda.com/redpandadata/redpanda:v26.2.2
+}
+
 if [[ -z "${MICROSVC_SCENARIO:-}" ]]; then
-  # Orchestrate scenarios on one project name so Docker layer/image cache is
-  # retained. Volumes are still recreated per scenario for isolation; images are
-  # kept (no --rmi local) via MICROSVC_KEEP_IMAGES.
+  # Reuse project-scoped images while each scenario starts with fresh volumes.
   export MICROSVC_SHARED_PROJECT="${MICROSVC_SHARED_PROJECT:-temporal-$(openssl rand -hex 8)}"
   export MICROSVC_KEEP_IMAGES=1
+  suite_compose=(docker compose -p "$MICROSVC_SHARED_PROJECT" -f docker-compose.yml -f "$suite/stack/compose.yml")
+  build_services=(frontend notification-service)
+  if [[ -z "${TEMPORAL_TEST_UI_PORT:-}" ]]; then
+    build_services+=(ai-service provider-fixtures)
+    if [[ "${MICROSVC_BROWSER:-0}" == 1 ]]; then
+      suite_compose+=(-f "$suite/stack/disputes.compose.yml")
+      build_services+=(disputes-worker statement-worker)
+    fi
+  fi
+  cleanup_suite() {
+    "${suite_compose[@]}" down --volumes --remove-orphans --rmi local >/dev/null 2>&1 || true
+  }
+  trap cleanup_suite EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+
+  pull_infrastructure_images
+  for attempt in 1 2 3 4 5; do
+    if "${suite_compose[@]}" build --with-dependencies "${build_services[@]}"; then
+      break
+    fi
+    if (( attempt == 5 )); then
+      exit 1
+    fi
+    echo "Compose image build failed (attempt $attempt); retrying..." >&2
+    sleep $((attempt * 15))
+  done
+  export MICROSVC_IMAGES_PREPARED=1
+
   status=0
   MICROSVC_SCENARIO=transfer-worker-replacement bash "$suite/run.sh" || status=$?
   if [[ -z "${TEMPORAL_TEST_UI_PORT:-}" ]]; then
@@ -21,9 +58,6 @@ if [[ -z "${MICROSVC_SCENARIO:-}" ]]; then
       MICROSVC_SCENARIO=disputes MICROSVC_REPORT_SUFFIX="${MICROSVC_REPORT:+disputes}" bash "$suite/run.sh" || status=$?
     fi
   fi
-  # Final image sweep once all scenarios finished.
-  docker compose -p "$MICROSVC_SHARED_PROJECT" -f docker-compose.yml -f "$suite/stack/compose.yml" \
-    down --volumes --remove-orphans --rmi local >/dev/null 2>&1 || true
   exit "$status"
 fi
 if [[ "$MICROSVC_SCENARIO" == statement-export ]]; then
@@ -94,27 +128,25 @@ trap 'exit 143' TERM
 
 docker info --format '{{.ServerVersion}}' >/dev/null
 stage=startup
-# Pre-pull Docker Hub images that flake on TLS/auth timeouts in CI.
-bash scripts/ci/docker-pull-retry.sh \
-  temporalio/temporal:1.10.1 \
-  postgres:19.0-alpine \
-  mongo:9.0.8 \
-  redis:8.10.3-alpine \
-  docker.redpanda.com/redpandadata/redpanda:v26.2.2
-# `up --build` builds the full dependency graph. Retry on Maven Central flakes;
-# tear down between attempts so partial creates do not leave missing images.
-compose_up_build() {
+build_option=--no-build
+if [[ "${MICROSVC_IMAGES_PREPARED:-0}" != 1 ]]; then
+  pull_infrastructure_images
+  build_option=--build
+fi
+
+# Clear partially created containers and volumes between startup attempts.
+compose_up() {
   local attempt=1
-  local no_deps=()
+  local up_args=(-d "$build_option")
   if [[ "${1:-}" == --no-deps ]]; then
-    no_deps=(--no-deps)
+    up_args+=(--no-deps)
     shift
   fi
   while (( attempt <= 5 )); do
-    if "${compose[@]}" up -d ${no_deps[@]+"${no_deps[@]}"} --build "$@"; then
+    if "${compose[@]}" up "${up_args[@]}" "$@"; then
       return 0
     fi
-    echo "compose up --build failed (attempt $attempt); retrying..." >&2
+    echo "Compose startup failed (attempt $attempt); retrying..." >&2
     "${compose[@]}" logs --tail 40 knowledge-service knowledge-schema rustfs || true
     "${compose[@]}" down --volumes --remove-orphans || true
     if (( attempt == 5 )); then
@@ -125,11 +157,11 @@ compose_up_build() {
   done
 }
 if [[ "$MICROSVC_SCENARIO" == ai ]]; then
-  compose_up_build --no-deps frontend ai-service provider-fixtures
+  compose_up --no-deps frontend ai-service provider-fixtures
 elif [[ "$MICROSVC_SCENARIO" == disputes ]]; then
-  compose_up_build frontend disputes-worker statement-worker notification-service
+  compose_up frontend disputes-worker statement-worker notification-service
 else
-  compose_up_build frontend notification-service
+  compose_up frontend notification-service
   export MICROSVC_GATEWAY="http://$("${compose[@]}" port api-gateway 8080)"
   export MICROSVC_NOTIFICATIONS="http://$("${compose[@]}" port notification-service 8080)"
   export MICROSVC_BROKER_CONTAINER="$("${compose[@]}" ps -q redpanda)"
