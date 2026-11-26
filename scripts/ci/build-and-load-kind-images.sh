@@ -18,7 +18,7 @@ cd "$root"
 GRADLE_CACHE_SUFFIX="${GRADLE_CACHE_SUFFIX:-0}"
 KIND_IMAGE_PARALLEL="${KIND_IMAGE_PARALLEL:-4}"
 use_gha_cache=0
-if [[ -n "${ACTIONS_CACHE_URL:-}" && -n "${ACTIONS_RUNTIME_TOKEN:-}" ]]; then
+if [[ -n "${ACTIONS_RESULTS_URL:-}" && -n "${ACTIONS_RUNTIME_TOKEN:-}" ]]; then
   use_gha_cache=1
 fi
 
@@ -67,8 +67,9 @@ build_one() {
     if [[ "$use_gha_cache" -eq 1 ]]; then
       args=(buildx build --load
         --build-arg "GRADLE_CACHE_SUFFIX=${suffix}"
-        --cache-from "type=gha,scope=kind-${service}"
-        --cache-to "type=gha,mode=max,scope=kind-${service}"
+        --cache-from "type=gha,version=2,scope=image-${service}"
+        --cache-from "type=gha,version=2,scope=kind-${service}"
+        --cache-to "type=gha,version=2,mode=max,scope=kind-${service},ignore-error=true"
         -t "$image")
     else
       args=(build -t "$image" --build-arg "GRADLE_CACHE_SUFFIX=${suffix}")

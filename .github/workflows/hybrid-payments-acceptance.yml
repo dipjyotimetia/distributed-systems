@@ -7,6 +7,7 @@ on:
   pull_request:
     paths:
       - '.github/workflows/hybrid-payments-acceptance.yml'
+      - '.github/actions/setup-buildkit-cache/**'
       - 'backend/payments-service/**'
       - 'backend/accounts-service/**'
       - 'backend/api-gateway/**'
@@ -65,6 +66,7 @@ jobs:
       - uses: ./.github/actions/setup-java-gradle
       - uses: ./.github/actions/setup-node-playwright
       - uses: docker/setup-buildx-action@v4.4.1
+      - uses: ./.github/actions/setup-buildkit-cache
       - uses: ./.github/actions/setup-kind
       - name: Run live hybrid acceptance (Kind)
         env:
