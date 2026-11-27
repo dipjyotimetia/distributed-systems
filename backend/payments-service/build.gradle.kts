@@ -46,7 +46,7 @@ dependencies {
     implementation("io.grpc:grpc-stub:1.86.0")
     implementation("com.google.protobuf:protobuf-java:4.36.2")
     testImplementation("org.mockito:mockito-core")
-    implementation("software.amazon.awssdk:s3:2.59.7")
+    implementation("software.amazon.awssdk:s3:2.59.8")
     implementation("io.micrometer:micrometer-registry-prometheus")
     implementation("io.opentelemetry.instrumentation:opentelemetry-spring-boot-starter:2.34.0")
     avroTools("org.apache.avro:avro-tools:1.12.2") { isTransitive = false }
