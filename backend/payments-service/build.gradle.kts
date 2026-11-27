@@ -41,9 +41,9 @@ dependencies {
     implementation("io.temporal:temporal-opentracing:1.41.1")
     implementation("io.opentelemetry:opentelemetry-opentracing-shim:1.68.0")
     implementation("io.opentelemetry:opentelemetry-exporter-otlp")
-    implementation("io.grpc:grpc-netty-shaded:1.85.1")
-    implementation("io.grpc:grpc-protobuf:1.85.1")
-    implementation("io.grpc:grpc-stub:1.85.1")
+    implementation("io.grpc:grpc-netty-shaded:1.86.0")
+    implementation("io.grpc:grpc-protobuf:1.86.0")
+    implementation("io.grpc:grpc-stub:1.86.0")
     implementation("com.google.protobuf:protobuf-java:4.36.2")
     testImplementation("org.mockito:mockito-core")
     implementation("software.amazon.awssdk:s3:2.59.7")
@@ -104,7 +104,7 @@ tasks.bootJar { archiveFileName.set("application.jar") }
 protobuf {
     protoc { artifact = "com.google.protobuf:protoc:4.36.2" }
     plugins {
-        id("grpc") { artifact = "io.grpc:protoc-gen-grpc-java:1.85.1" }
+        id("grpc") { artifact = "io.grpc:protoc-gen-grpc-java:1.86.0" }
     }
     generateProtoTasks {
         all().configureEach { plugins { maybeCreate("grpc") } }

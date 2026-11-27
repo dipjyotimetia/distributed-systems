@@ -15,7 +15,7 @@ version = findProperty("serviceVersion") as String
 dependencyManagement {
     imports {
         mavenBom("io.opentelemetry:opentelemetry-bom:1.68.0")
-        mavenBom("io.grpc:grpc-bom:1.85.1")
+        mavenBom("io.grpc:grpc-bom:1.86.0")
         mavenBom("software.amazon.awssdk:bom:2.59.7")
     }
     dependencies {
@@ -29,9 +29,9 @@ dependencies {
     implementation("io.opentelemetry:opentelemetry-opentracing-shim:1.68.0")
     testImplementation("io.temporal:temporal-testing:1.41.1")
     implementation("com.google.protobuf:protobuf-java:4.36.2")
-    implementation("io.grpc:grpc-netty:1.85.1")
-    implementation("io.grpc:grpc-protobuf:1.85.1")
-    implementation("io.grpc:grpc-stub:1.85.1")
+    implementation("io.grpc:grpc-netty:1.86.0")
+    implementation("io.grpc:grpc-protobuf:1.86.0")
+    implementation("io.grpc:grpc-stub:1.86.0")
     implementation("org.springframework.boot:spring-boot-starter-oauth2-client")
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
@@ -92,7 +92,7 @@ sourceSets.main {
 protobuf {
     protoc { artifact = "com.google.protobuf:protoc:4.36.2" }
     plugins {
-        id("grpc") { artifact = "io.grpc:protoc-gen-grpc-java:1.85.1" }
+        id("grpc") { artifact = "io.grpc:protoc-gen-grpc-java:1.86.0" }
     }
     generateProtoTasks {
         all().configureEach { plugins { maybeCreate("grpc") } }
