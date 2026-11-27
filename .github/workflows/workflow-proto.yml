@@ -129,6 +129,10 @@ jobs:
         working-directory: frontend
         run: npm ci
       - name: Verify internal gRPC and OpenAPI server stubs
+        env:
+          # grpcio-tools 1.83.2 ships Linux wheels for Python 3.14.
+          UV_PYTHON: "3.14"
+          UV_NO_BUILD_PACKAGE: grpcio-tools
         run: |
           go install github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.5.0
           bash scripts/check-contract-drift.sh

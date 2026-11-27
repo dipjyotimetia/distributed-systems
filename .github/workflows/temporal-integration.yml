@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - '.github/workflows/temporal-integration.yml'
+      - '.github/actions/setup-buildkit-cache/**'
       - 'backend/**'
       - 'frontend/**'
       - 'docker-compose.yml'
@@ -103,6 +104,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: docker/setup-buildx-action@v4.4.1
+      - uses: ./.github/actions/setup-buildkit-cache
       - uses: ./.github/actions/setup-kind
       - name: Build and load Kind images
         env:

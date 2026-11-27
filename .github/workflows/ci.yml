@@ -333,8 +333,8 @@ jobs:
         push: ${{ github.event_name == 'push' && github.ref != 'refs/heads/main' }}
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
+        cache-from: type=gha,scope=image-${{ matrix.service }}
+        cache-to: type=gha,mode=max,scope=image-${{ matrix.service }}
 
     # Retry once on master to absorb transient GHCR push errors
     # (e.g. "error writing layer blob: not_found"). Cache makes this fast.
@@ -353,8 +353,8 @@ jobs:
         push: true
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
+        cache-from: type=gha,scope=image-${{ matrix.service }}
+        cache-to: type=gha,mode=max,scope=image-${{ matrix.service }}
 
   update-k8s-manifests:
     needs: [build-and-push]
