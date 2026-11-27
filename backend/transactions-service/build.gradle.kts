@@ -15,7 +15,7 @@ version = findProperty("serviceVersion") as String
 dependencyManagement {
     imports {
         mavenBom("io.opentelemetry:opentelemetry-bom:1.68.0")
-        mavenBom("io.grpc:grpc-bom:1.85.1")
+        mavenBom("io.grpc:grpc-bom:1.86.0")
     }
     dependencies {
         dependency("com.google.guava:guava:33.8.0-android")
@@ -50,8 +50,8 @@ dependencies {
     implementation("io.opentelemetry.instrumentation:opentelemetry-jdbc:2.34.0-alpha")
     implementation("io.micrometer:micrometer-registry-prometheus")
     implementation("org.springframework.boot:spring-boot-starter-grpc-client")
-    implementation("io.grpc:grpc-protobuf:1.85.1")
-    implementation("io.grpc:grpc-stub:1.85.1")
+    implementation("io.grpc:grpc-protobuf:1.86.0")
+    implementation("io.grpc:grpc-stub:1.86.0")
     implementation("com.google.protobuf:protobuf-java:4.36.2")
     implementation("org.springframework.boot:spring-boot-starter-kafka")
     implementation("org.apache.avro:avro:1.12.2")
@@ -117,7 +117,7 @@ tasks.compileJava {
 protobuf {
     protoc { artifact = "com.google.protobuf:protoc:4.36.2" }
     plugins {
-        id("grpc") { artifact = "io.grpc:protoc-gen-grpc-java:1.85.1" }
+        id("grpc") { artifact = "io.grpc:protoc-gen-grpc-java:1.86.0" }
     }
     generateProtoTasks {
         all().configureEach { plugins { maybeCreate("grpc") } }
