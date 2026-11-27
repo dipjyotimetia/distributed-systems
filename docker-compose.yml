@@ -435,7 +435,7 @@ services:
   # S3-compatible object store for knowledge-service blobs (MinIO Docker Hub pulls are blocked).
   # https://github.com/rustfs/rustfs — Apache-2.0, path-style S3 on :9000, console on :9001.
   rustfs-volume-init:
-    image: alpine:3.22
+    image: alpine:3.24
     volumes:
       - rustfs_data:/data
     command: ["sh", "-c", "chown -R 10001:10001 /data"]
@@ -443,7 +443,7 @@ services:
       - banking-network
 
   rustfs:
-    image: rustfs/rustfs:1.0.5
+    image: rustfs/rustfs:1.0.6
     container_name: banking-rustfs
     depends_on:
       rustfs-volume-init:
