@@ -26,7 +26,7 @@ Browser banking requests flow through the frontend server. The AI chat proxy use
 Client → Frontend Service → API Gateway → Backend Services
 ```
 
-`contracts/proto/` is the protobuf contract for gRPC APIs, next to the OpenAPI files in `contracts/openapi/`. KYC is `contracts/proto/kyc/kyc.proto` and cards is `contracts/proto/cards/cards.proto`. `scripts/frontend-proto.sh` writes the checked-in TypeScript under `frontend/src/gen` with Buf 1.75.0 and `protoc-gen-es` 2.16.0. Next.js route handlers import those stubs and call the Go servers with the gRPC protocol. The browser uses the HTTP routes. Those routes forward the incoming `Authorization` header as gRPC metadata.
+`contracts/proto/` is the protobuf contract for gRPC APIs, next to the OpenAPI files in `contracts/openapi/`. KYC is `contracts/proto/kyc/kyc.proto` and cards is `contracts/proto/cards/cards.proto`. `scripts/frontend-proto.sh` writes the checked-in TypeScript under `frontend/src/gen` with Buf 1.75.0 and `protoc-gen-es` 2.17.0. Next.js route handlers import those stubs and call the Go servers with the gRPC protocol. The browser uses the HTTP routes. Those routes forward the incoming `Authorization` header as gRPC metadata.
 
 Kafka event shapes live under [`contracts/avro/`](contracts/avro/README.md) (not protobuf). Producers and notification-service use Confluent wire-format Avro via Redpanda Schema Registry (`SCHEMA_REGISTRY_URL`, default `http://banking-kafka:8081`).
 
