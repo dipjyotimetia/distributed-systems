@@ -327,6 +327,14 @@ updates:
     commit-message:
       prefix: chore
       include: scope
+    ignore:
+      # Keep container images aligned with the Java 25 and .NET 10 LTS targets.
+      - dependency-name: amazoncorretto
+        update-types: ["version-update:semver-major"]
+      - dependency-name: dotnet/sdk
+        update-types: ["version-update:semver-major"]
+      - dependency-name: dotnet/aspnet
+        update-types: ["version-update:semver-major"]
     groups:
       service-base-images:
         patterns: ["*"]
