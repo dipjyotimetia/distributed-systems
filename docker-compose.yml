@@ -318,7 +318,7 @@ services:
 
   # Redis for rate limiting
   redis:
-    image: redis:8.10.3-alpine
+    image: redis:8.12.0-alpine
     container_name: banking-redis
     ports:
       - "6379:6379"
